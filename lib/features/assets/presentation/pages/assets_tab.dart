@@ -496,7 +496,8 @@ class _AssetsTabState extends State<AssetsTab> {
   // --- SKELETON SHIMMER LOADER (ZERO CLS) ---
   Widget _buildSkeletonLoader() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 70),
       child: Column(
         children: [
           // 1. Shimmer Scope Box
@@ -580,7 +581,8 @@ class _AssetsTabState extends State<AssetsTab> {
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 70),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -825,7 +827,8 @@ class _AssetsTabState extends State<AssetsTab> {
   // --- MANAGE ASSETS VIEW (MATCHING LUX LEVEL CHECKLIST SETTINGS) ---
   Widget _buildManageAssetsView() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -986,7 +989,8 @@ class _AssetsTabState extends State<AssetsTab> {
   // --- HELP VIEW ---
   Widget _buildHelpView() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
