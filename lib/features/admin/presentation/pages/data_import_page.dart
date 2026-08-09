@@ -192,6 +192,11 @@ class _DataImportPageState extends State<DataImportPage> {
           'Cols': 'tagId, equipmentType, owner, department, location, seqNo',
           'Note': 'Power Tools & Equipment Registry (IS/CEA Industrial Standard).\n• tagId: Tag ID / Document Key (e.g. PLANT-UNIT-WM-001, optional - auto-generated if left blank)\n• equipmentType / type: Standard equipment name (e.g. Welding Machine, Grinding Machine, Cutting Machine, Hand Drilling Machine, Pedestal Drill Machine, Extension Board, Mancooler, etc.)\n• owner / contractor: Owner or Vendor name (e.g. Vedanta, Monomark, V.Desai, Bhavana, Devika, Ishan Logistics)\n• department: Department (e.g. Electrical, Mechanical, Civil, Production, Instrumentation, HSE)\n• location: Area name (e.g. Cast House Floor Bay 1)\n• seqNo: 3-digit sequence number (e.g. 001, 002).'
         };
+      case 'assets':
+        return {
+          'Cols': 'type, name, make, model, serialNo, powerKw, voltage, speedRpm, status, seqNo',
+          'Note': 'Plant Asset & Equipment Registry (Motors, Gearboxes, Pumps).\n• type: motor, gearbox, or pump\n• name: Equipment Name (e.g. Primary Sizer Motor, Cooling Tower Pump)\n• make / model / serialNo: Manufacturer details\n• powerKw / voltage / speedRpm: Technical specifications\n• status: active, spare, underMaintenance, or scrapped\n• seqNo: 3-digit sequence (e.g. 001, 002 - Optional).\n* Tag ID is auto-generated as [Plant]-[Unit]-[MTR/GBX/PMP]-[seqNo]!'
+        };
       default:
         return {
           'Cols': 'id, name, description',
@@ -351,6 +356,62 @@ class _DataImportPageState extends State<DataImportPage> {
             TextCellValue('Electrical'),
             TextCellValue('Cast House Bay 2'),
             TextCellValue('001'),
+          ]);
+        }
+      } else if (widget.collectionId == 'assets') {
+        for (final doc in querySnapshot.docs) {
+          final data = doc.data();
+          final row = [
+            TextCellValue(data['type']?.toString() ?? 'motor'),
+            TextCellValue(data['name']?.toString() ?? ''),
+            TextCellValue(data['make']?.toString() ?? ''),
+            TextCellValue(data['model']?.toString() ?? ''),
+            TextCellValue(data['serialNo']?.toString() ?? ''),
+            TextCellValue(data['powerKw']?.toString() ?? '75'),
+            TextCellValue(data['voltage']?.toString() ?? '415'),
+            TextCellValue(data['speedRpm']?.toString() ?? '1480'),
+            TextCellValue(data['status']?.toString() ?? 'active'),
+            TextCellValue(data['seqNo']?.toString() ?? '001'),
+          ];
+          templateSheet.appendRow(row);
+        }
+
+        if (querySnapshot.docs.isEmpty) {
+          templateSheet.appendRow([
+            TextCellValue('motor'),
+            TextCellValue('BF 1 Sizer Drive Motor'),
+            TextCellValue('ABB'),
+            TextCellValue('M3BP 280SMB'),
+            TextCellValue('SN-882310'),
+            TextCellValue('75'),
+            TextCellValue('415'),
+            TextCellValue('1480'),
+            TextCellValue('active'),
+            TextCellValue('001'),
+          ]);
+          templateSheet.appendRow([
+            TextCellValue('pump'),
+            TextCellValue('Cooling Water Circulation Pump'),
+            TextCellValue('Kirloskar'),
+            TextCellValue('DB 100/26'),
+            TextCellValue('SN-441920'),
+            TextCellValue('45'),
+            TextCellValue('415'),
+            TextCellValue('2900'),
+            TextCellValue('active'),
+            TextCellValue('002'),
+          ]);
+          templateSheet.appendRow([
+            TextCellValue('gearbox'),
+            TextCellValue('Primary Sizer Speed Reducer Gearbox'),
+            TextCellValue('Elecon'),
+            TextCellValue('SNH-315'),
+            TextCellValue('SN-129033'),
+            TextCellValue('90'),
+            TextCellValue('415'),
+            TextCellValue('1500'),
+            TextCellValue('active'),
+            TextCellValue('003'),
           ]);
         }
       } else {
@@ -1035,6 +1096,38 @@ class _DataImportPageState extends State<DataImportPage> {
           data['location'] = locStr;
           data['seqNo'] = seqStr.padLeft(3, '0');
           data['status'] = data['status']?.toString().isNotEmpty == true ? data['status'] : 'Never Tested';
+          data['createdAt'] = data['createdAt'] ?? DateTime.now().toIso8601String();
+          data['updatedAt'] = DateTime.now().toIso8601String();
+        } else if (widget.collectionId == 'assets') {
+          final typeStr = data['type']?.toString().trim().toLowerCase() ?? 'motor';
+          final nameStr = data['name']?.toString().trim() ?? 'Equipment Asset';
+          final makeStr = data['make']?.toString().trim() ?? 'Standard';
+          final modelStr = data['model']?.toString().trim() ?? '';
+          final serialStr = data['serialNo']?.toString().trim() ?? 'SN-${DateTime.now().millisecondsSinceEpoch}';
+          final statusStr = data['status']?.toString().trim().toLowerCase() ?? 'active';
+          final seqStr = data['seqNo']?.toString().trim() ?? '001';
+
+          final typeCode = typeStr.contains('gear') ? 'GBX' : typeStr.contains('pump') ? 'PMP' : 'MTR';
+          final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? '';
+          final finalTagId = rawTagId.isNotEmpty
+              ? rawTagId
+              : '${_userPlantId!}-${_userUnitId!}-$typeCode-${seqStr.padLeft(3, '0')}';
+
+          data['id'] = finalTagId;
+          data['tagNo'] = finalTagId;
+          data['name'] = nameStr;
+          data['type'] = typeStr;
+          data['status'] = statusStr;
+          data['make'] = makeStr;
+          data['model'] = modelStr;
+          data['serialNo'] = serialStr;
+          data['powerKw'] = double.tryParse(data['powerKw']?.toString() ?? '');
+          data['voltage'] = double.tryParse(data['voltage']?.toString() ?? '');
+          data['speedRpm'] = double.tryParse(data['speedRpm']?.toString() ?? '');
+          data['seqNo'] = seqStr.padLeft(3, '0');
+          data['imageUrl'] = data['imageUrl'] ?? '';
+          data['description'] = data['description'] ?? '';
+          data['masterEquipmentId'] = data['masterEquipmentId'] ?? '';
           data['createdAt'] = data['createdAt'] ?? DateTime.now().toIso8601String();
           data['updatedAt'] = DateTime.now().toIso8601String();
         }

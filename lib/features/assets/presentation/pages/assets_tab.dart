@@ -1,16 +1,23 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:excel/excel.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../features/home/presentation/widgets/custom_app_bar.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/permission_helper.dart';
 import '../../data/models/asset_model.dart';
 import '../widgets/asset_card.dart';
-import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../core/services/hierarchy_service.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/constants/app_roles.dart';
 import '../../../../core/widgets/glass_container.dart';
+import '../../../../core/widgets/responsive_layout.dart';
+import '../../../../core/utils/file_download_helper.dart';
+import '../../../admin/presentation/pages/data_import_page.dart';
 import 'asset_detail_page.dart';
 import 'add_edit_asset_page.dart';
 import '../../data/models/master_equipment_model.dart';
@@ -25,21 +32,23 @@ class AssetsTab extends StatefulWidget {
 class _AssetsTabState extends State<AssetsTab> {
   final TextEditingController _searchController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
-  
-  AssetType? _selectedTypeFilter; // null means 'All'
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  AssetType? _selectedTypeFilter;
+  AssetStatus? _selectedStatusFilter;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
   List<String> _units = [];
-  
+
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
   String _userRole = '';
   bool _isAdmin = false;
   String? _userPlantId;
   String? _userUnitId;
-  
-  bool _isLoadingProfile = true;
+
+  bool _isLoading = true;
   Stream<List<AssetModel>>? _assetsStream;
   List<MasterEquipmentModel> _scopeEquipments = [];
 
@@ -48,27 +57,28 @@ class _AssetsTabState extends State<AssetsTab> {
     super.initState();
     _loadUserProfile();
   }
-  
+
   Future<void> _loadUserProfile() async {
+    setState(() => _isLoading = true);
     final user = AuthService().currentUser;
     if (user == null) return;
-    
+
     final profile = await _firestoreService.getUserProfile(user.uid);
     if (profile == null) return;
-    
+
     _userRole = profile['role'] ?? AppRoles.guest;
-    _isAdmin = profile['isAdmin'] == true;
+    _isAdmin = profile['isAdmin'] == true || _userRole == AppRoles.developer;
     _userPlantId = profile['plantId'] as String?;
     _userUnitId = profile['unitId'] as String?;
-    final uBusinessId = profile['businessId'] as String? ?? 'VISL'; // NEW
-    
-    await HierarchyService().init(businessId: uBusinessId); // PREVENT BLANK
-    
+    final uBusinessId = profile['businessId'] as String? ?? 'VISL';
+
+    await HierarchyService().init(businessId: uBusinessId);
+
     _plants = HierarchyService().getPlants();
-    
+
     final String? userPlant = (_userPlantId == null || _userPlantId!.isEmpty || _userPlantId == 'Unknown') ? null : _userPlantId;
     final String? userUnit = (_userUnitId == null || _userUnitId!.isEmpty || _userUnitId == 'Unknown') ? null : _userUnitId;
-    
+
     final bool hasGlobalAdmin = profile['isAdmin'] == true && userPlant == null;
     final bool hasPlantAdmin = profile['isAdmin'] == true && userPlant != null;
 
@@ -94,14 +104,15 @@ class _AssetsTabState extends State<AssetsTab> {
       _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
       _selectedUnitId = userUnit;
     }
-    
+
     _updateUnitList();
-    
+
     if (!_isUnitLocked && _selectedUnitId == null) {
       _selectedUnitId = _units.isNotEmpty ? _units.first : null;
     }
-    
-    if (mounted) setState(() => _isLoadingProfile = false);
+
+    _refreshStreams();
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _updateUnitList() {
@@ -110,20 +121,18 @@ class _AssetsTabState extends State<AssetsTab> {
       _selectedUnitId = null;
     } else {
       _units = HierarchyService().getUnitsForPlant(_selectedPlantId!);
-      if (_units.isEmpty) _units = ['PID1', 'MCD']; // Fallback
+      if (_units.isEmpty) _units = ['PID1', 'MCD'];
       if (!_units.contains(_selectedUnitId)) {
         _selectedUnitId = _units.isNotEmpty ? _units.first : null;
       }
     }
-    _refreshStreams();
   }
 
   void _refreshStreams() {
     setState(() {
       _assetsStream = _firestoreService.getAssetsStream(_selectedUnitId, _selectedPlantId);
     });
-    
-    // Also load master equipments for filtering
+
     _firestoreService.getAllMasterEquipmentsStream(_selectedUnitId, _selectedPlantId).listen((equipments) {
       if (mounted) {
         setState(() {
@@ -142,199 +151,508 @@ class _AssetsTabState extends State<AssetsTab> {
   List<AssetModel> _filterAssets(List<AssetModel> assets) {
     return assets.where((a) {
       // 1. Type Logic
-      bool matchesType = true;
-      if (_selectedTypeFilter != null) {
-        matchesType = a.type == _selectedTypeFilter;
-      }
-      
-      // 1. Scope Logic (Only show assets belonging to Master Equipments in the current scope)
-      // If we have no scope equipments loaded, either the scope is empty or loading. We allow all for now, 
-      // but ideally we check if the asset's masterEquipmentId matches our list.
-      bool matchesScope = true;
-      if (_selectedPlantId != null || _selectedUnitId != null) {
-         if (_scopeEquipments.isNotEmpty) {
-           matchesScope = _scopeEquipments.any((e) => e.id == a.masterEquipmentId);
-         } else {
-           // If scope is selected but no master equipments exist there, show nothing
-           matchesScope = false; 
-         }
+      if (_selectedTypeFilter != null && a.type != _selectedTypeFilter) {
+        return false;
       }
 
-      // 2. Search Logic
-      final query = _searchController.text.toLowerCase();
-      bool matchesSearch = true;
-      if (query.isNotEmpty) {
-         matchesSearch = a.tagNo.toLowerCase().contains(query) ||
-           a.name.toLowerCase().contains(query) ||
-           a.serialNo.toLowerCase().contains(query);
+      // 2. Status Logic
+      if (_selectedStatusFilter != null && a.status != _selectedStatusFilter) {
+        return false;
       }
-      
-      return matchesType && matchesScope && matchesSearch;
+
+      // 3. Search Logic
+      final query = _searchController.text.trim().toLowerCase();
+      if (query.isNotEmpty) {
+        final matchesTag = a.tagNo.toLowerCase().contains(query);
+        final matchesName = a.name.toLowerCase().contains(query);
+        final matchesSerial = a.serialNo.toLowerCase().contains(query);
+        final matchesMake = a.make.toLowerCase().contains(query);
+        final matchesModel = a.model.toLowerCase().contains(query);
+        final matchesRfid = a.rfidTag?.toLowerCase().contains(query) ?? false;
+        if (!matchesTag && !matchesName && !matchesSerial && !matchesMake && !matchesModel && !matchesRfid) {
+          return false;
+        }
+      }
+
+      return true;
     }).toList();
+  }
+
+  // --- EXPORT ASSETS TO EXCEL ---
+  Future<void> _exportAssetsToExcel(List<AssetModel> assets) async {
+    if (_selectedPlantId == null || _selectedUnitId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select scope first.')),
+      );
+      return;
+    }
+
+    try {
+      var excel = Excel.createExcel();
+      String defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
+      excel.rename(defaultSheet, 'Asset_Inventory');
+      Sheet sheet = excel['Asset_Inventory'];
+
+      final headers = [
+        'Tag No',
+        'Equipment Name',
+        'Type',
+        'Status',
+        'Make',
+        'Model',
+        'Serial No',
+        'Power (kW)',
+        'Voltage (V)',
+        'Speed (RPM)',
+        'RFID Tag',
+        'Critical Asset',
+        'Parent Equipment',
+      ];
+      sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
+
+      for (var a in assets) {
+        sheet.appendRow([
+          TextCellValue(a.tagNo),
+          TextCellValue(a.name),
+          TextCellValue(a.type.name.toUpperCase()),
+          TextCellValue(a.status.name.toUpperCase()),
+          TextCellValue(a.make),
+          TextCellValue(a.model),
+          TextCellValue(a.serialNo),
+          TextCellValue(a.powerKw?.toString() ?? ''),
+          TextCellValue(a.voltage?.toString() ?? ''),
+          TextCellValue(a.speedRpm?.toString() ?? ''),
+          TextCellValue(a.rfidTag ?? ''),
+          TextCellValue(a.isCritical ? 'YES' : 'NO'),
+          TextCellValue(a.masterEquipmentId),
+        ]);
+      }
+
+      final bytes = excel.save();
+      if (bytes != null) {
+        final fileName = 'Asset_Inventory_${_selectedPlantId}_${_selectedUnitId}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        final savedPath = await FileDownloadHelper.downloadFile(bytes, fileName);
+        if (savedPath != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Excel exported: $fileName'), backgroundColor: AppColors.success),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  // --- ADMIN SETTINGS & DATABASE MANAGEMENT MODAL ---
+  void _showSettingsModal(List<AssetModel> currentAssets) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return GlassContainer(
+          borderRadius: 24,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.settings, color: AppColors.primary, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Asset Registry Management',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // 1. Bulk Excel Import
+                ListTile(
+                  leading: const Icon(Icons.upload_file, color: Colors.cyanAccent),
+                  title: const Text('Bulk Excel Import', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Upload Motors, Gearboxes & Pumps via Excel sheet'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (_selectedPlantId != null && _selectedUnitId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DataImportPage(collectionId: 'assets'),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please select scope first.')),
+                      );
+                    }
+                  },
+                ),
+                const Divider(),
+
+                // 2. Export Inventory
+                ListTile(
+                  leading: const Icon(Icons.download, color: Colors.greenAccent),
+                  title: const Text('Export Inventory to Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Export ${currentAssets.length} assets to .xlsx spreadsheet'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _exportAssetsToExcel(currentAssets);
+                  },
+                ),
+                const Divider(),
+
+                // 3. Batch Delete / Purge (Admins only)
+                if (_isAdmin) ...[
+                  ListTile(
+                    leading: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+                    title: const Text('Purge Current Scope Assets', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    subtitle: Text('Delete all ${currentAssets.length} assets in $_selectedPlantId / $_selectedUnitId'),
+                    trailing: const Icon(Icons.warning, color: Colors.redAccent),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _confirmPurgeAssets(currentAssets);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmPurgeAssets(List<AssetModel> assets) {
+    if (assets.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text('Confirm Batch Delete'),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to permanently delete all ${assets.length} assets in ${_selectedPlantId} / ${_selectedUnitId}?\nThis action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                setState(() => _isLoading = true);
+                try {
+                  final batch = _firestore.batch();
+                  for (var a in assets) {
+                    batch.delete(_firestore.collection('assets').doc(a.id));
+                  }
+                  await batch.commit();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Successfully deleted ${assets.length} assets.')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Purge failed: $e')),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _isLoading = false);
+                }
+              },
+              child: const Text('Delete All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- HELP DIALOG ---
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.help_outline, color: AppColors.primary, size: 24),
+              SizedBox(width: 10),
+              Text('Asset Registry Guide', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('ISO 55000 Plant Asset Architecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                SizedBox(height: 6),
+                Text('• Tag ID Standard: [PLANT]-[UNIT]-[TYPE]-[SEQ] (e.g. IOG-COD-MTR-001)\n• Types: MTR (Motors), GBX (Gearboxes), PMP (Pumps).\n• Statuses: ACTIVE (in service), SPARE (standby/pooled), UNDER MAINTENANCE, SCRAPPED.', style: TextStyle(fontSize: 12)),
+                SizedBox(height: 12),
+                Text('Spare Pooling & Replacement', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                SizedBox(height: 6),
+                Text('• Spares can be assigned to multiple compatible parent equipments.\n• When replacing in the field, Tag IDs remain unique and prevent record collision.', style: TextStyle(fontSize: 12)),
+                SizedBox(height: 12),
+                Text('RFID / NFC Tagging', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                SizedBox(height: 6),
+                Text('• Tap the NFC scan button in Add/Edit Asset to capture physical high-frequency RFID tags directly into the asset identity record.', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingProfile) {
+    if (_isLoading) {
       return const Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(child: PulseLoading(size: 60)),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    // ALLOW nulls for Developer/Unit Admin
-    // if (_userUnitId == null ...) <-- Removed blocking check
+    final canEdit = PermissionHelper.canEditDatabaseItem(
+      userRole: _userRole,
+      isAdmin: _isAdmin,
+      userPlantId: _userPlantId,
+      userUnitId: _userUnitId,
+      itemPlantId: _selectedPlantId,
+      itemUnitId: _selectedUnitId,
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: const CustomAppBar(title: 'Inventory'),
-      body: StreamBuilder<List<AssetModel>>(
-        stream: _assetsStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-             return const Center(child: PulseLoading(size: 60));
-          }
-          
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Theme.of(context).colorScheme.error)));
-          }
+      appBar: const CustomAppBar(title: 'Asset Inventory'),
+      body: ResponsiveContentWrapper(
+        maxWidth: 1320,
+        child: StreamBuilder<List<AssetModel>>(
+          stream: _assetsStream,
+          builder: (context, snapshot) {
+            final allAssets = snapshot.data ?? [];
+            final filtered = _filterAssets(allAssets);
 
-          final allAssets = snapshot.data ?? [];
+            return Column(
+              children: [
+                // 1. Signature Checklist-style Scope Selectors
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  child: GlassContainer(
+                    borderRadius: 16,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedPlantId,
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Select Plant', border: InputBorder.none),
+                              items: _plants
+                                  .map((e) => DropdownMenuItem(
+                                      value: e,
+                                      child: Text(HierarchyService().getPlantNames()[e] ?? e,
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          overflow: TextOverflow.ellipsis)))
+                                  .toList(),
+                              onChanged: _isPlantLocked
+                                  ? null
+                                  : (val) {
+                                      if (val != null) {
+                                        setState(() {
+                                          _selectedPlantId = val;
+                                          _updateUnitList();
+                                          _refreshStreams();
+                                        });
+                                      }
+                                    },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedUnitId,
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Select Unit', border: InputBorder.none),
+                              items: _units
+                                  .map((e) => DropdownMenuItem(
+                                      value: e,
+                                      child: Text(HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? '')[e] ?? e,
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          overflow: TextOverflow.ellipsis)))
+                                  .toList(),
+                              onChanged: _isUnitLocked
+                                  ? null
+                                  : (val) {
+                                      if (val != null) {
+                                        setState(() {
+                                          _selectedUnitId = val;
+                                          _refreshStreams();
+                                        });
+                                      }
+                                    },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 350.ms),
+                ),
 
-          return Column(
-            children: [
-              // SCOPE SELECTORS
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                // 2. Clean Single-Layer Search & Action Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Row(
                     children: [
-                      _isPlantLocked 
-                        ? _buildScopeChip(label: 'Plant', value: HierarchyService().getPlantNames()[_selectedPlantId] ?? _selectedPlantId ?? '...', icon: Icons.factory)
-                        : _buildScopeDropdown(
-                            label: 'Plant',
-                            value: _selectedPlantId,
-                            items: _plants,
-                            onChanged: (v) => setState(() { _selectedPlantId = v; _updateUnitList(); }),
-                            icon: Icons.factory,
-                            itemNames: HierarchyService().getPlantNames(),
+                      // Clean Search Field
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                          decoration: InputDecoration(
+                            hintText: 'Search Tag ID, Name, Serial, RFID...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                           ),
+                        ),
+                      ),
                       const SizedBox(width: 8),
 
-                      _isUnitLocked
-                        ? _buildScopeChip(label: 'Unit', value: HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? '')[_selectedUnitId] ?? _selectedUnitId ?? '...', icon: Icons.settings_input_component)
-                        : _buildScopeDropdown(
-                            label: 'Unit',
-                            value: _selectedUnitId,
-                            items: _units,
-                            onChanged: (v) => setState(() { _selectedUnitId = v; }),
-                            icon: Icons.settings_input_component,
-                            itemNames: HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? ''),
-                          ),
+                      // Filter Button [tune]
+                      IconButton.filled(
+                        style: IconButton.styleFrom(backgroundColor: AppColors.primary),
+                        icon: const Icon(Icons.tune, color: Colors.white, size: 20),
+                        tooltip: 'Filter by Type & Status',
+                        onPressed: _showFilterBottomSheet,
+                      ),
+                      const SizedBox(width: 6),
+
+                      // Settings / Admin Management Icon [⚙️]
+                      IconButton.filled(
+                        style: IconButton.styleFrom(backgroundColor: Colors.indigoAccent),
+                        icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+                        tooltip: 'Registry Settings & Import/Export',
+                        onPressed: () => _showSettingsModal(filtered),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // Help Button [?]
+                      IconButton.filled(
+                        style: IconButton.styleFrom(backgroundColor: Colors.teal),
+                        icon: const Icon(Icons.help_outline, color: Colors.white, size: 20),
+                        tooltip: 'Asset Hierarchy Guide',
+                        onPressed: _showHelpDialog,
+                      ),
+
+                      // Add Asset Button [+]
+                      if (canEdit) ...[
+                        const SizedBox(width: 6),
+                        IconButton.filled(
+                          style: IconButton.styleFrom(backgroundColor: AppColors.accent),
+                          icon: const Icon(Icons.add, color: Colors.black, size: 20),
+                          tooltip: 'Add New Asset',
+                          onPressed: () {
+                            if (_selectedUnitId != null && _selectedPlantId != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddEditAssetPage(
+                                    unitId: _selectedUnitId,
+                                    plantId: _selectedPlantId,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select a Plant and Unit first.')),
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
 
-              // Search & Filter Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 50,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Theme.of(context).dividerColor),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: (_) => setState(() {}), // Trigger rebuild for search
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: 'Tag ID, Name, Serial...',
-                                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                ),
-                              ),
+                // 3. Active Filter Chip Summary (if applied)
+                if (_selectedTypeFilter != null || _selectedStatusFilter != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                    child: Row(
+                      children: [
+                        if (_selectedTypeFilter != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Chip(
+                              label: Text('Type: ${_selectedTypeFilter!.name.toUpperCase()}', style: const TextStyle(fontSize: 11)),
+                              deleteIcon: const Icon(Icons.close, size: 14),
+                              onDeleted: () => setState(() => _selectedTypeFilter = null),
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        if (_selectedStatusFilter != null)
+                          Chip(
+                            label: Text('Status: ${_selectedStatusFilter!.name.toUpperCase()}', style: const TextStyle(fontSize: 11)),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            onDeleted: () => setState(() => _selectedStatusFilter = null),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      height: 50,
-                      width: 50,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5)),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.filter_list, color: AppColors.primaryLight),
-                        onPressed: _showFilterBottomSheet,
-                      ),
-                    ),
-                    if (PermissionHelper.canEditDatabaseItem(
-                      userRole: _userRole,
-                      isAdmin: _isAdmin,
-                      userPlantId: _userPlantId,
-                      userUnitId: _userUnitId,
-                      itemPlantId: _selectedPlantId,
-                      itemUnitId: _selectedUnitId,
-                    )) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        height: 50,
-                        width: 50,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5)),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.add, color: AppColors.accent),
-                          onPressed: () {
-                             if (_selectedUnitId != null && _selectedPlantId != null) {
-                               Navigator.push(
-                                 context,
-                                 MaterialPageRoute(
-                                   builder: (context) => AddEditAssetPage(
-                                     unitId: _selectedUnitId,
-                                     plantId: _selectedPlantId,
-                                   ),
-                                 ),
-                               );
-                             } else {
-                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a Plant and Unit first.')));
-                             }
-                          },
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 16),
-              // Unified List Content
-              Expanded(
-                child: _buildAssetList(allAssets),
-              ),
-            ],
-          );
-        },
+                // 4. Asset List
+                Expanded(
+                  child: snapshot.connectionState == ConnectionState.waiting
+                      ? const Center(child: CircularProgressIndicator())
+                      : _buildAssetList(filtered),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -353,50 +671,71 @@ class _AssetsTabState extends State<AssetsTab> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Filter by Type', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-              
-              // "All" Option
-              ListTile(
-                title: const Text('All Types', style: TextStyle(color: Colors.white)),
-                trailing: _selectedTypeFilter == null ? const Icon(Icons.check, color: AppColors.accent) : null,
-                onTap: () {
-                  setState(() => _selectedTypeFilter = null);
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(color: Colors.white24),
+                Text('Filter Inventory', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
 
-              // Dynamic List of Enums
-              ...AssetType.values.map((type) {
-                final display = () {
-                  final idx = AssetType.values.indexOf(type);
-                  if (idx >= 0 && idx < HierarchyService.assetTypes.length) {
-                    return HierarchyService.assetTypes[idx];
-                  }
-                  return type.name;
-                }();
-                return ListTile(
-                  title: Text(display, style: const TextStyle(color: Colors.white)),
-                  trailing: _selectedTypeFilter == type ? const Icon(Icons.check, color: AppColors.accent) : null,
-                  onTap: () {
-                    setState(() => _selectedTypeFilter = type);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              const SizedBox(height: 32),
-            ],
-          ),
+                // Type Filter
+                const Text('Asset Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All Types'),
+                      selected: _selectedTypeFilter == null,
+                      onSelected: (val) => setState(() => _selectedTypeFilter = null),
+                    ),
+                    ...AssetType.values.map((type) {
+                      return ChoiceChip(
+                        label: Text(type.name.toUpperCase()),
+                        selected: _selectedTypeFilter == type,
+                        onSelected: (val) => setState(() => _selectedTypeFilter = val ? type : null),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Status Filter
+                const Text('Asset Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All Statuses'),
+                      selected: _selectedStatusFilter == null,
+                      onSelected: (val) => setState(() => _selectedStatusFilter = null),
+                    ),
+                    ...AssetStatus.values.map((st) {
+                      return ChoiceChip(
+                        label: Text(st.name.toUpperCase()),
+                        selected: _selectedStatusFilter == st,
+                        onSelected: (val) => setState(() => _selectedStatusFilter = val ? st : null),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Center(child: Text('Apply Filter', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildAssetList(List<AssetModel> allAssets) {
-    final assets = _filterAssets(allAssets);
-    
+  Widget _buildAssetList(List<AssetModel> assets) {
     if (assets.isEmpty) {
       return Center(
         child: Column(
@@ -404,85 +743,29 @@ class _AssetsTabState extends State<AssetsTab> {
           children: [
             Icon(Icons.inbox, color: Theme.of(context).disabledColor, size: 48),
             const SizedBox(height: 16),
-            Text('No items found', style: TextStyle(color: Theme.of(context).disabledColor)),
+            Text('No matching assets found in this scope.', style: TextStyle(color: Theme.of(context).disabledColor)),
           ],
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 100), // Bottom padding for navbar
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
       itemCount: assets.length,
       itemBuilder: (context, index) {
+        final asset = assets[index];
         return AssetCard(
-          asset: assets[index],
+          asset: asset,
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AssetDetailPage(asset: assets[index]),
+                builder: (context) => AssetDetailPage(assetId: asset.id),
               ),
             );
           },
-        ).animate().fadeIn(duration: 300.ms, delay: (50 * index).ms).slideX(begin: 0.1);
+        ).animate(delay: (index * 40).ms).fadeIn(duration: 300.ms).slideY(begin: 0.08, end: 0);
       },
-    );
-  }
-
-  // --- HELPER UI ---
-  Widget _buildScopeChip({required String label, required String value, required IconData icon}) {
-    return GlassContainer(
-      height: 48,
-      borderRadius: 12,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Text('$label:', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            const SizedBox(width: 4),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScopeDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required void Function(String?) onChanged,
-    required IconData icon,
-    Map<String, String>? itemNames,
-  }) {
-    return GlassContainer(
-      height: 48,
-      borderRadius: 12,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.primary),
-            const SizedBox(width: 8),
-            DropdownButton<String>(
-              value: items.contains(value) ? value : null,
-              hint: Text('Select $label', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              items: items.map((e) {
-                final display = itemNames != null ? (itemNames[e] ?? e) : e;
-                return DropdownMenuItem(value: e, child: Text(display, style: const TextStyle(fontWeight: FontWeight.bold)));
-              }).toList(),
-              onChanged: onChanged,
-              underline: const SizedBox(),
-              icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
-              dropdownColor: Theme.of(context).colorScheme.surface,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

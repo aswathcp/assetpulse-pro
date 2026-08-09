@@ -56,6 +56,8 @@ class AssetModel {
 
   // Operational Context
   final bool isCritical;
+  final List<String>? applicableParentEquipmentIds; // Multiple parent equipments for spares
+  final String? seqNo;
   
   // Lifecycle
   final DateTime? installationDate;
@@ -111,6 +113,8 @@ class AssetModel {
     this.bearingNDE,
     
     this.isCritical = false,
+    this.applicableParentEquipmentIds,
+    this.seqNo,
     
     this.installationDate,
     this.lastServiceDate,
@@ -123,6 +127,12 @@ class AssetModel {
 
   // Factory to create AssetModel from Firestore Map
   factory AssetModel.fromMap(Map<String, dynamic> map, String docId) {
+    final rawParents = map['applicableParentEquipmentIds'];
+    List<String>? parents;
+    if (rawParents is List) {
+      parents = rawParents.map((e) => e.toString()).toList();
+    }
+
     return AssetModel(
       id: docId,
       masterEquipmentId: map['masterEquipmentId'] ?? '',
@@ -175,6 +185,8 @@ class AssetModel {
       bearingNDE: map['bearingNDE'],
       
       isCritical: map['isCritical'] ?? false,
+      applicableParentEquipmentIds: parents,
+      seqNo: map['seqNo']?.toString(),
       
       installationDate: (map['installationDate'] as dynamic)?.toDate(),
       lastServiceDate: (map['lastServiceDate'] as dynamic)?.toDate(),
@@ -233,6 +245,8 @@ class AssetModel {
 
       // Context
       'isCritical': isCritical,
+      'applicableParentEquipmentIds': applicableParentEquipmentIds,
+      'seqNo': seqNo,
 
       // Dates (Auto-converted to Timestamp by Firestore if DateTime)
       'installationDate': installationDate,
