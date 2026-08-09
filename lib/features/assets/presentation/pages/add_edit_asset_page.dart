@@ -1045,16 +1045,14 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               Expanded(
                 child: TextFormField(
                   controller: _makeController,
-                  decoration: const InputDecoration(labelText: 'Manufacturer / Make *', border: OutlineInputBorder()),
-                  validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(labelText: 'Manufacturer / Make (Optional)', border: OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
                   controller: _modelController,
-                  decoration: const InputDecoration(labelText: 'Model *', border: OutlineInputBorder()),
-                  validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(labelText: 'Model (Optional)', border: OutlineInputBorder()),
                 ),
               ),
             ],
@@ -1067,8 +1065,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               Expanded(
                 child: TextFormField(
                   controller: _serialController,
-                  decoration: const InputDecoration(labelText: 'Serial No *', border: OutlineInputBorder()),
-                  validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(labelText: 'Serial No (Optional)', border: OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: 12),
