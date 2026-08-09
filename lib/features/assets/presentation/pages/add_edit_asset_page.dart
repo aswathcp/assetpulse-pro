@@ -1,7 +1,12 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
@@ -11,12 +16,11 @@ import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../core/utils/permission_helper.dart';
 import '../../data/models/asset_model.dart';
 import '../../data/models/master_equipment_model.dart';
-import '../../../scanning/presentation/pages/nfc_scanner_page.dart';
 
 class AddEditAssetPage extends StatefulWidget {
   final AssetModel? asset;
-  final String? unitId;  // Required if creating new
-  final String? plantId; // Required if creating new
+  final String? unitId;
+  final String? plantId;
 
   const AddEditAssetPage({super.key, this.asset, this.unitId, this.plantId});
 
@@ -29,7 +33,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late TabController _tabController;
   bool _isLoading = false;
-  
+
   List<MasterEquipmentModel> _masterEquipments = [];
   String? _selectedParentId;
   List<String> _selectedParentIdsForSpares = [];
@@ -71,12 +75,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _polesController = TextEditingController();
   final _pfController = TextEditingController();
   final _efficiencyController = TextEditingController();
-  
+
   // Gearbox Specs
   final _gearRatioController = TextEditingController();
   final _oilTypeController = TextEditingController();
   final _oilCapacityController = TextEditingController();
-  
+
   // Pump Specs
   final _flowRateController = TextEditingController();
   final _headController = TextEditingController();
@@ -84,22 +88,27 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _pumpPowerController = TextEditingController();
   final _greaseTypeController = TextEditingController();
 
-  // Common Motor/Electrical Types
+  // Construction Bearings
   final _bearingDEController = TextEditingController();
   final _bearingNDEController = TextEditingController();
 
-  // Health
+  // Lifecycle Dates
+  DateTime? _installationDate;
+  DateTime? _lastServiceDate;
+  DateTime? _nextServiceDue;
+
+  // Health & Diagnostics
   final _resRYController = TextEditingController();
   final _resYBController = TextEditingController();
   final _resRBController = TextEditingController();
-  
+
   final _irRyController = TextEditingController();
   final _irYbController = TextEditingController();
   final _irBrController = TextEditingController();
   final _irReController = TextEditingController();
   final _irYeController = TextEditingController();
   final _irBeController = TextEditingController();
-  
+
   final _piController = TextEditingController();
 
   // Vibration
@@ -114,8 +123,8 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    
+    _tabController = TabController(length: 3, vsync: this);
+
     _loadUserProfile();
     _loadMasterData();
 
@@ -130,7 +139,8 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   }
 
   String get _currentPlantId => widget.plantId ?? widget.asset?.id.split('-').first ?? _userPlantId ?? 'PLANT';
-  String get _currentUnitId => widget.unitId ?? (_currentPlantId.isNotEmpty ? widget.asset?.id.split('-').skip(1).firstOrNull : null) ?? _userUnitId ?? 'UNIT';
+  String get _currentUnitId =>
+      widget.unitId ?? (_currentPlantId.isNotEmpty ? widget.asset?.id.split('-').skip(1).firstOrNull : null) ?? _userUnitId ?? 'UNIT';
 
   String _getTypeCode(AssetType type) {
     switch (type) {
@@ -156,7 +166,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
       final snap = await _firestore.collection('assets').get();
       final typeCode = _getTypeCode(_selectedType);
       final prefix = '$_currentPlantId-$_currentUnitId-$typeCode-';
-      
+
       int maxSeq = 0;
       for (var doc in snap.docs) {
         final tag = doc.data()['tagNo']?.toString() ?? doc.id;
@@ -226,7 +236,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _selectedParentId = a.masterEquipmentId;
     _selectedParentIdsForSpares = List<String>.from(a.applicableParentEquipmentIds ?? []);
 
-    // Extract sequence number from tag
     final parts = a.tagNo.split('-');
     if (parts.length >= 4) {
       _seqController.text = parts.last;
@@ -235,20 +244,20 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     }
 
     _nameController.text = a.name;
-    _descController.text = a.description; 
+    _descController.text = a.description;
     _makeController.text = a.make;
     _modelController.text = a.model;
     _serialController.text = a.serialNo;
     _poController.text = a.poNo ?? '';
     _yearController.text = a.manufacturingYear?.toString() ?? '';
     _imageController.text = a.imageUrl;
-    _rfidController.text = a.rfidTag ?? ''; 
-    
+    _rfidController.text = a.rfidTag ?? '';
+
     _powerController.text = a.powerKw?.toString() ?? '';
     _voltageController.text = a.voltage?.toString() ?? '';
     _currentController.text = a.fullLoadCurrent?.toString() ?? '';
-    _frequencyController.text = a.frequency?.toString() ?? ''; 
-    _noLoadCurrentController.text = a.noLoadCurrent?.toString() ?? ''; 
+    _frequencyController.text = a.frequency?.toString() ?? '';
+    _noLoadCurrentController.text = a.noLoadCurrent?.toString() ?? '';
     _speedController.text = a.speedRpm?.toString() ?? '';
     _frameController.text = a.frameSize ?? '';
     _mountingController.text = a.mountingType ?? '';
@@ -258,7 +267,11 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _bearingDEController.text = a.bearingDE ?? '';
     _bearingNDEController.text = a.bearingNDE ?? '';
 
-    // Load Dynamic Specs
+    _installationDate = a.installationDate;
+    _lastServiceDate = a.lastServiceDate;
+    _nextServiceDue = a.nextServiceDue;
+
+    // Dynamic Specs
     if (a.specs != null) {
       _gearRatioController.text = a.specs!['gearRatio']?.toString() ?? '';
       _oilTypeController.text = a.specs!['oilType']?.toString() ?? '';
@@ -277,7 +290,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
       _resRBController.text = a.windingResistance!['R-B']?.toString() ?? '';
     }
 
-    // Extended IR
     if (a.insulationResistance != null) {
       _irRyController.text = a.insulationResistance!['R-Y']?.toString() ?? '';
       _irYbController.text = a.insulationResistance!['Y-B']?.toString() ?? '';
@@ -286,10 +298,9 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
       _irYeController.text = a.insulationResistance!['Y-E']?.toString() ?? '';
       _irBeController.text = a.insulationResistance!['B-E']?.toString() ?? '';
     }
-    
+
     _piController.text = a.polarizationIndex?.toString() ?? '';
 
-    // Vibration
     if (a.vibration != null) {
       _vibDeHController.text = a.vibration!['DE_H']?.toString() ?? '';
       _vibDeVController.text = a.vibration!['DE_V']?.toString() ?? '';
@@ -305,49 +316,183 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   void dispose() {
     _tabController.dispose();
     _seqController.dispose();
-    _nameController.dispose(); _makeController.dispose();
-    _modelController.dispose(); _serialController.dispose(); _yearController.dispose();
-    _imageController.dispose(); _powerController.dispose(); _voltageController.dispose();
-    _currentController.dispose(); _speedController.dispose(); _frameController.dispose();
-    _frequencyController.dispose(); _noLoadCurrentController.dispose(); _rfidController.dispose(); 
-    _poController.dispose(); _greaseTypeController.dispose();
-    _oilCapacityController.dispose(); _pumpPowerController.dispose();
-    _mountingController.dispose(); _polesController.dispose(); 
-    _pfController.dispose(); _efficiencyController.dispose();
-    _bearingDEController.dispose(); _bearingNDEController.dispose();
-    _resRYController.dispose(); _resYBController.dispose(); _resRBController.dispose();
-    
-    _irRyController.dispose(); _irYbController.dispose(); _irBrController.dispose();
-    _irReController.dispose(); _irYeController.dispose(); _irBeController.dispose();
+    _nameController.dispose();
+    _makeController.dispose();
+    _modelController.dispose();
+    _serialController.dispose();
+    _yearController.dispose();
+    _imageController.dispose();
+    _powerController.dispose();
+    _voltageController.dispose();
+    _currentController.dispose();
+    _speedController.dispose();
+    _frameController.dispose();
+    _frequencyController.dispose();
+    _noLoadCurrentController.dispose();
+    _rfidController.dispose();
+    _poController.dispose();
+    _greaseTypeController.dispose();
+    _oilCapacityController.dispose();
+    _pumpPowerController.dispose();
+    _mountingController.dispose();
+    _polesController.dispose();
+    _pfController.dispose();
+    _efficiencyController.dispose();
+    _bearingDEController.dispose();
+    _bearingNDEController.dispose();
+    _resRYController.dispose();
+    _resYBController.dispose();
+    _resRBController.dispose();
+
+    _irRyController.dispose();
+    _irYbController.dispose();
+    _irBrController.dispose();
+    _irReController.dispose();
+    _irYeController.dispose();
+    _irBeController.dispose();
     _piController.dispose();
-    
-    _vibDeHController.dispose(); _vibDeVController.dispose(); _vibDeAController.dispose();
-    _vibNdeHController.dispose(); _vibNdeVController.dispose(); _vibNdeAController.dispose();
+
+    _vibDeHController.dispose();
+    _vibDeVController.dispose();
+    _vibDeAController.dispose();
+    _vibNdeHController.dispose();
+    _vibNdeVController.dispose();
+    _vibNdeAController.dispose();
     _vibGController.dispose();
-    
-    _gearRatioController.dispose(); _oilTypeController.dispose();
-    _flowRateController.dispose(); _headController.dispose(); _impellerSizeController.dispose();
+
+    _gearRatioController.dispose();
+    _oilTypeController.dispose();
+    _flowRateController.dispose();
+    _headController.dispose();
+    _impellerSizeController.dispose();
     _descController.dispose();
 
     super.dispose();
   }
 
-  // --- NFC SCANNER INTEGRATION ---
-  Future<void> _scanNfcTag() async {
-    final scannedCode = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const NFCScannerPage()),
-    );
+  // --- DIRECT IN-SITU NFC SCANNER MODAL ---
+  Future<void> _startInSituNfcScan() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('NFC scanning is supported on mobile devices (Android/iOS). Please enter manually.')),
+      );
+      return;
+    }
 
-    if (scannedCode != null && scannedCode.isNotEmpty) {
-      setState(() {
-        _rfidController.text = scannedCode;
-      });
+    bool isAvailable = false;
+    try {
+      isAvailable = (await NfcManager.instance.checkAvailability()) == NfcAvailability.enabled;
+    } catch (_) {
+      isAvailable = false;
+    }
+
+    if (!isAvailable) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('NFC/RFID Tag Captured: $scannedCode'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('NFC is not enabled or not available on this device.')),
         );
       }
+      return;
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return GlassContainer(
+          borderRadius: 24,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated Radar Wave
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blueAccent.withValues(alpha: 0.15),
+                    border: Border.all(color: Colors.blueAccent, width: 2),
+                  ),
+                  child: const Icon(Icons.nfc, size: 44, color: Colors.blueAccent),
+                )
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .scale(begin: const Offset(1, 1), end: const Offset(1.15, 1.15), duration: 900.ms),
+                const SizedBox(height: 20),
+                const Text(
+                  'Ready to Scan NFC / RFID Tag',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Hold your phone near the asset RFID/NFC tag...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade800),
+                  onPressed: () {
+                    NfcManager.instance.stopSession();
+                    Navigator.pop(modalCtx);
+                  },
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      await NfcManager.instance.startSession(
+        pollingOptions: {NfcPollingOption.iso14443, NfcPollingOption.iso15693, NfcPollingOption.iso18092},
+        onDiscovered: (NfcTag tag) async {
+          String tagData = '';
+          // ignore: invalid_use_of_protected_member
+          final Map<String, dynamic> data = Map<String, dynamic>.from(tag.data as Map);
+
+          final ndef = Ndef.from(tag);
+          if (ndef != null && ndef.cachedMessage != null) {
+            for (var record in ndef.cachedMessage!.records) {
+              tagData += String.fromCharCodes(record.payload);
+            }
+          }
+
+          if (tagData.isEmpty) {
+            final tagId = data['nfca']?['identifier'] ??
+                data['nfcb']?['identifier'] ??
+                data['nfcf']?['identifier'] ??
+                data['nfcv']?['identifier'];
+
+            if (tagId != null && tagId is List) {
+              tagData = tagId.map((e) => e.toRadixString(16).padLeft(2, '0')).join(':').toUpperCase();
+            }
+          }
+
+          await NfcManager.instance.stopSession();
+
+          if (mounted) {
+            Navigator.pop(context); // Close bottom sheet
+            setState(() {
+              _rfidController.text = tagData;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('NFC Tag Captured: $tagData'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('NFC Error: $e');
     }
   }
 
@@ -415,10 +560,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
 
     try {
       // 1. Duplicate Asset Tag ID Check
-      final duplicateQuery = await _firestore
-          .collection('assets')
-          .where('tagNo', isEqualTo: targetTagId)
-          .get();
+      final duplicateQuery = await _firestore.collection('assets').where('tagNo', isEqualTo: targetTagId).get();
 
       final isDuplicate = duplicateQuery.docs.any((doc) => doc.id != widget.asset?.id);
       if (isDuplicate) {
@@ -499,11 +641,9 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         poNo: _poController.text.trim().isNotEmpty ? _poController.text.trim() : null,
         manufacturingYear: int.tryParse(_yearController.text),
         imageUrl: _imageController.text.trim(),
-        
         type: _selectedType,
         status: _selectedStatus,
         specs: dynamicSpecs.isNotEmpty ? dynamicSpecs : null,
-        
         powerKw: double.tryParse(_powerController.text),
         voltage: double.tryParse(_voltageController.text),
         fullLoadCurrent: double.tryParse(_currentController.text),
@@ -515,19 +655,18 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         powerFactor: double.tryParse(_pfController.text),
         frameSize: _frameController.text.trim().isNotEmpty ? _frameController.text.trim() : null,
         mountingType: _mountingController.text.trim().isNotEmpty ? _mountingController.text.trim() : null,
-        
         windingResistance: windingRes.isNotEmpty ? windingRes : null,
         insulationResistance: insulationRes.isNotEmpty ? insulationRes : null,
         polarizationIndex: double.tryParse(_piController.text),
         vibration: vibData.isNotEmpty ? vibData : null,
-        
         bearingDE: _bearingDEController.text.trim().isNotEmpty ? _bearingDEController.text.trim() : null,
         bearingNDE: _bearingNDEController.text.trim().isNotEmpty ? _bearingNDEController.text.trim() : null,
-        
         isCritical: _isCritical,
         applicableParentEquipmentIds: _selectedParentIdsForSpares.isNotEmpty ? _selectedParentIdsForSpares : null,
         seqNo: _seqController.text.trim(),
-        
+        installationDate: _installationDate,
+        lastServiceDate: _lastServiceDate,
+        nextServiceDue: _nextServiceDue,
         createdAt: widget.asset?.createdAt,
         createdBy: widget.asset?.createdBy ?? AuthService().currentUser?.email,
         modifiedAt: DateTime.now(),
@@ -572,178 +711,183 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         elevation: 0,
       ),
       body: AnimatedGradientBackground(
-        child: _isLoading 
-          ? const Center(child: PulseLoading(size: 60))
-          : Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // --- TOP SECTION: STATUS, TYPE & CRITICALITY CONTEXT ---
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: GlassContainer(
-                      borderRadius: 16,
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+        child: _isLoading
+            ? const Center(child: PulseLoading(size: 60))
+            : Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    // --- TOP SECTION: STATUS, TYPE & CRITICALITY ---
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: GlassContainer(
+                        borderRadius: 16,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Asset Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.warning_amber, color: Colors.orangeAccent, size: 16),
+                                      const SizedBox(width: 4),
+                                      const Text('Critical Asset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      Switch(
+                                        value: _isCritical,
+                                        activeColor: Colors.redAccent,
+                                        onChanged: (val) => setState(() => _isCritical = val),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                children: AssetStatus.values.map((st) {
+                                  final isSelected = _selectedStatus == st;
+                                  Color stColor = Colors.grey;
+                                  if (st == AssetStatus.active) stColor = Colors.greenAccent;
+                                  if (st == AssetStatus.spare) stColor = Colors.cyanAccent;
+                                  if (st == AssetStatus.underMaintenance) stColor = Colors.orangeAccent;
+                                  if (st == AssetStatus.scrapped) stColor = Colors.redAccent;
+
+                                  return ChoiceChip(
+                                    label: Text(st.name.toUpperCase(),
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? Colors.black : Colors.white)),
+                                    selected: isSelected,
+                                    selectedColor: stColor,
+                                    onSelected: (val) {
+                                      if (val) setState(() => _selectedStatus = st);
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Asset Classification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                children: AssetType.values.map((tp) {
+                                  final isSelected = _selectedType == tp;
+                                  return ChoiceChip(
+                                    label: Text(tp.name.toUpperCase(),
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? Colors.black : Colors.white)),
+                                    selected: isSelected,
+                                    selectedColor: AppColors.primary,
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setState(() {
+                                          _selectedType = tp;
+                                          _calculateNextSeqNo();
+                                        });
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // --- LOCKED PREFIX & AUTO TAG ID BAR ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
                           children: [
-                            // 1. Status Selector
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Asset Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                                // Criticality Switch
-                                Row(
-                                  children: [
-                                    const Icon(Icons.warning_amber, color: Colors.orangeAccent, size: 16),
-                                    const SizedBox(width: 4),
-                                    const Text('Critical Asset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    Switch(
-                                      value: _isCritical,
-                                      activeColor: Colors.redAccent,
-                                      onChanged: (val) => setState(() => _isCritical = val),
-                                    ),
-                                  ],
+                            const Icon(Icons.tag, color: AppColors.accent, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('LOCKED ASSET TAG ID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent)),
+                                  Text(_computedTagId, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 90,
+                              child: TextFormField(
+                                controller: _seqController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Seq No',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              children: AssetStatus.values.map((st) {
-                                final isSelected = _selectedStatus == st;
-                                Color stColor = Colors.grey;
-                                if (st == AssetStatus.active) stColor = Colors.greenAccent;
-                                if (st == AssetStatus.spare) stColor = Colors.cyanAccent;
-                                if (st == AssetStatus.underMaintenance) stColor = Colors.orangeAccent;
-                                if (st == AssetStatus.scrapped) stColor = Colors.redAccent;
-
-                                return ChoiceChip(
-                                  label: Text(st.name.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.white)),
-                                  selected: isSelected,
-                                  selectedColor: stColor,
-                                  onSelected: (val) {
-                                    if (val) setState(() => _selectedStatus = st);
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 12),
-
-                            // 2. Type Selector
-                            const Text('Asset Classification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              children: AssetType.values.map((tp) {
-                                final isSelected = _selectedType == tp;
-                                return ChoiceChip(
-                                  label: Text(tp.name.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.white)),
-                                  selected: isSelected,
-                                  selectedColor: AppColors.primary,
-                                  onSelected: (val) {
-                                    if (val) {
-                                      setState(() {
-                                        _selectedType = tp;
-                                        _calculateNextSeqNo();
-                                      });
-                                    }
-                                  },
-                                );
-                              }).toList(),
+                                onChanged: (_) => _updateComputedTagId(),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
 
-                  // --- LOCKED PREFIX & AUTO TAG ID BAR ---
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
+                    // 3 Tabs
+                    TabBar(
+                      controller: _tabController,
+                      indicatorColor: AppColors.accent,
+                      tabs: const [
+                        Tab(text: "Identity & General"),
+                        Tab(text: "Specifications"),
+                        Tab(text: "Diagnostics & Health"),
+                      ],
+                    ),
+
+                    // Tab Views
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
                         children: [
-                          const Icon(Icons.tag, color: AppColors.accent, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('LOCKED ASSET TAG ID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent)),
-                                Text(_computedTagId, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          // Sequence Number Input
-                          SizedBox(
-                            width: 90,
-                            child: TextFormField(
-                              controller: _seqController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Seq No',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) => _updateComputedTagId(),
-                            ),
-                          ),
+                          _buildIdentityTab(prefix),
+                          _buildSpecsTab(),
+                          _buildDiagnosticsTab(),
                         ],
                       ),
                     ),
-                  ),
 
-                  // Tab Bar
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: AppColors.accent,
-                    tabs: const [
-                      Tab(text: "Identity & General"),
-                      Tab(text: "Specifications"),
-                    ],
-                  ),
-
-                  // Tab Views
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildIdentityTab(prefix),
-                        _buildSpecsTab(),
-                      ],
-                    ),
-                  ),
-
-                  // Save Action
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _saveAsset,
-                        child: Text(
-                          widget.asset != null ? 'UPDATE ASSET RECORD' : 'REGISTER ASSET TO REGISTRY',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                    // Save Action
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _saveAsset,
+                          child: Text(
+                            widget.asset != null ? 'UPDATE ASSET RECORD' : 'REGISTER ASSET TO REGISTRY',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
       ),
     );
   }
@@ -781,7 +925,8 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   ),
                   const SizedBox(height: 4),
                   _selectedParentIdsForSpares.isEmpty
-                      ? const Text('No parent machines linked yet. Tap above to assign multiple compatible parent equipments.', style: TextStyle(fontSize: 11, color: Colors.grey))
+                      ? const Text('No parent machines linked yet. Tap above to assign multiple compatible parent equipments.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey))
                       : Wrap(
                           spacing: 6,
                           runSpacing: 4,
@@ -891,7 +1036,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
           ),
           const SizedBox(height: 14),
 
-          // RFID Tag with Scan NFC Integration
+          // Direct In-Situ NFC Scanning
           TextFormField(
             controller: _rfidController,
             decoration: InputDecoration(
@@ -905,17 +1050,30 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 ),
                 icon: const Icon(Icons.sensors, size: 16, color: Colors.blueAccent),
                 label: const Text('Scan NFC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                onPressed: _scanNfcTag,
+                onPressed: _startInSituNfcScan,
               ),
               border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 14),
 
-          // PO Number
-          TextFormField(
-            controller: _poController,
-            decoration: const InputDecoration(labelText: 'Purchase Order (PO) No', border: OutlineInputBorder()),
+          // PO Number & Image URL
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _poController,
+                  decoration: const InputDecoration(labelText: 'Purchase Order (PO) No', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _imageController,
+                  decoration: const InputDecoration(labelText: 'Image URL', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
 
@@ -930,7 +1088,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     );
   }
 
-  // --- TAB 2: TECHNICAL SPECIFICATIONS ---
+  // --- TAB 2: TECHNICAL SPECIFICATIONS & DYNAMICS ---
   Widget _buildSpecsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -972,9 +1130,9 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _speedController,
+                    controller: _noLoadCurrentController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Speed (RPM)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'No Load Current (A)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -982,6 +1140,14 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             const SizedBox(height: 12),
             Row(
               children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _speedController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Speed (RPM)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _polesController,
@@ -989,12 +1155,24 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                     decoration: const InputDecoration(labelText: 'Poles', border: OutlineInputBorder()),
                   ),
                 ),
-                const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
                 Expanded(
                   child: TextFormField(
                     controller: _frequencyController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Frequency (Hz)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _pfController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Power Factor (PF)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1004,18 +1182,24 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _frameController,
-                    decoration: const InputDecoration(labelText: 'Frame Size', border: OutlineInputBorder()),
+                    controller: _efficiencyController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Efficiency (%)', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _mountingController,
-                    decoration: const InputDecoration(labelText: 'Mounting Type (B3/B5)', border: OutlineInputBorder()),
+                    controller: _frameController,
+                    decoration: const InputDecoration(labelText: 'Frame Size', border: OutlineInputBorder()),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _mountingController,
+              decoration: const InputDecoration(labelText: 'Mounting Type (B3 / B5 / V1)', border: OutlineInputBorder()),
             ),
           ] else if (_selectedType == AssetType.gearbox) ...[
             const Text('Gearbox Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
@@ -1032,7 +1216,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 Expanded(
                   child: TextFormField(
                     controller: _oilTypeController,
-                    decoration: const InputDecoration(labelText: 'Oil Grade (VG 320)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Oil Grade (VG 320 / 460)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1084,10 +1268,15 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _greaseTypeController,
+              decoration: const InputDecoration(labelText: 'Grease Type / Lubrication', border: OutlineInputBorder()),
+            ),
           ],
           const SizedBox(height: 16),
 
-          // Bearings
+          // Construction Bearings
           const Text('Bearing Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
           const SizedBox(height: 10),
           Row(
@@ -1095,41 +1284,170 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               Expanded(
                 child: TextFormField(
                   controller: _bearingDEController,
-                  decoration: const InputDecoration(labelText: 'Drive End (DE) Bearing', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Drive End (DE) Bearing (e.g. 6314 C3)', border: OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
                   controller: _bearingNDEController,
-                  decoration: const InputDecoration(labelText: 'Non-Drive End (NDE) Bearing', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Non-Drive End (NDE) Bearing (e.g. 6312 C3)', border: OutlineInputBorder()),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Diagnostics
-          const Text('Diagnostics: Insulation Resistance (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+          // Lifecycle Dates
+          const Text('Lifecycle & Service Scheduling', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: TextFormField(controller: _irRyController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y', border: OutlineInputBorder()))),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(_installationDate != null ? 'Installed: ${_installationDate!.toLocal().toString().split(' ').first}' : 'Install Date',
+                      style: const TextStyle(fontSize: 11)),
+                  onPressed: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _installationDate ?? DateTime.now(),
+                      firstDate: DateTime(1980),
+                      lastDate: DateTime(2050),
+                    );
+                    if (d != null) setState(() => _installationDate = d);
+                  },
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irYbController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B', border: OutlineInputBorder()))),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.build, size: 16),
+                  label: Text(_lastServiceDate != null ? 'Last: ${_lastServiceDate!.toLocal().toString().split(' ').first}' : 'Last Serviced',
+                      style: const TextStyle(fontSize: 11)),
+                  onPressed: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _lastServiceDate ?? DateTime.now(),
+                      firstDate: DateTime(1980),
+                      lastDate: DateTime(2050),
+                    );
+                    if (d != null) setState(() => _lastServiceDate = d);
+                  },
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irBrController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R', border: OutlineInputBorder()))),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.event, size: 16),
+                  label: Text(_nextServiceDue != null ? 'Due: ${_nextServiceDue!.toLocal().toString().split(' ').first}' : 'Next Due',
+                      style: const TextStyle(fontSize: 11)),
+                  onPressed: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _nextServiceDue ?? DateTime.now().add(const Duration(days: 90)),
+                      firstDate: DateTime(1980),
+                      lastDate: DateTime(2050),
+                    );
+                    if (d != null) setState(() => _nextServiceDue = d);
+                  },
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 3: DIAGNOSTICS & HEALTH ---
+  Widget _buildDiagnosticsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Winding Resistance
+          const Text('Winding Resistance (Ω)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: TextFormField(controller: _irReController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E', border: OutlineInputBorder()))),
+              Expanded(child: TextFormField(controller: _resRYController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y (Ω)', border: OutlineInputBorder()))),
               const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irYeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E', border: OutlineInputBorder()))),
+              Expanded(child: TextFormField(controller: _resYBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B (Ω)', border: OutlineInputBorder()))),
               const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irBeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E', border: OutlineInputBorder()))),
+              Expanded(child: TextFormField(controller: _resRBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-B (Ω)', border: OutlineInputBorder()))),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // 2. Insulation Resistance Phase-Phase
+          const Text('Insulation Resistance: Phase-Phase (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: TextFormField(controller: _irRyController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y (MΩ)', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _irYbController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B (MΩ)', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _irBrController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R (MΩ)', border: OutlineInputBorder()))),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 3. Insulation Resistance Phase-Earth
+          const Text('Insulation Resistance: Phase-Earth (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: TextFormField(controller: _irReController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E (MΩ)', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _irYeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E (MΩ)', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _irBeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E (MΩ)', border: OutlineInputBorder()))),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 4. Polarization Index
+          TextFormField(
+            controller: _piController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Polarization Index (PI 10m/1m)', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+
+          // 5. Vibration Analysis
+          const Text('Vibration Analysis (ISO 10816 / IS 12075)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+          const SizedBox(height: 10),
+          const Text('Drive End (DE) Vibration (mm/s):', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: TextFormField(controller: _vibDeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Horizontal', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _vibDeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Vertical', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _vibDeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Axial', border: OutlineInputBorder()))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text('Non-Drive End (NDE) Vibration (mm/s):', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: TextFormField(controller: _vibNdeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Horizontal', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _vibNdeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Vertical', border: OutlineInputBorder()))),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(controller: _vibNdeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Axial', border: OutlineInputBorder()))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _vibGController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Peak Acceleration G-Value (g)', border: OutlineInputBorder()),
           ),
         ],
       ),

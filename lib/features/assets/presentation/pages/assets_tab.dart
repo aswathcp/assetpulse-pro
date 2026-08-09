@@ -3,7 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:open_file/open_file.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../features/home/presentation/widgets/custom_app_bar.dart';
@@ -33,8 +37,6 @@ class _AssetsTabState extends State<AssetsTab> {
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  AssetType? _selectedTypeFilter;
-  AssetStatus? _selectedStatusFilter;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
@@ -48,7 +50,10 @@ class _AssetsTabState extends State<AssetsTab> {
   String? _userUnitId;
 
   bool _isLoading = true;
-  Stream<List<AssetModel>>? _assetsStream;
+  bool _isManagingAssets = false;
+  bool _showHelp = false;
+
+  List<AssetModel> _assets = [];
 
   @override
   void initState() {
@@ -109,7 +114,7 @@ class _AssetsTabState extends State<AssetsTab> {
       _selectedUnitId = _units.isNotEmpty ? _units.first : null;
     }
 
-    _refreshStreams();
+    await _fetchAssets();
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -126,10 +131,25 @@ class _AssetsTabState extends State<AssetsTab> {
     }
   }
 
-  void _refreshStreams() {
-    setState(() {
-      _assetsStream = _firestoreService.getAssetsStream(_selectedUnitId, _selectedPlantId);
-    });
+  Future<void> _fetchAssets() async {
+    if (_selectedPlantId == null || _selectedUnitId == null) return;
+    try {
+      final snap = await _firestore.collection('assets').get();
+      final prefix = '$_selectedPlantId-$_selectedUnitId-';
+
+      final list = snap.docs
+          .map((d) => AssetModel.fromMap(d.data(), d.id))
+          .where((a) => a.id.startsWith(prefix) || a.tagNo.startsWith(prefix))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _assets = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching assets: $e');
+    }
   }
 
   @override
@@ -138,44 +158,29 @@ class _AssetsTabState extends State<AssetsTab> {
     super.dispose();
   }
 
-  List<AssetModel> _filterAssets(List<AssetModel> assets) {
-    return assets.where((a) {
-      // 1. Type Logic
-      if (_selectedTypeFilter != null && a.type != _selectedTypeFilter) {
-        return false;
-      }
-
-      // 2. Status Logic
-      if (_selectedStatusFilter != null && a.status != _selectedStatusFilter) {
-        return false;
-      }
-
-      // 3. Search Logic
-      final query = _searchController.text.trim().toLowerCase();
-      if (query.isNotEmpty) {
-        final matchesTag = a.tagNo.toLowerCase().contains(query);
-        final matchesName = a.name.toLowerCase().contains(query);
-        final matchesSerial = a.serialNo.toLowerCase().contains(query);
-        final matchesMake = a.make.toLowerCase().contains(query);
-        final matchesModel = a.model.toLowerCase().contains(query);
-        final matchesRfid = a.rfidTag?.toLowerCase().contains(query) ?? false;
-        if (!matchesTag && !matchesName && !matchesSerial && !matchesMake && !matchesModel && !matchesRfid) {
-          return false;
-        }
-      }
-
-      return true;
+  List<AssetModel> get _filteredAssets {
+    final query = _searchController.text.trim().toLowerCase();
+    return _assets.where((a) {
+      if (query.isEmpty) return true;
+      return a.tagNo.toLowerCase().contains(query) ||
+          a.name.toLowerCase().contains(query) ||
+          a.serialNo.toLowerCase().contains(query) ||
+          a.make.toLowerCase().contains(query) ||
+          a.model.toLowerCase().contains(query) ||
+          (a.rfidTag?.toLowerCase().contains(query) ?? false);
     }).toList();
   }
 
-  // --- EXPORT ASSETS TO EXCEL ---
-  Future<void> _exportAssetsToExcel(List<AssetModel> assets) async {
-    if (_selectedPlantId == null || _selectedUnitId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select scope first.')),
-      );
-      return;
-    }
+  // --- KPI STATS ---
+  int get _totalAssets => _assets.length;
+  int get _activeCount => _assets.where((a) => a.status == AssetStatus.active).length;
+  int get _maintenanceCount => _assets.where((a) => a.status == AssetStatus.underMaintenance || a.isCritical).length;
+  int get _spareCount => _assets.where((a) => a.status == AssetStatus.spare).length;
+  double get _activeRate => _totalAssets == 0 ? 0.0 : (_activeCount / _totalAssets) * 100;
+
+  // --- EXCEL REPORT EXPORT ---
+  Future<void> _exportExcelReport() async {
+    if (_selectedPlantId == null || _selectedUnitId == null) return;
 
     try {
       var excel = Excel.createExcel();
@@ -200,7 +205,7 @@ class _AssetsTabState extends State<AssetsTab> {
       ];
       sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
 
-      for (var a in assets) {
+      for (var a in _filteredAssets) {
         sheet.appendRow([
           TextCellValue(a.tagNo),
           TextCellValue(a.name),
@@ -223,9 +228,7 @@ class _AssetsTabState extends State<AssetsTab> {
         final fileName = 'Asset_Inventory_${_selectedPlantId}_${_selectedUnitId}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
         final savedPath = await downloadFile(bytes, fileName);
         if (savedPath != null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Excel exported: $fileName'), backgroundColor: AppColors.success),
-          );
+          _handleSavedFile(savedPath, fileName);
         }
       }
     } catch (e) {
@@ -237,149 +240,124 @@ class _AssetsTabState extends State<AssetsTab> {
     }
   }
 
-  // --- ADMIN SETTINGS & DATABASE MANAGEMENT MODAL ---
-  void _showSettingsModal(List<AssetModel> currentAssets) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return GlassContainer(
-          borderRadius: 24,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.settings, color: AppColors.primary, size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Asset Registry Management',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+  // --- PDF REPORT EXPORT ---
+  Future<void> _exportPdfReport() async {
+    if (_selectedPlantId == null || _selectedUnitId == null) return;
 
-                // 1. Bulk Excel Import
-                ListTile(
-                  leading: const Icon(Icons.upload_file, color: Colors.cyanAccent),
-                  title: const Text('Bulk Excel Import', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Upload Motors, Gearboxes & Pumps via Excel sheet'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    if (_selectedPlantId != null && _selectedUnitId != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DataImportPage(
-                            collectionId: 'assets',
-                            title: 'Asset Inventory Import',
-                            plantId: _selectedPlantId,
-                            unitId: _selectedUnitId,
-                          ),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select scope first.')),
-                      );
-                    }
-                  },
-                ),
-                const Divider(),
+    try {
+      final pdf = pw.Document();
 
-                // 2. Export Inventory
-                ListTile(
-                  leading: const Icon(Icons.download, color: Colors.greenAccent),
-                  title: const Text('Export Inventory to Excel', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Export ${currentAssets.length} assets to .xlsx spreadsheet'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _exportAssetsToExcel(currentAssets);
-                  },
-                ),
-                const Divider(),
-
-                // 3. Batch Delete / Purge (Admins only)
-                if (_isAdmin) ...[
-                  ListTile(
-                    leading: const Icon(Icons.delete_sweep, color: Colors.redAccent),
-                    title: const Text('Purge Current Scope Assets', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                    subtitle: Text('Delete all ${currentAssets.length} assets in $_selectedPlantId / $_selectedUnitId'),
-                    trailing: const Icon(Icons.warning, color: Colors.redAccent),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _confirmPurgeAssets(currentAssets);
-                    },
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(24),
+          build: (context) => [
+            pw.Header(
+              level: 0,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('VEDANTA IRON & STEEL LTD - ASSET REGISTRY REPORT', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Plant: $_selectedPlantId | Unit: $_selectedUnitId | Generated: ${DateTime.now().toLocal().toString().split('.').first}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    ],
                   ),
+                  pw.Text('ISO 55000 ASSET PULSE PRO', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
                 ],
-              ],
+              ),
             ),
-          ),
+            pw.SizedBox(height: 12),
+            pw.TableHelper.fromTextArray(
+              headers: ['Tag No', 'Equipment Name', 'Type', 'Status', 'Make', 'Model', 'Serial No', 'Power (kW)', 'RFID Tag', 'Critical'],
+              data: _filteredAssets.map((a) => [
+                a.tagNo,
+                a.name,
+                a.type.name.toUpperCase(),
+                a.status.name.toUpperCase(),
+                a.make,
+                a.model,
+                a.serialNo,
+                a.powerKw?.toString() ?? '-',
+                a.rfidTag ?? '-',
+                a.isCritical ? 'YES' : 'NO',
+              ]).toList(),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellPadding: const pw.EdgeInsets.all(4),
+            ),
+          ],
+        ),
+      );
+
+      final bytes = await pdf.save();
+      final fileName = 'Asset_Report_${_selectedPlantId}_${_selectedUnitId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final savedPath = await downloadFile(bytes, fileName);
+      if (savedPath != null && mounted) {
+        _handleSavedFile(savedPath, fileName);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF generation failed: $e'), backgroundColor: AppColors.error),
         );
-      },
-    );
+      }
+    }
   }
 
-  void _confirmPurgeAssets(List<AssetModel> assets) {
-    if (assets.isEmpty) return;
+  void _handleSavedFile(String path, String fileName) {
+    if (!mounted) return;
+
+    final bool isPublic = path.contains('/storage/emulated/0/Download/Assetpulse-pro');
+    final String locationMessage = isPublic
+        ? 'Saved to Internal Storage: Download/Assetpulse-pro/$fileName'
+        : 'Saved to Application Storage: $fileName';
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
+          backgroundColor: Theme.of(dialogCtx).colorScheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Row(
             children: [
-              Icon(Icons.warning, color: Colors.redAccent),
+              Icon(Icons.file_download_done, color: Colors.greenAccent, size: 24),
               SizedBox(width: 10),
-              Text('Confirm Batch Delete'),
+              Text('Report Exported', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text(
-            'Are you sure you want to permanently delete all ${assets.length} assets in $_selectedPlantId / $_selectedUnitId?\nThis action cannot be undone.',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(locationMessage, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              const SizedBox(height: 12),
+              const Text('Would you like to open or share this file?', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel'),
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              onPressed: () async {
+            OutlinedButton.icon(
+              icon: const Icon(Icons.share, size: 16),
+              label: const Text('Share'),
+              onPressed: () {
                 Navigator.pop(dialogCtx);
-                setState(() => _isLoading = true);
-                try {
-                  final batch = _firestore.batch();
-                  for (var a in assets) {
-                    batch.delete(_firestore.collection('assets').doc(a.id));
-                  }
-                  await batch.commit();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Successfully deleted ${assets.length} assets.')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Purge failed: $e')),
-                    );
-                  }
-                } finally {
-                  if (mounted) setState(() => _isLoading = false);
-                }
+                Share.shareXFiles([XFile(path)], text: 'Asset Inventory Export: $fileName');
               },
-              child: const Text('Delete All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              icon: const Icon(Icons.open_in_new, size: 16, color: Colors.white),
+              label: const Text('Open', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                OpenFile.open(path);
+              },
             ),
           ],
         );
@@ -387,56 +365,82 @@ class _AssetsTabState extends State<AssetsTab> {
     );
   }
 
-  // --- HELP DIALOG ---
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.help_outline, color: AppColors.primary, size: 24),
-              SizedBox(width: 10),
-              Text('Asset Registry Guide', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('ISO 55000 Plant Asset Architecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                SizedBox(height: 6),
-                Text('• Tag ID Standard: [PLANT]-[UNIT]-[TYPE]-[SEQ] (e.g. IOG-COD-MTR-001)\n• Types: MTR (Motors), GBX (Gearboxes), PMP (Pumps).\n• Statuses: ACTIVE (in service), SPARE (standby/pooled), UNDER MAINTENANCE, SCRAPPED.', style: TextStyle(fontSize: 12)),
-                SizedBox(height: 12),
-                Text('Spare Pooling & Replacement', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                SizedBox(height: 6),
-                Text('• Spares can be assigned to multiple compatible parent equipments.\n• When replacing in the field, Tag IDs remain unique and prevent record collision.', style: TextStyle(fontSize: 12)),
-                SizedBox(height: 12),
-                Text('RFID / NFC Tagging', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                SizedBox(height: 6),
-                Text('• Tap the NFC scan button in Add/Edit Asset to capture physical high-frequency RFID tags directly into the asset identity record.', style: TextStyle(fontSize: 12)),
-              ],
+  // --- SKELETON SHIMMER LOADER (ZERO CLS) ---
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Column(
+        children: [
+          // 1. Shimmer Scope Box
+          Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
             ),
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+
+          // 2. Shimmer Stats Card
+          Container(
+            height: 110,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
             ),
-          ],
-        );
-      },
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+
+          // 3. Shimmer Search & Action Bar
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+
+          // 4. Shimmer Cards
+          ...List.generate(4, (index) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+            ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08));
+          }),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(child: CircularProgressIndicator()),
+        appBar: const CustomAppBar(title: 'Asset Inventory'),
+        body: _buildSkeletonLoader(),
+      );
+    }
+
+    if (_isManagingAssets) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const CustomAppBar(title: 'Asset Inventory'),
+        body: _buildManageAssetsView(),
+      );
+    }
+
+    if (_showHelp) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const CustomAppBar(title: 'Asset Inventory'),
+        body: _buildHelpView(),
       );
     }
 
@@ -449,147 +453,184 @@ class _AssetsTabState extends State<AssetsTab> {
       itemUnitId: _selectedUnitId,
     );
 
+    final filtered = _filteredAssets;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: const CustomAppBar(title: 'Asset Inventory'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
-        child: StreamBuilder<List<AssetModel>>(
-          stream: _assetsStream,
-          builder: (context, snapshot) {
-            final allAssets = snapshot.data ?? [];
-            final filtered = _filterAssets(allAssets);
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Signature Scope Selectors Box (Matching Lux Checklist & Panel Room)
+              GlassContainer(
+                borderRadius: 16,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedPlantId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Select Plant', border: OutlineInputBorder()),
+                          items: _plants
+                              .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text(HierarchyService().getPlantNames()[e] ?? e,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis)))
+                              .toList(),
+                          onChanged: _isPlantLocked
+                              ? null
+                              : (val) async {
+                                  if (val != null) {
+                                    setState(() {
+                                      _selectedPlantId = val;
+                                      _updateUnitList();
+                                      _isLoading = true;
+                                    });
+                                    await _fetchAssets();
+                                    if (mounted) setState(() => _isLoading = false);
+                                  }
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedUnitId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Select Unit', border: OutlineInputBorder()),
+                          items: _units
+                              .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text(HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? '')[e] ?? e,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis)))
+                              .toList(),
+                          onChanged: _isUnitLocked
+                              ? null
+                              : (val) async {
+                                  if (val != null) {
+                                    setState(() {
+                                      _selectedUnitId = val;
+                                      _isLoading = true;
+                                    });
+                                    await _fetchAssets();
+                                    if (mounted) setState(() => _isLoading = false);
+                                  }
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ).animate().fadeIn(duration: 300.ms),
+              const SizedBox(height: 16),
 
-            return Column(
-              children: [
-                // 1. Signature Checklist-style Scope Selectors
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: GlassContainer(
-                    borderRadius: 16,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Row(
+              // 2. Metrics Overview Dashboard Card (Matching Screenshot)
+              GlassContainer(
+                borderRadius: 20,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedPlantId,
-                              isExpanded: true,
-                              decoration: const InputDecoration(labelText: 'Select Plant', border: InputBorder.none),
-                              items: _plants
-                                  .map((e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text(HierarchyService().getPlantNames()[e] ?? e,
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                          overflow: TextOverflow.ellipsis)))
-                                  .toList(),
-                              onChanged: _isPlantLocked
-                                  ? null
-                                  : (val) {
-                                      if (val != null) {
-                                        setState(() {
-                                          _selectedPlantId = val;
-                                          _updateUnitList();
-                                          _refreshStreams();
-                                        });
-                                      }
-                                    },
+                          const Text('Asset Inventory Overview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _activeRate >= 80.0 ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedUnitId,
-                              isExpanded: true,
-                              decoration: const InputDecoration(labelText: 'Select Unit', border: InputBorder.none),
-                              items: _units
-                                  .map((e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text(HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? '')[e] ?? e,
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                          overflow: TextOverflow.ellipsis)))
-                                  .toList(),
-                              onChanged: _isUnitLocked
-                                  ? null
-                                  : (val) {
-                                      if (val != null) {
-                                        setState(() {
-                                          _selectedUnitId = val;
-                                          _refreshStreams();
-                                        });
-                                      }
-                                    },
+                            child: Text(
+                              '${_activeRate.toStringAsFixed(1)}%',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: _activeRate >= 80.0 ? Colors.greenAccent : Colors.redAccent),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ).animate().fadeIn(duration: 350.ms),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem('Total Assets', '$_totalAssets', Colors.white),
+                          _buildStatItem('Active / Healthy', '$_activeCount', Colors.greenAccent),
+                          _buildStatItem('Maintenance / Critical', '$_maintenanceCount', Colors.redAccent),
+                          _buildStatItem('Spares', '$_spareCount', Colors.orangeAccent),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+              ).animate().fadeIn(duration: 350.ms),
+              const SizedBox(height: 16),
 
-                // 2. Clean Single-Layer Search & Action Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Row(
+              // 3. Search Bar & Help/Settings Buttons (Matching Screenshot)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search tag, name or ID...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    style: IconButton.styleFrom(backgroundColor: AppColors.primary),
+                    icon: const Icon(Icons.help_outline, color: Colors.white),
+                    tooltip: 'Asset Hierarchy Guide',
+                    onPressed: () => setState(() => _showHelp = true),
+                  ),
+                  if (_isAdmin) ...[
+                    const SizedBox(width: 4),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(backgroundColor: AppColors.primary),
+                      icon: const Icon(Icons.settings, color: Colors.white),
+                      tooltip: 'Manage Assets in Database',
+                      onPressed: () => setState(() => _isManagingAssets = true),
+                    ),
+                  ],
+                ],
+              ).animate().fadeIn(duration: 400.ms),
+              const SizedBox(height: 16),
+
+              // 4. Header Row with Title & Excel / PDF / Add Asset Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Assets (${filtered.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  Row(
                     children: [
-                      // Clean Search Field
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (_) => setState(() {}),
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            hintText: 'Search Tag ID, Name, Serial, RFID...',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {});
-                                    },
-                                  )
-                                : null,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                          ),
-                        ),
+                      TextButton.icon(
+                        onPressed: _exportExcelReport,
+                        icon: const Icon(Icons.table_chart, size: 16, color: Colors.greenAccent),
+                        label: const Text('Excel', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
-                      const SizedBox(width: 8),
-
-                      // Filter Button [tune]
-                      IconButton.filled(
-                        style: IconButton.styleFrom(backgroundColor: AppColors.primary),
-                        icon: const Icon(Icons.tune, color: Colors.white, size: 20),
-                        tooltip: 'Filter by Type & Status',
-                        onPressed: _showFilterBottomSheet,
+                      const SizedBox(width: 4),
+                      TextButton.icon(
+                        onPressed: _exportPdfReport,
+                        icon: const Icon(Icons.picture_as_pdf, size: 16, color: Colors.redAccent),
+                        label: const Text('PDF Report', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
-                      const SizedBox(width: 6),
-
-                      // Settings / Admin Management Icon [⚙️]
-                      IconButton.filled(
-                        style: IconButton.styleFrom(backgroundColor: Colors.indigoAccent),
-                        icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                        tooltip: 'Registry Settings & Import/Export',
-                        onPressed: () => _showSettingsModal(filtered),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Help Button [?]
-                      IconButton.filled(
-                        style: IconButton.styleFrom(backgroundColor: Colors.teal),
-                        icon: const Icon(Icons.help_outline, color: Colors.white, size: 20),
-                        tooltip: 'Asset Hierarchy Guide',
-                        onPressed: _showHelpDialog,
-                      ),
-
-                      // Add Asset Button [+]
                       if (canEdit) ...[
-                        const SizedBox(width: 6),
-                        IconButton.filled(
-                          style: IconButton.styleFrom(backgroundColor: AppColors.accent),
-                          icon: const Icon(Icons.add, color: Colors.black, size: 20),
-                          tooltip: 'Add New Asset',
+                        const SizedBox(width: 4),
+                        TextButton.icon(
                           onPressed: () {
                             if (_selectedUnitId != null && _selectedPlantId != null) {
                               Navigator.push(
@@ -600,167 +641,275 @@ class _AssetsTabState extends State<AssetsTab> {
                                     plantId: _selectedPlantId,
                                   ),
                                 ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please select a Plant and Unit first.')),
-                              );
+                              ).then((_) => _fetchAssets());
                             }
                           },
+                          icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.accent),
+                          label: const Text('Add Asset', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ],
                   ),
-                ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-                // 3. Active Filter Chip Summary (if applied)
-                if (_selectedTypeFilter != null || _selectedStatusFilter != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                    child: Row(
-                      children: [
-                        if (_selectedTypeFilter != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Chip(
-                              label: Text('Type: ${_selectedTypeFilter!.name.toUpperCase()}', style: const TextStyle(fontSize: 11)),
-                              deleteIcon: const Icon(Icons.close, size: 14),
-                              onDeleted: () => setState(() => _selectedTypeFilter = null),
-                            ),
-                          ),
-                        if (_selectedStatusFilter != null)
-                          Chip(
-                            label: Text('Status: ${_selectedStatusFilter!.name.toUpperCase()}', style: const TextStyle(fontSize: 11)),
-                            deleteIcon: const Icon(Icons.close, size: 14),
-                            onDeleted: () => setState(() => _selectedStatusFilter = null),
-                          ),
-                      ],
+              // 5. Asset Cards List
+              filtered.isEmpty
+                  ? Container(
+                      padding: const EdgeInsets.all(32),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceDark,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.inbox, color: Colors.grey, size: 48),
+                          SizedBox(height: 12),
+                          Text('No matching assets found in this scope.', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final asset = filtered[index];
+                        return AssetCard(
+                          asset: asset,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AssetDetailPage(asset: asset),
+                              ),
+                            ).then((_) => _fetchAssets());
+                          },
+                        ).animate(delay: (index * 30).ms).fadeIn(duration: 300.ms).slideY(begin: 0.08, end: 0);
+                      },
                     ),
-                  ),
-
-                // 4. Asset List
-                Expanded(
-                  child: snapshot.connectionState == ConnectionState.waiting
-                      ? const Center(child: CircularProgressIndicator())
-                      : _buildAssetList(filtered),
-                ),
-              ],
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return GlassContainer(
-          borderRadius: 24,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Filter Inventory', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-
-                // Type Filter
-                const Text('Asset Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('All Types'),
-                      selected: _selectedTypeFilter == null,
-                      onSelected: (val) => setState(() => _selectedTypeFilter = null),
-                    ),
-                    ...AssetType.values.map((type) {
-                      return ChoiceChip(
-                        label: Text(type.name.toUpperCase()),
-                        selected: _selectedTypeFilter == type,
-                        onSelected: (val) => setState(() => _selectedTypeFilter = val ? type : null),
-                      );
-                    }),
-                  ],
+  // --- MANAGE ASSETS VIEW (MATCHING LUX LEVEL CHECKLIST SETTINGS) ---
+  Widget _buildManageAssetsView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _isManagingAssets = false),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Manage Asset Registry',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-                // Status Filter
-                const Text('Asset Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('All Statuses'),
-                      selected: _selectedStatusFilter == null,
-                      onSelected: (val) => setState(() => _selectedStatusFilter = null),
-                    ),
-                    ...AssetStatus.values.map((st) {
-                      return ChoiceChip(
-                        label: Text(st.name.toUpperCase()),
-                        selected: _selectedStatusFilter == st,
-                        onSelected: (val) => setState(() => _selectedStatusFilter = val ? st : null),
-                      );
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                ElevatedButton(
+          // Action Buttons: Add New & Import Excel
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Center(child: Text('Apply Filter', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Add New Asset', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    if (_selectedUnitId != null && _selectedPlantId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddEditAssetPage(
+                            unitId: _selectedUnitId,
+                            plantId: _selectedPlantId,
+                          ),
+                        ),
+                      ).then((_) => _fetchAssets());
+                    }
+                  },
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent.withValues(alpha: 0.15),
+                    foregroundColor: Colors.blueAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.file_upload),
+                  label: const Text('Import Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DataImportPage(
+                          collectionId: 'assets',
+                          title: 'Asset Inventory',
+                          plantId: _selectedPlantId,
+                          unitId: _selectedUnitId,
+                        ),
+                      ),
+                    );
+                    await _fetchAssets();
+                    setState(() {});
+                  },
+                ),
+              ),
+            ],
           ),
+          const Divider(height: 24),
+
+          // Asset List with Edit & Delete Actions
+          _assets.isEmpty
+              ? const Center(child: Text('No assets registered in this scope. Add one above!'))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _assets.length,
+                  itemBuilder: (context, idx) {
+                    final a = _assets[idx];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: ListTile(
+                        title: Text('${a.tagNo} - ${a.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          'Type: ${a.type.name.toUpperCase()} | Status: ${a.status.name.toUpperCase()}\nMake: ${a.make} | Model: ${a.model} | Serial: ${a.serialNo}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.amberAccent, size: 20),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AddEditAssetPage(asset: a),
+                                  ),
+                                ).then((_) => _fetchAssets());
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                              onPressed: () => _confirmDeleteSingleAsset(a),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteSingleAsset(AssetModel a) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: const Text('Delete Asset'),
+          content: Text('Are you sure you want to permanently delete asset "${a.tagNo} (${a.name})"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                await _firestore.collection('assets').doc(a.id).delete();
+                await _fetchAssets();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Asset ${a.tagNo} deleted successfully')),
+                  );
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildAssetList(List<AssetModel> assets) {
-    if (assets.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox, color: Theme.of(context).disabledColor, size: 48),
-            const SizedBox(height: 16),
-            Text('No matching assets found in this scope.', style: TextStyle(color: Theme.of(context).disabledColor)),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
-      itemCount: assets.length,
-      itemBuilder: (context, index) {
-        final asset = assets[index];
-        return AssetCard(
-          asset: asset,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AssetDetailPage(asset: asset),
+  // --- HELP VIEW ---
+  Widget _buildHelpView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _showHelp = false),
               ),
-            );
-          },
-        ).animate(delay: (index * 40).ms).fadeIn(duration: 300.ms).slideY(begin: 0.08, end: 0);
-      },
+              const SizedBox(width: 8),
+              const Text('Asset Registry & ISO 55000 Guide', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          GlassContainer(
+            borderRadius: 16,
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Asset Naming & Hierarchy Taxonomy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                  SizedBox(height: 8),
+                  Text('• Tag ID Standard: [PLANT]-[UNIT]-[TYPE]-[SEQ] (e.g. IOG-COD-MTR-001)\n• MTR = Motors | GBX = Gearboxes | PMP = Pumps\n• Sequence numbers auto-generate with next available 3-digit number.', style: TextStyle(fontSize: 12)),
+                  SizedBox(height: 14),
+                  Text('Spare Pooling Architecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                  SizedBox(height: 8),
+                  Text('• Spare assets can be linked to multiple compatible parent machines.\n• Unique Tag IDs ensure field replacements never overwrite historical records.', style: TextStyle(fontSize: 12)),
+                  SizedBox(height: 14),
+                  Text('Direct In-Situ NFC Scanning', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                  SizedBox(height: 8),
+                  Text('• Tap "Scan NFC" on the registration form to capture high-frequency RFID tags directly into the asset identity without leaving the form.', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+      ],
     );
   }
 }
