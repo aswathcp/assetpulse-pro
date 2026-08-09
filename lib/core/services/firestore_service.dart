@@ -356,20 +356,25 @@ class FirestoreService {
 
   // Generic Batch Save for Bulk Upload
   Future<void> batchSave(String collection, List<Map<String, dynamic>> items) async {
-    final batch = _db.batch();
+    WriteBatch batch = _db.batch();
     int count = 0;
     
     for (var item in items) {
-       if (item['id'] == null) continue;
-       final ref = _db.collection(collection).doc(item['id'].toString());
+       final docId = item['id']?.toString().trim() ?? item['tagNo']?.toString().trim();
+       if (docId == null || docId.isEmpty) continue;
+       final ref = _db.collection(collection).doc(docId);
        batch.set(ref, item, SetOptions(merge: true));
        
        count++;
-       if (count >= 490) { 
+       if (count >= 450) { 
          await batch.commit();
+         batch = _db.batch();
+         count = 0;
        }
     }
-    await batch.commit();
+    if (count > 0) {
+      await batch.commit();
+    }
   }
   
   // Generic collection stream 

@@ -1314,10 +1314,6 @@ class _DataImportPageState extends State<DataImportPage> {
           if (data['feederId'] != null && data['feederId'].toString().isNotEmpty) {
             data['feederId'] = HierarchyService.prefixId(data['feederId'].toString(), _userPlantId!, _userUnitId!);
           }
-        } else if (widget.collectionId == 'assets') {
-          if (data['masterEquipmentId'] != null) {
-            data['masterEquipmentId'] = HierarchyService.prefixId(data['masterEquipmentId'].toString(), _userPlantId!, _userUnitId!);
-          }
         } else if (widget.collectionId == 'lighting_dbs') {
           // Convert rccbCount from Excel double (e.g. 1.0) to clean int
           final rccbRaw = data['rccbCount'];
@@ -1534,15 +1530,17 @@ class _DataImportPageState extends State<DataImportPage> {
                       ? 'scrapped'
                       : 'active';
 
-          final seqStr = data['seqNo']?.toString().trim() ??
-                         data['seq']?.toString().trim() ??
-                         '001';
+          final rawSeq = data['seqNo']?.toString().trim() ?? data['seq']?.toString().trim() ?? '';
+          final parsedSeqNum = int.tryParse(rawSeq) ?? double.tryParse(rawSeq)?.toInt();
+          final seqStr = parsedSeqNum != null
+              ? parsedSeqNum.toString().padLeft(3, '0')
+              : (rawSeq.isNotEmpty ? rawSeq.padLeft(3, '0') : '001');
 
           final typeCode = typeStr == 'gearbox' ? 'GBX' : typeStr == 'pump' ? 'PMP' : 'MTR';
           final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? data['id']?.toString().trim() ?? '';
           String finalTagId = rawTagId.isNotEmpty
               ? rawTagId
-              : '${_userPlantId!}-${_userUnitId!}-$typeCode-${seqStr.padLeft(3, '0')}';
+              : '${_userPlantId!}-${_userUnitId!}-$typeCode-$seqStr';
           
           // Ensure tag is prefixed with plant and unit
           if (!finalTagId.toUpperCase().startsWith('${_userPlantId!.toUpperCase()}-${_userUnitId!.toUpperCase()}-')) {
