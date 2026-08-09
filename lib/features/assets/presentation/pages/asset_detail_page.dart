@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/auth_service.dart';
@@ -24,8 +26,6 @@ class AssetDetailPage extends StatefulWidget {
 }
 
 class _AssetDetailPageState extends State<AssetDetailPage> {
-  AssetModel get asset => widget.asset;
-  
   bool _isLoading = true;
   String _userRole = '';
   bool _isAdmin = false;
@@ -52,15 +52,17 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
           _userUnitId = profile['unitId'] as String?;
         }
       }
-      
-      final meDoc = await FirebaseFirestore.instance
-          .collection('master_equipments')
-          .doc(widget.asset.masterEquipmentId)
-          .get();
-      if (meDoc.exists && meDoc.data() != null) {
-        final data = meDoc.data()!;
-        _assetPlantId = data['plantId'] as String?;
-        _assetUnitId = data['unitId'] as String?;
+
+      if (widget.asset.masterEquipmentId.isNotEmpty) {
+        final meDoc = await FirebaseFirestore.instance
+            .collection('master_equipments')
+            .doc(widget.asset.masterEquipmentId)
+            .get();
+        if (meDoc.exists && meDoc.data() != null) {
+          final data = meDoc.data()!;
+          _assetPlantId = data['plantId'] as String?;
+          _assetUnitId = data['unitId'] as String?;
+        }
       }
     } catch (e) {
       debugPrint("Error loading detail permissions: $e");
@@ -84,135 +86,154 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(widget.asset.tagNo),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_alert_rounded),
-            tooltip: 'Log Fault',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddFaultLogPage(
-                    masterEquipmentId: widget.asset.masterEquipmentId,
-                    masterEquipmentName: 'Equipment ${widget.asset.masterEquipmentId}',
-                    assetId: widget.asset.id,
-                  ),
-                ),
-              );
-            },
-          ),
-          if (!_isLoading && _canEdit)
-            IconButton(
-              icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.onSurface),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddEditAssetPage(
-                      asset: widget.asset,
-                      unitId: _assetUnitId,
-                      plantId: _assetPlantId,
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-      body: AnimatedGradientBackground(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 100, bottom: 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header Information
-              _buildHeader(context),
-              
-              const SizedBox(height: 24),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('assets').doc(widget.asset.id).snapshots(),
+      builder: (context, snapshot) {
+        final AssetModel currentAsset = snapshot.hasData && snapshot.data!.exists && snapshot.data!.data() != null
+            ? AssetModel.fromMap(snapshot.data!.data()!, snapshot.data!.id)
+            : widget.asset;
 
-              // 2. Tabbed Details
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GlassContainer(
-                  width: double.infinity,
-                  height: 600, // Taller for more specs
-                  borderRadius: 24,
-                  child: DefaultTabController(
-                    length: 4,
-                    child: Column(
-                      children: [
-                        const TabBar(
-                          labelColor: AppColors.accent,
-                          unselectedLabelColor: Colors.grey,
-                          indicatorColor: AppColors.accent,
-                          isScrollable: true,
-                          tabAlignment: TabAlignment.start,
-                          tabs: [
-                            Tab(text: 'Identity'),
-                            Tab(text: 'Specs'), 
-                            Tab(text: 'Health'),
-                            Tab(text: 'History'),
-                          ],
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _buildIdentityTab(context),
-                              _buildSpecsTab(context),
-                              _buildHealthTab(context),
-                              _buildHistoryTab(context),
-                            ],
-                          ),
-                        ),
-                      ],
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            title: Text(currentAsset.tagNo),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_ios, color: Theme.of(context).colorScheme.onSurface),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add_alert_rounded),
+                tooltip: 'Log Fault',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddFaultLogPage(
+                        masterEquipmentId: currentAsset.masterEquipmentId,
+                        masterEquipmentName: 'Equipment ${currentAsset.masterEquipmentId}',
+                        assetId: currentAsset.id,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
+              if (!_isLoading && _canEdit)
+                IconButton(
+                  icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.onSurface),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddEditAssetPage(
+                          asset: currentAsset,
+                          unitId: _assetUnitId,
+                          plantId: _assetPlantId,
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
-        ),
-      ),
+          body: AnimatedGradientBackground(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(top: 100, bottom: 40),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Header Information
+                  _buildHeader(context, currentAsset),
+
+                  const SizedBox(height: 20),
+
+                  // 2. Tabbed Details
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GlassContainer(
+                      width: double.infinity,
+                      height: 620,
+                      borderRadius: 24,
+                      child: DefaultTabController(
+                        length: 4,
+                        child: Column(
+                          children: [
+                            const TabBar(
+                              labelColor: AppColors.accent,
+                              unselectedLabelColor: Colors.grey,
+                              indicatorColor: AppColors.accent,
+                              isScrollable: true,
+                              tabAlignment: TabAlignment.start,
+                              tabs: [
+                                Tab(text: 'Identity'),
+                                Tab(text: 'Specs'),
+                                Tab(text: 'Health'),
+                                Tab(text: 'History'),
+                              ],
+                            ),
+                            Expanded(
+                              child: TabBarView(
+                                children: [
+                                  _buildIdentityTab(context, currentAsset),
+                                  _buildSpecsTab(context, currentAsset),
+                                  _buildHealthTab(context, currentAsset),
+                                  _buildHistoryTab(context, currentAsset),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AssetModel asset) {
     return Center(
       child: Column(
         children: [
           Text(
             asset.name,
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
           ),
-          const SizedBox(height: 8),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(height: 10),
+
+          // Header Badges (Status, Type, Critical, and Health only if known)
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
-               _buildStatusBadge(asset.status),
-               const SizedBox(width: 12),
-               _buildHealthBadge(asset.healthStatus),
+              _buildStatusBadge(asset.status),
+              _buildTypeBadge(asset.type),
+              if (asset.isCritical) _buildCriticalBadge(),
+              if (asset.healthStatus != AssetHealthStatus.unknown) _buildHealthBadge(asset.healthStatus),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
           if (asset.status == AssetStatus.active) ...[
             TextButton.icon(
-              onPressed: () => _showReplaceWithSpareDialog(context),
+              onPressed: () => _showReplaceWithSpareDialog(context, asset),
               icon: const Icon(Icons.swap_horiz, color: AppColors.accent),
               label: const Text('Replace with Spare', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
               style: TextButton.styleFrom(
@@ -221,21 +242,29 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
-          // Quick Context
+
+          // Quick Context Row
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-               Icon(Icons.place, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
-               const SizedBox(width: 4),
-               Text(asset.masterEquipmentId.isNotEmpty ? asset.masterEquipmentId : 'Unassigned', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-               const SizedBox(width: 16),
-               Icon(Icons.sell, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
-               const SizedBox(width: 4),
-               Text(asset.make, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Icon(Icons.precision_manufacturing, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                asset.status == AssetStatus.spare
+                    ? (asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Spare Pool')
+                    : (asset.masterEquipmentId.isNotEmpty ? asset.masterEquipmentId : 'Unassigned Machine'),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+              ),
+              if (asset.make.isNotEmpty) ...[
+                const SizedBox(width: 16),
+                Icon(Icons.factory_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
+                const SizedBox(width: 4),
+                Text(asset.make, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+              ],
             ],
-          )
+          ),
         ],
       ),
     );
@@ -244,22 +273,87 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
   Widget _buildStatusBadge(AssetStatus status) {
     Color color;
     switch (status) {
-      case AssetStatus.active: color = AppColors.success; break;
-      case AssetStatus.underMaintenance: color = AppColors.warning; break;
-      case AssetStatus.scrapped: color = AppColors.error; break;
-      case AssetStatus.spare: color = Colors.grey; break;
+      case AssetStatus.active:
+        color = AppColors.success;
+        break;
+      case AssetStatus.underMaintenance:
+        color = AppColors.warning;
+        break;
+      case AssetStatus.scrapped:
+        color = AppColors.error;
+        break;
+      case AssetStatus.spare:
+        color = Colors.cyanAccent;
+        break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color),
+        border: Border.all(color: color.withValues(alpha: 0.7)),
       ),
       child: Text(
         status.name.toUpperCase(),
-        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+      ),
+    );
+  }
+
+  Widget _buildTypeBadge(AssetType type) {
+    IconData icon;
+    switch (type) {
+      case AssetType.motor:
+        icon = Icons.electric_bolt;
+        break;
+      case AssetType.gearbox:
+        icon = Icons.settings;
+        break;
+      case AssetType.pump:
+        icon = Icons.water_drop;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.accent),
+          const SizedBox(width: 5),
+          Text(
+            type.name.toUpperCase(),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriticalBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.redAccent),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber, color: Colors.redAccent, size: 13),
+          SizedBox(width: 4),
+          Text(
+            'CRITICAL',
+            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+        ],
       ),
     );
   }
@@ -270,120 +364,146 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     final label = service.getHealthLabel(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.monitor_heart_outlined, color: color, size: 16),
-          const SizedBox(width: 8),
+          Icon(Icons.monitor_heart_outlined, color: color, size: 13),
+          const SizedBox(width: 6),
           Text(
             label.toUpperCase(),
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildIdentityTab(BuildContext context) {
+  // --- TAB 1: IDENTITY & GENERAL ---
+  Widget _buildIdentityTab(BuildContext context, AssetModel asset) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionHeader('General Identity'),
           Row(
             children: [
-              Expanded(child: _buildDetailBox(context, 'Tag No', asset.tagNo)),
+              Expanded(child: _buildDetailBox(context, 'Asset Tag ID', asset.tagNo)),
               const SizedBox(width: 12),
-              Expanded(child: _buildDetailBox(context, 'Serial No', asset.serialNo)),
+              Expanded(child: _buildDetailBox(context, 'Asset Name', asset.name)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildDetailBox(context, 'Make', asset.make)),
+              Expanded(child: _buildDetailBox(context, 'Classification', asset.type.name.toUpperCase())),
               const SizedBox(width: 12),
-              Expanded(child: _buildDetailBox(context, 'Model', asset.model)),
+              Expanded(child: _buildDetailBox(context, 'Status', asset.status.name.toUpperCase())),
             ],
           ),
-          if (asset.rfidTag != null || asset.manufacturingYear != null || asset.poNo != null) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildDetailBox(context, 'Manufacturer / Make', asset.make.isNotEmpty ? asset.make : '-')),
+              const SizedBox(width: 12),
+              Expanded(child: _buildDetailBox(context, 'Model', asset.model.isNotEmpty ? asset.model : '-')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildDetailBox(context, 'Serial Number', asset.serialNo.isNotEmpty ? asset.serialNo : '-')),
+              const SizedBox(width: 12),
+              Expanded(child: _buildDetailBox(context, 'Mfg Year', asset.manufacturingYear != null ? asset.manufacturingYear.toString() : '-')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildDetailBox(context, 'PO Number', asset.poNo != null && asset.poNo!.isNotEmpty ? asset.poNo! : '-')),
+              const SizedBox(width: 12),
+              Expanded(child: _buildDetailBox(context, 'RFID / NFC Tag ID', asset.rfidTag != null && asset.rfidTag!.isNotEmpty ? asset.rfidTag! : '-')),
+            ],
+          ),
+          if (asset.description.isNotEmpty) ...[
             const SizedBox(height: 12),
+            _buildDetailBox(context, 'Asset Description / Observations', asset.description),
+          ],
+
+          Divider(color: Theme.of(context).dividerColor, height: 32),
+          _sectionHeader('Context & Operational Placement'),
+
+          if (asset.status == AssetStatus.spare) ...[
+            _buildDetailBox(context, 'Spare Storage Location / Rack', asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Not Specified'),
+            const SizedBox(height: 12),
+            const Text('Compatible Parent Machines:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            asset.applicableParentEquipmentIds != null && asset.applicableParentEquipmentIds!.isNotEmpty
+                ? Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: asset.applicableParentEquipmentIds!
+                        .map((pid) => Chip(
+                              label: Text(pid, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              backgroundColor: Colors.cyan.withValues(alpha: 0.15),
+                              side: const BorderSide(color: Colors.cyanAccent),
+                            ))
+                        .toList(),
+                  )
+                : const Text('No parent machines assigned for this spare pool.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ] else ...[
             Row(
               children: [
-                if (asset.poNo != null) Expanded(child: _buildDetailBox(context, 'PO Number', asset.poNo!)) else const Expanded(child: SizedBox()),
-                if (asset.poNo != null && (asset.rfidTag != null || asset.manufacturingYear != null)) const SizedBox(width: 12),
-                if (asset.rfidTag != null) Expanded(child: _buildDetailBox(context, 'RFID', asset.rfidTag!)) else if (asset.manufacturingYear != null) Expanded(child: _buildDetailBox(context, 'Mfg Year', asset.manufacturingYear.toString())) else const Expanded(child: SizedBox()),
+                Expanded(child: _buildDetailBox(context, 'Installed Parent Equipment', asset.masterEquipmentId.isNotEmpty ? asset.masterEquipmentId : 'Unassigned')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Site Installation Date', asset.installationDate != null ? _formatDate(asset.installationDate!) : '-')),
               ],
             ),
-            if (asset.rfidTag != null && asset.manufacturingYear != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildDetailBox(context, 'Mfg Year', asset.manufacturingYear.toString())),
-                  const Expanded(child: SizedBox()),
-                ],
-              ),
-            ]
           ],
-          
-          Divider(color: Theme.of(context).dividerColor, height: 32),
-          _sectionHeader('Context'),
-          Row(
-            children: [
-              if (asset.masterEquipmentId.isNotEmpty) 
-                Expanded(child: _buildDetailBox(context, 'Parent Equipment', asset.masterEquipmentId)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _buildDetailBox(context, 'Asset Type', asset.type.name.toUpperCase())),
-              const SizedBox(width: 12),
-              Expanded(child: _buildDetailBox(context, 'Criticality', asset.isCritical ? 'CRITICAL' : 'Normal')),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildSpecsTab(BuildContext context) {
+  // --- TAB 2: TECHNICAL SPECIFICATIONS (TAILORED PER ASSET TYPE) ---
+  Widget _buildSpecsTab(BuildContext context, AssetModel asset) {
     final isMotor = asset.type == AssetType.motor;
     final isGearbox = asset.type == AssetType.gearbox;
     final isPump = asset.type == AssetType.pump;
-    
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. MOTOR SPECIFICATIONS
           if (isMotor) ...[
-            _sectionHeader('Motor Technical Specifications'),
+            _sectionHeader('Motor Electrical Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Power', asset.powerKw != null ? '${asset.powerKw} KW' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Rated Power', asset.powerKw != null ? '${asset.powerKw} kW' : '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Voltage', asset.voltage != null ? '${asset.voltage} V' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Rated Voltage', asset.voltage != null ? '${asset.voltage} V' : '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'FLA / Rated Current', asset.fullLoadCurrent != null ? '${asset.fullLoadCurrent} A' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Full Load Current (FLC)', asset.fullLoadCurrent != null ? '${asset.fullLoadCurrent} A' : '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Speed', asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'No Load Current', asset.noLoadCurrent != null ? '${asset.noLoadCurrent} A' : '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Frequency', asset.frequency != null ? '${asset.frequency} Hz' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Rated Speed', asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-')),
                 const SizedBox(width: 12),
                 Expanded(child: _buildDetailBox(context, 'Poles', asset.poles?.toString() ?? '-')),
               ],
@@ -391,38 +511,35 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Power Factor (PF)', asset.powerFactor?.toString() ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Frequency', asset.frequency != null ? '${asset.frequency} Hz' : '-')),
                 const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Power Factor (cos φ)', asset.powerFactor?.toString() ?? '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
                 Expanded(child: _buildDetailBox(context, 'Efficiency', asset.efficiency != null ? '${asset.efficiency}%' : '-')),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
+                const SizedBox(width: 12),
                 Expanded(child: _buildDetailBox(context, 'Frame Size', asset.frameSize ?? '-')),
-                const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Mounting', asset.mountingType ?? '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'DE Bearing', asset.bearingDE ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Mounting Type', asset.mountingType ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'NDE Bearing', asset.bearingNDE ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Grease Type / Grade', asset.specs?['greaseType'] ?? '-')),
               ],
             ),
-            if (asset.specs?['greaseType'] != null) ...[
-              const SizedBox(height: 12),
-              _buildDetailBox(context, 'Grease Type / Grade', asset.specs!['greaseType']),
-            ],
-          ],
-          
-          if (isGearbox) ...[
-            _sectionHeader('Gearbox Technical Specifications'),
+          ]
+
+          // 2. GEARBOX SPECIFICATIONS
+          else if (isGearbox) ...[
+            _sectionHeader('Gearbox Transmission Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Power Rating', asset.powerKw != null ? '${asset.powerKw} KW' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Power Rating', (asset.specs?['inputPowerKw'] ?? asset.powerKw) != null ? '${asset.specs?['inputPowerKw'] ?? asset.powerKw} kW' : '-')),
                 const SizedBox(width: 12),
                 Expanded(child: _buildDetailBox(context, 'Gear Ratio (i)', asset.specs?['gearRatio']?.toString() ?? '-')),
               ],
@@ -430,32 +547,53 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Speed', asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Speed', (asset.specs?['inputSpeedRpm'] ?? asset.speedRpm) != null ? '${asset.specs?['inputSpeedRpm'] ?? asset.speedRpm} RPM' : '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Oil Capacity', asset.specs?['oilCapacity'] != null ? '${asset.specs!['oilCapacity']} L' : '-')),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildDetailBox(context, 'Recommended Oil Type', asset.specs?['oilType'] ?? '-'),
-            const SizedBox(height: 12),
-            _buildDetailBox(context, 'Mounting', asset.mountingType ?? '-'),
-          ],
-          
-          if (isPump) ...[
-            _sectionHeader('Pump Technical Specifications'),
-            Row(
-              children: [
-                Expanded(child: _buildDetailBox(context, 'Power Required', asset.specs?['pumpPower'] != null ? '${asset.specs!['pumpPower']} KW' : '-')),
-                const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Speed', asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Output Speed', asset.specs?['outputSpeedRpm'] != null ? '${asset.specs!['outputSpeedRpm']} RPM' : '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Flow Rate', asset.specs?['flowRate'] != null ? '${asset.specs!['flowRate']} m³/hr' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Recommended Oil Grade', asset.specs?['oilType'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Head', asset.specs?['head'] != null ? '${asset.specs!['head']} meters' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Oil Sump Capacity', asset.specs?['oilCapacity'] != null ? '${asset.specs!['oilCapacity']} L' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Input Shaft Ø', asset.specs?['inputShaftMm'] != null ? '${asset.specs!['inputShaftMm']} mm' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Output Shaft Ø', asset.specs?['outputShaftMm'] != null ? '${asset.specs!['outputShaftMm']} mm' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Lubrication Method', asset.specs?['lubricationMethod'] ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Mounting Orientation', asset.specs?['mountingOrientation'] ?? asset.mountingType ?? '-')),
+              ],
+            ),
+          ]
+
+          // 3. PUMP SPECIFICATIONS
+          else if (isPump) ...[
+            _sectionHeader('Pump Hydraulic Specifications'),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Flow Rate / Capacity', asset.specs?['flowRate'] != null ? '${asset.specs!['flowRate']} m³/hr' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Total Dynamic Head', asset.specs?['head'] != null ? '${asset.specs!['head']} m' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Pump Speed', (asset.specs?['pumpSpeedRpm'] ?? asset.speedRpm) != null ? '${asset.specs?['pumpSpeedRpm'] ?? asset.speedRpm} RPM' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Shaft Power Required', (asset.specs?['pumpPower'] ?? asset.powerKw) != null ? '${asset.specs?['pumpPower'] ?? asset.powerKw} kW' : '-')),
               ],
             ),
             const SizedBox(height: 12),
@@ -463,38 +601,64 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
               children: [
                 Expanded(child: _buildDetailBox(context, 'Impeller Diameter', asset.specs?['impellerSize'] != null ? '${asset.specs!['impellerSize']} mm' : '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Grease Type', asset.specs?['greaseType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Seal Type', asset.specs?['sealType'] ?? '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Suction Flange Ø', asset.specs?['suctionFlangeMm'] != null ? '${asset.specs!['suctionFlangeMm']} mm' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Discharge Flange Ø', asset.specs?['dischargeFlangeMm'] != null ? '${asset.specs!['dischargeFlangeMm']} mm' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Casing Material', asset.specs?['casingMaterial'] ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Grease / Lubricant', asset.specs?['greaseType'] ?? '-')),
               ],
             ),
           ],
+
+          // Common Bearing Specifications
+          Divider(color: Theme.of(context).dividerColor, height: 32),
+          _sectionHeader('Bearing Details'),
+          Row(
+            children: [
+              Expanded(child: _buildDetailBox(context, 'Drive End (DE) Bearing', asset.bearingDE ?? '-')),
+              const SizedBox(width: 12),
+              Expanded(child: _buildDetailBox(context, 'Non-Drive End (NDE) Bearing', asset.bearingNDE ?? '-')),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHealthTab(BuildContext context) {
+  // --- TAB 3: DIAGNOSTICS & HEALTH ---
+  Widget _buildHealthTab(BuildContext context, AssetModel asset) {
     return Column(
       children: [
-        // Action Header
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Historical Diagnostic Tests', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('Diagnostic Test Logs', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
               ElevatedButton.icon(
-                onPressed: () => _showLogTestDialog(context),
-                icon: const Icon(Icons.add_chart, size: 18),
-                label: const Text('Log Test'),
+                onPressed: () => _showLogTestDialog(context, asset),
+                icon: const Icon(Icons.add_chart, size: 16),
+                label: const Text('Log Test', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 ),
               ),
             ],
           ),
         ),
-        
         Expanded(
           child: StreamBuilder<List<HealthLogModel>>(
             stream: FirestoreService().getHealthLogsStream(asset.id),
@@ -510,17 +674,17 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     children: [
                       Icon(Icons.assignment_turned_in_outlined, size: 48, color: Theme.of(context).disabledColor),
                       const SizedBox(height: 16),
-                      Text('No diagnostic health logs found.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      Text('No diagnostic health logs recorded yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () => _showLogTestDialog(context),
+                        onPressed: () => _showLogTestDialog(context, asset),
                         child: const Text('Record First Test Log'),
-                      )
+                      ),
                     ],
                   ),
                 );
               }
-              
+
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: logs.length,
@@ -532,11 +696,14 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ExpansionTile(
                       leading: _buildHealthBadge(
-                        log.healthStatus == 'healthy' ? AssetHealthStatus.healthy :
-                        log.healthStatus == 'warning' ? AssetHealthStatus.warning : AssetHealthStatus.critical
+                        log.healthStatus == 'healthy'
+                            ? AssetHealthStatus.healthy
+                            : log.healthStatus == 'warning'
+                                ? AssetHealthStatus.warning
+                                : AssetHealthStatus.critical,
                       ),
-                      title: Text('Test Run: ${_formatDate(log.testDate)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('By ${log.testedBy} • Status: ${log.healthStatus.toUpperCase()}', style: const TextStyle(fontSize: 12)),
+                      title: Text('Test Run: ${_formatDate(log.testDate)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      subtitle: Text('By ${log.testedBy} • Status: ${log.healthStatus.toUpperCase()}', style: const TextStyle(fontSize: 11)),
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(16),
@@ -548,26 +715,28 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                                 const Divider(),
                               ],
                               if (asset.type == AssetType.motor) ...[
-                                if (log.noLoadCurrent != null)
-                                  _buildLogItem('No-Load Current', '${log.noLoadCurrent} A'),
+                                if (log.noLoadCurrent != null) _buildLogItem('No-Load Current', '${log.noLoadCurrent} A'),
                                 if (log.windingResistance != null)
-                                  _buildLogItem('Winding Resistance', 'R-Y: ${log.windingResistance!['R-Y'] ?? "-"} Ω, Y-B: ${log.windingResistance!['Y-B'] ?? "-"} Ω, R-B: ${log.windingResistance!['R-B'] ?? "-"} Ω'),
+                                  _buildLogItem('Winding Resistance',
+                                      'R-Y: ${log.windingResistance!['R-Y'] ?? "-"} Ω, Y-B: ${log.windingResistance!['Y-B'] ?? "-"} Ω, R-B: ${log.windingResistance!['R-B'] ?? "-"} Ω'),
                                 if (log.insulationResistance != null) ...[
-                                  _buildLogItem('IR Phase-Phase', 'R-Y: ${log.insulationResistance!['R-Y'] ?? "-"} MΩ, Y-B: ${log.insulationResistance!['Y-B'] ?? "-"} MΩ, B-R: ${log.insulationResistance!['B-R'] ?? "-"} MΩ'),
-                                  _buildLogItem('IR Phase-Earth', 'R-E: ${log.insulationResistance!['R-E'] ?? "-"} MΩ, Y-E: ${log.insulationResistance!['Y-E'] ?? "-"} MΩ, B-E: ${log.insulationResistance!['B-E'] ?? "-"} MΩ'),
+                                  _buildLogItem('IR Phase-Phase',
+                                      'R-Y: ${log.insulationResistance!['R-Y'] ?? "-"} MΩ, Y-B: ${log.insulationResistance!['Y-B'] ?? "-"} MΩ, B-R: ${log.insulationResistance!['B-R'] ?? "-"} MΩ'),
+                                  _buildLogItem('IR Phase-Earth',
+                                      'R-E: ${log.insulationResistance!['R-E'] ?? "-"} MΩ, Y-E: ${log.insulationResistance!['Y-E'] ?? "-"} MΩ, B-E: ${log.insulationResistance!['B-E'] ?? "-"} MΩ'),
                                 ],
-                                if (log.polarizationIndex != null)
-                                  _buildLogItem('Polarization Index (PI)', '${log.polarizationIndex}'),
+                                if (log.polarizationIndex != null) _buildLogItem('Polarization Index (PI)', '${log.polarizationIndex}'),
                               ],
                               if (log.vibration != null) ...[
-                                _buildLogItem('DE Vibration', 'H: ${log.vibration!['DE_H'] ?? "-"} mm/s, V: ${log.vibration!['DE_V'] ?? "-"} mm/s, A: ${log.vibration!['DE_A'] ?? "-"} mm/s'),
-                                _buildLogItem('NDE Vibration', 'H: ${log.vibration!['NDE_H'] ?? "-"} mm/s, V: ${log.vibration!['NDE_V'] ?? "-"} mm/s, A: ${log.vibration!['NDE_A'] ?? "-"} mm/s'),
-                                if (log.vibration!['G_Value'] != null)
-                                  _buildLogItem('Acceleration (G-Value)', '${log.vibration!['G_Value']} G'),
+                                _buildLogItem('DE Vibration',
+                                    'H: ${log.vibration!['DE_H'] ?? "-"} mm/s, V: ${log.vibration!['DE_V'] ?? "-"} mm/s, A: ${log.vibration!['DE_A'] ?? "-"} mm/s'),
+                                _buildLogItem('NDE Vibration',
+                                    'H: ${log.vibration!['NDE_H'] ?? "-"} mm/s, V: ${log.vibration!['NDE_V'] ?? "-"} mm/s, A: ${log.vibration!['NDE_A'] ?? "-"} mm/s'),
+                                if (log.vibration!['G_Value'] != null) _buildLogItem('Acceleration (G-Value)', '${log.vibration!['G_Value']} G'),
                               ],
                             ],
                           ),
-                        )
+                        ),
                       ],
                     ),
                   );
@@ -577,6 +746,86 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
           ),
         ),
       ],
+    );
+  }
+
+  // --- TAB 4: HISTORY ---
+  Widget _buildHistoryTab(BuildContext context, AssetModel asset) {
+    return StreamBuilder<List<FaultLogModel>>(
+      stream: FirestoreService().getFaultLogsStream(asset.masterEquipmentId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: PulseLoading(size: 40));
+        }
+
+        final logs = snapshot.data ?? [];
+        final assetLogs = logs.where((FaultLogModel l) => l.assetId == asset.id).toList();
+
+        if (assetLogs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history, size: 48, color: Theme.of(context).disabledColor),
+                const SizedBox(height: 16),
+                Text('No fault or replacement history found.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: assetLogs.length,
+          itemBuilder: (context, index) {
+            final log = assetLogs[index];
+            final dateStr = _formatDate(log.reportedAt);
+
+            return _buildHistoryItem(
+              context,
+              log.category.name.toUpperCase(),
+              '${log.cause}\n${log.actionTaken}',
+              dateStr,
+              status: log.status.name,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Helpers ---
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.accent,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.1,
+          fontSize: 11.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailBox(BuildContext context, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13.5)),
+        ],
+      ),
     );
   }
 
@@ -593,30 +842,70 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  Widget _buildHistoryItem(BuildContext context, String title, String subtitle, String date, {String? status}) {
+    Color statusColor = AppColors.success;
+    if (status == 'open') statusColor = AppColors.error;
+    if (status == 'in_progress') statusColor = AppColors.warning;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Icon(status == 'open' ? Icons.warning_rounded : Icons.check_circle_outline, color: statusColor, size: 16),
+              ),
+              Container(width: 2, height: 36, color: Theme.of(context).dividerColor),
+            ],
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(date, style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 11)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _showLogTestDialog(BuildContext context) {
+  void _showLogTestDialog(BuildContext context, AssetModel asset) {
     final testedByController = TextEditingController(text: AuthService().currentUser?.displayName ?? 'Operator');
     final remarksController = TextEditingController();
-    
-    // Motor specific
+
     final noLoadCurrentController = TextEditingController();
     final resRYController = TextEditingController();
     final resYBController = TextEditingController();
     final resRBController = TextEditingController();
-    
+
     final irRyController = TextEditingController();
     final irYbController = TextEditingController();
     final irBrController = TextEditingController();
     final irReController = TextEditingController();
     final irYeController = TextEditingController();
     final irBeController = TextEditingController();
-    
+
     final piController = TextEditingController();
-    
-    // Vibration
+
     final vibDeHController = TextEditingController();
     final vibDeVController = TextEditingController();
     final vibDeAController = TextEditingController();
@@ -624,7 +913,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     final vibNdeVController = TextEditingController();
     final vibNdeAController = TextEditingController();
     final vibGController = TextEditingController();
-    
+
     String selectedStatus = 'healthy';
 
     showDialog(
@@ -644,7 +933,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                       decoration: const InputDecoration(labelText: 'Tested By', border: OutlineInputBorder()),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       dropdownColor: Theme.of(context).colorScheme.surface,
                       value: selectedStatus,
@@ -663,88 +952,85 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                         }
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: remarksController,
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                       decoration: const InputDecoration(labelText: 'Remarks / Comments', border: OutlineInputBorder()),
                     ),
-                    const SizedBox(height: 16),
-                    
+                    const SizedBox(height: 14),
                     if (asset.type == AssetType.motor) ...[
                       const Divider(),
-                      const Text('Winding Resistance (Ω)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Winding Resistance (Ω)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: TextField(controller: resRYController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: resYBController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: resRBController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-B'))),
+                          Expanded(child: TextField(controller: resRYController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: resYBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: resRBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-B'))),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      const Text('Insulation Resistance / IR (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 14),
+                      const Text('Insulation Resistance / IR (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: TextField(controller: irRyController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: irYbController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: irBrController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R'))),
+                          Expanded(child: TextField(controller: irRyController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: irYbController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: irBrController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R'))),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: TextField(controller: irReController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: irYeController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: irBeController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E'))),
+                          Expanded(child: TextField(controller: irReController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: irYeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E'))),
+                          const SizedBox(width: 6),
+                          Expanded(child: TextField(controller: irBeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E'))),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
-                          Expanded(child: TextField(controller: noLoadCurrentController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'No-Load Current (A)'))),
-                          const SizedBox(width: 12),
-                          Expanded(child: TextField(controller: piController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'PI Value'))),
+                          Expanded(child: TextField(controller: noLoadCurrentController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'No-Load Current (A)'))),
+                          const SizedBox(width: 10),
+                          Expanded(child: TextField(controller: piController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'PI Value'))),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                     ],
-                    
                     const Divider(),
-                    const Text('Vibration (mm/s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('Vibration (mm/s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                     const SizedBox(height: 8),
                     const Text('Drive End (DE)', style: TextStyle(fontSize: 11)),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: vibDeHController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: vibDeVController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: vibDeAController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
+                        Expanded(child: TextField(controller: vibDeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
+                        const SizedBox(width: 6),
+                        Expanded(child: TextField(controller: vibDeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
+                        const SizedBox(width: 6),
+                        Expanded(child: TextField(controller: vibDeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
                       ],
                     ),
                     const SizedBox(height: 8),
                     const Text('Non-Drive End (NDE)', style: TextStyle(fontSize: 11)),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: vibNdeHController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: vibNdeVController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: vibNdeAController, style: TextStyle(color: Theme.of(context).colorScheme.onSurface), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
+                        Expanded(child: TextField(controller: vibNdeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
+                        const SizedBox(width: 6),
+                        Expanded(child: TextField(controller: vibNdeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
+                        const SizedBox(width: 6),
+                        Expanded(child: TextField(controller: vibNdeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: vibGController,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Acceleration (G-Value)', border: OutlineInputBorder()),
                     ),
@@ -755,13 +1041,12 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: () async {
-                    // Create health log model
                     final windingRes = {
                       if (resRYController.text.isNotEmpty) 'R-Y': double.tryParse(resRYController.text),
                       if (resYBController.text.isNotEmpty) 'Y-B': double.tryParse(resYBController.text),
                       if (resRBController.text.isNotEmpty) 'R-B': double.tryParse(resRBController.text),
                     };
-                    
+
                     final irMap = {
                       if (irRyController.text.isNotEmpty) 'R-Y': double.tryParse(irRyController.text),
                       if (irYbController.text.isNotEmpty) 'Y-B': double.tryParse(irYbController.text),
@@ -770,7 +1055,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       if (irYeController.text.isNotEmpty) 'Y-E': double.tryParse(irYeController.text),
                       if (irBeController.text.isNotEmpty) 'B-E': double.tryParse(irBeController.text),
                     };
-                    
+
                     final vibMap = {
                       if (vibDeHController.text.isNotEmpty) 'DE_H': double.tryParse(vibDeHController.text),
                       if (vibDeVController.text.isNotEmpty) 'DE_V': double.tryParse(vibDeVController.text),
@@ -780,7 +1065,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       if (vibNdeAController.text.isNotEmpty) 'NDE_A': double.tryParse(vibNdeAController.text),
                       if (vibGController.text.isNotEmpty) 'G_Value': double.tryParse(vibGController.text),
                     };
-                    
+
                     final log = HealthLogModel(
                       id: 'new',
                       assetId: asset.id,
@@ -794,14 +1079,15 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       remarks: remarksController.text,
                       healthStatus: selectedStatus,
                     );
-                    
-                    // Save to DB
+
                     await FirestoreService().saveHealthLog(log);
-                    
-                    // Update asset status
-                    final hStatus = selectedStatus == 'healthy' ? AssetHealthStatus.healthy :
-                                   selectedStatus == 'warning' ? AssetHealthStatus.warning : AssetHealthStatus.critical;
-                                   
+
+                    final hStatus = selectedStatus == 'healthy'
+                        ? AssetHealthStatus.healthy
+                        : selectedStatus == 'warning'
+                            ? AssetHealthStatus.warning
+                            : AssetHealthStatus.critical;
+
                     final updatedAsset = AssetModel(
                       id: asset.id,
                       masterEquipmentId: asset.masterEquipmentId,
@@ -835,6 +1121,9 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       polarizationIndex: log.polarizationIndex ?? asset.polarizationIndex,
                       vibration: log.vibration ?? asset.vibration,
                       isCritical: asset.isCritical,
+                      applicableParentEquipmentIds: asset.applicableParentEquipmentIds,
+                      spareLocation: asset.spareLocation,
+                      seqNo: asset.seqNo,
                       installationDate: asset.installationDate,
                       healthStatus: hStatus,
                       lastPulseTime: DateTime.now(),
@@ -843,9 +1132,9 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       modifiedAt: DateTime.now(),
                       modifiedBy: AuthService().currentUser?.uid,
                     );
-                    
+
                     await FirestoreService().saveAsset(updatedAsset);
-                    
+
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Diagnostic log recorded successfully!'), backgroundColor: AppColors.success));
                       Navigator.pop(context);
@@ -862,142 +1151,9 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
-  Widget _buildHistoryTab(BuildContext context) {
-    return StreamBuilder<List<FaultLogModel>>(
-      stream: FirestoreService().getFaultLogsStream(asset.masterEquipmentId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: PulseLoading(size: 40));
-        }
-
-        final logs = snapshot.data ?? [];
-        // Filter for specific asset if it was logged against this sub-component
-        final assetLogs = logs.where((FaultLogModel l) => l.assetId == asset.id).toList();
-
-        if (assetLogs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 48, color: Theme.of(context).disabledColor),
-                const SizedBox(height: 16),
-                Text('No fault history found.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(24),
-          itemCount: assetLogs.length,
-          itemBuilder: (context, index) {
-            final log = assetLogs[index];
-            final dateStr = log.reportedAt.toString().split(' ')[0];
-            
-              return _buildHistoryItem(
-                context, 
-                log.category.name.toUpperCase(), 
-                '${log.cause}\n${log.actionTaken}', 
-                dateStr,
-                status: log.status.name,
-              );
-          },
-        );
-      },
-    );
-  }
-
-  // --- Helpers ---
-  
-  Widget _sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.accent, 
-          fontWeight: FontWeight.bold, 
-          letterSpacing: 1.1,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailBox(BuildContext context, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-
-
-  Widget _buildHistoryItem(BuildContext context, String title, String subtitle, String date, {String? status}) {
-    Color statusColor = AppColors.success;
-    if (status == 'open') statusColor = AppColors.error;
-    if (status == 'in_progress') statusColor = AppColors.warning;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                   color: statusColor.withValues(alpha: 0.1),
-                   shape: BoxShape.circle,
-                   border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                ),
-                child: Icon(
-                  status == 'open' ? Icons.warning_rounded : Icons.check_circle_outline, 
-                  color: statusColor, 
-                  size: 18
-                ),
-              ),
-              // Timeline line
-              Container(width: 2, height: 40, color: Theme.of(context).dividerColor),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
-                    Text(date, style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 11)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showReplaceWithSpareDialog(BuildContext context) async {
-    // 1. Fetch available spares of the same type
-    final querySnapshot = await FirebaseFirestore.instance.collection('assets')
+  void _showReplaceWithSpareDialog(BuildContext context, AssetModel asset) async {
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('assets')
         .where('type', isEqualTo: asset.type.name)
         .where('status', isEqualTo: AssetStatus.spare.name)
         .get();
@@ -1025,7 +1181,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -1045,7 +1201,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     items: spares.map((s) {
                       return DropdownMenuItem<AssetModel>(
                         value: s,
-                        child: Text('${s.tagNo} - ${s.make} (${s.model})'),
+                        child: Text('${s.tagNo} - ${s.make} (${s.model})', overflow: TextOverflow.ellipsis),
                       );
                     }).toList(),
                     onChanged: (v) {
@@ -1056,58 +1212,58 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Note: Upon confirmation, the current asset (${asset.tagNo}) will be marked as "Under Maintenance" and removed from this location. The selected spare will take its place.',
+                    'Note: Upon confirmation, the current asset (${asset.tagNo}) will be marked as "Under Maintenance" and moved to standby. The selected spare (${selectedSpare?.tagNo ?? "..."}) will become ACTIVE at this machine location.',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
                 ElevatedButton(
-                  onPressed: selectedSpare == null ? null : () async {
-                    // Start transaction
-                    final db = FirebaseFirestore.instance;
-                    final batch = db.batch();
+                  onPressed: selectedSpare == null
+                      ? null
+                      : () async {
+                          final db = FirebaseFirestore.instance;
+                          final batch = db.batch();
 
-                    final currentRef = db.collection('assets').doc(asset.id);
-                    final spareRef = db.collection('assets').doc(selectedSpare!.id);
+                          final currentRef = db.collection('assets').doc(asset.id);
+                          final spareRef = db.collection('assets').doc(selectedSpare!.id);
 
-                    // 1. Move current asset to underMaintenance and clear parent
-                    batch.update(currentRef, {
-                      'status': AssetStatus.underMaintenance.name,
-                      'masterEquipmentId': '', // unassigned
-                      'modifiedAt': FieldValue.serverTimestamp(),
-                      'modifiedBy': AuthService().currentUser?.uid,
-                    });
+                          // 1. Move current asset to underMaintenance and clear parent
+                          batch.update(currentRef, {
+                            'status': AssetStatus.underMaintenance.name,
+                            'masterEquipmentId': '',
+                            'modifiedAt': FieldValue.serverTimestamp(),
+                            'modifiedBy': AuthService().currentUser?.uid,
+                          });
 
-                    // 2. Move spare to active and set parent
-                    batch.update(spareRef, {
-                      'status': AssetStatus.active.name,
-                      'masterEquipmentId': asset.masterEquipmentId,
-                      'modifiedAt': FieldValue.serverTimestamp(),
-                      'modifiedBy': AuthService().currentUser?.uid,
-                    });
+                          // 2. Move spare to active and set parent
+                          batch.update(spareRef, {
+                            'status': AssetStatus.active.name,
+                            'masterEquipmentId': asset.masterEquipmentId,
+                            'installationDate': FieldValue.serverTimestamp(),
+                            'modifiedAt': FieldValue.serverTimestamp(),
+                            'modifiedBy': AuthService().currentUser?.uid,
+                          });
 
-                    // Commit batch
-                    await batch.commit();
+                          await batch.commit();
 
-                    // Log activity
-                    await FirestoreService().logActivity(
-                      userId: AuthService().currentUser?.uid ?? 'unknown',
-                      action: 'Replace Asset with Spare',
-                      details: 'Replaced asset ${asset.tagNo} with spare ${selectedSpare!.tagNo} at equipment location ${asset.masterEquipmentId}',
-                    );
+                          await FirestoreService().logActivity(
+                            userId: AuthService().currentUser?.uid ?? 'unknown',
+                            action: 'Replace Asset with Spare',
+                            details: 'Replaced asset ${asset.tagNo} with spare ${selectedSpare!.tagNo} at equipment location ${asset.masterEquipmentId}',
+                          );
 
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Asset replaced with ${selectedSpare!.tagNo} successfully!'), backgroundColor: AppColors.success),
-                      );
-                      Navigator.pop(context); // close dialog
-                      Navigator.pop(context); // go back to assets list since current asset is now unassigned
-                    }
-                  },
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Asset replaced with ${selectedSpare!.tagNo} successfully!'), backgroundColor: AppColors.success),
+                            );
+                            Navigator.pop(dialogCtx);
+                            Navigator.pop(context);
+                          }
+                        },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-                  child: const Text('Confirm Swap', style: TextStyle(color: Colors.white)),
+                  child: const Text('Confirm Swap', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             );
