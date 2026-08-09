@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../data/models/asset_model.dart';
-import '../../../../core/services/health_service.dart'; // NEW
+import '../../../../core/services/health_service.dart';
 
 class AssetCard extends StatelessWidget {
   final AssetModel asset;
@@ -17,13 +16,13 @@ class AssetCard extends StatelessWidget {
   Color _getStatusColor(AssetStatus status) {
     switch (status) {
       case AssetStatus.active:
-        return AppColors.success;
+        return Colors.greenAccent;
       case AssetStatus.underMaintenance:
-        return AppColors.warning;
+        return Colors.orangeAccent;
       case AssetStatus.scrapped:
-        return AppColors.error;
+        return Colors.redAccent;
       case AssetStatus.spare:
-        return Colors.grey;
+        return Colors.cyanAccent;
     }
   }
 
@@ -33,6 +32,11 @@ class AssetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = _getStatusColor(asset.status);
+    final indicatorColor = asset.healthStatus != AssetHealthStatus.unknown
+        ? HealthService().getHealthColor(asset.healthStatus)
+        : statusColor;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -46,14 +50,21 @@ class AssetCard extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Health Indicator Bar
+                // Live Status / Health Indicator Bar
                 Container(
-                  width: 6,
+                  width: 5,
                   height: double.infinity,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: HealthService().getHealthColor(asset.healthStatus),
+                    color: indicatorColor,
                     borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: indicatorColor.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
                 ),
                 

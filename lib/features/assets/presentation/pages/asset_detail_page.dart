@@ -14,6 +14,7 @@ import '../../../../core/services/firestore_service.dart';
 import '../../../../core/widgets/pulse_loading.dart';
 import '../../../assets/presentation/pages/add_edit_asset_page.dart';
 import '../../../log_data/presentation/pages/add_fault_log_page.dart';
+import 'log_diagnostic_test_page.dart';
 import '../../data/models/fault_log_model.dart';
 
 class AssetDetailPage extends StatefulWidget {
@@ -648,7 +649,14 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             children: [
               Text('Diagnostic Test Logs', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
               ElevatedButton.icon(
-                onPressed: () => _showLogTestDialog(context, asset),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LogDiagnosticTestPage(asset: asset),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.add_chart, size: 16),
                 label: const Text('Log Test', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
@@ -677,7 +685,14 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       Text('No diagnostic health logs recorded yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () => _showLogTestDialog(context, asset),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LogDiagnosticTestPage(asset: asset),
+                            ),
+                          );
+                        },
                         child: const Text('Record First Test Log'),
                       ),
                     ],
@@ -888,268 +903,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
-  void _showLogTestDialog(BuildContext context, AssetModel asset) {
-    final testedByController = TextEditingController(text: AuthService().currentUser?.displayName ?? 'Operator');
-    final remarksController = TextEditingController();
 
-    final noLoadCurrentController = TextEditingController();
-    final resRYController = TextEditingController();
-    final resYBController = TextEditingController();
-    final resRBController = TextEditingController();
-
-    final irRyController = TextEditingController();
-    final irYbController = TextEditingController();
-    final irBrController = TextEditingController();
-    final irReController = TextEditingController();
-    final irYeController = TextEditingController();
-    final irBeController = TextEditingController();
-
-    final piController = TextEditingController();
-
-    final vibDeHController = TextEditingController();
-    final vibDeVController = TextEditingController();
-    final vibDeAController = TextEditingController();
-    final vibNdeHController = TextEditingController();
-    final vibNdeVController = TextEditingController();
-    final vibNdeAController = TextEditingController();
-    final vibGController = TextEditingController();
-
-    String selectedStatus = 'healthy';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              title: Text('Log Diagnostic Test Run', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: testedByController,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                      decoration: const InputDecoration(labelText: 'Tested By', border: OutlineInputBorder()),
-                    ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      dropdownColor: Theme.of(context).colorScheme.surface,
-                      value: selectedStatus,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                      decoration: const InputDecoration(labelText: 'Overall Health Status', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'healthy', child: Text('HEALTHY')),
-                        DropdownMenuItem(value: 'warning', child: Text('WARNING')),
-                        DropdownMenuItem(value: 'critical', child: Text('CRITICAL')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) {
-                          setDialogState(() {
-                            selectedStatus = v;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: remarksController,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                      decoration: const InputDecoration(labelText: 'Remarks / Comments', border: OutlineInputBorder()),
-                    ),
-                    const SizedBox(height: 14),
-                    if (asset.type == AssetType.motor) ...[
-                      const Divider(),
-                      const Text('Winding Resistance (Ω)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: TextField(controller: resRYController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: resYBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: resRBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-B'))),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      const Text('Insulation Resistance / IR (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: TextField(controller: irRyController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: irYbController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: irBrController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R'))),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: TextField(controller: irReController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: irYeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E'))),
-                          const SizedBox(width: 6),
-                          Expanded(child: TextField(controller: irBeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E'))),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(child: TextField(controller: noLoadCurrentController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'No-Load Current (A)'))),
-                          const SizedBox(width: 10),
-                          Expanded(child: TextField(controller: piController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'PI Value'))),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    const Divider(),
-                    const Text('Vibration (mm/s)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                    const SizedBox(height: 8),
-                    const Text('Drive End (DE)', style: TextStyle(fontSize: 11)),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: vibDeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
-                        const SizedBox(width: 6),
-                        Expanded(child: TextField(controller: vibDeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
-                        const SizedBox(width: 6),
-                        Expanded(child: TextField(controller: vibDeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Non-Drive End (NDE)', style: TextStyle(fontSize: 11)),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: vibNdeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'H'))),
-                        const SizedBox(width: 6),
-                        Expanded(child: TextField(controller: vibNdeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'V'))),
-                        const SizedBox(width: 6),
-                        Expanded(child: TextField(controller: vibNdeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'A'))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: vibGController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Acceleration (G-Value)', border: OutlineInputBorder()),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () async {
-                    final windingRes = {
-                      if (resRYController.text.isNotEmpty) 'R-Y': double.tryParse(resRYController.text),
-                      if (resYBController.text.isNotEmpty) 'Y-B': double.tryParse(resYBController.text),
-                      if (resRBController.text.isNotEmpty) 'R-B': double.tryParse(resRBController.text),
-                    };
-
-                    final irMap = {
-                      if (irRyController.text.isNotEmpty) 'R-Y': double.tryParse(irRyController.text),
-                      if (irYbController.text.isNotEmpty) 'Y-B': double.tryParse(irYbController.text),
-                      if (irBrController.text.isNotEmpty) 'B-R': double.tryParse(irBrController.text),
-                      if (irReController.text.isNotEmpty) 'R-E': double.tryParse(irReController.text),
-                      if (irYeController.text.isNotEmpty) 'Y-E': double.tryParse(irYeController.text),
-                      if (irBeController.text.isNotEmpty) 'B-E': double.tryParse(irBeController.text),
-                    };
-
-                    final vibMap = {
-                      if (vibDeHController.text.isNotEmpty) 'DE_H': double.tryParse(vibDeHController.text),
-                      if (vibDeVController.text.isNotEmpty) 'DE_V': double.tryParse(vibDeVController.text),
-                      if (vibDeAController.text.isNotEmpty) 'DE_A': double.tryParse(vibDeAController.text),
-                      if (vibNdeHController.text.isNotEmpty) 'NDE_H': double.tryParse(vibNdeHController.text),
-                      if (vibNdeVController.text.isNotEmpty) 'NDE_V': double.tryParse(vibNdeVController.text),
-                      if (vibNdeAController.text.isNotEmpty) 'NDE_A': double.tryParse(vibNdeAController.text),
-                      if (vibGController.text.isNotEmpty) 'G_Value': double.tryParse(vibGController.text),
-                    };
-
-                    final log = HealthLogModel(
-                      id: 'new',
-                      assetId: asset.id,
-                      testDate: DateTime.now(),
-                      testedBy: testedByController.text,
-                      noLoadCurrent: double.tryParse(noLoadCurrentController.text),
-                      windingResistance: windingRes.isNotEmpty ? windingRes : null,
-                      insulationResistance: irMap.isNotEmpty ? irMap : null,
-                      polarizationIndex: double.tryParse(piController.text),
-                      vibration: vibMap.isNotEmpty ? vibMap : null,
-                      remarks: remarksController.text,
-                      healthStatus: selectedStatus,
-                    );
-
-                    await FirestoreService().saveHealthLog(log);
-
-                    final hStatus = selectedStatus == 'healthy'
-                        ? AssetHealthStatus.healthy
-                        : selectedStatus == 'warning'
-                            ? AssetHealthStatus.warning
-                            : AssetHealthStatus.critical;
-
-                    final updatedAsset = AssetModel(
-                      id: asset.id,
-                      masterEquipmentId: asset.masterEquipmentId,
-                      tagNo: asset.tagNo,
-                      name: asset.name,
-                      make: asset.make,
-                      model: asset.model,
-                      serialNo: asset.serialNo,
-                      poNo: asset.poNo,
-                      manufacturingYear: asset.manufacturingYear,
-                      imageUrl: asset.imageUrl,
-                      rfidTag: asset.rfidTag,
-                      type: asset.type,
-                      status: asset.status,
-                      specs: asset.specs,
-                      powerKw: asset.powerKw,
-                      voltage: asset.voltage,
-                      fullLoadCurrent: asset.fullLoadCurrent,
-                      noLoadCurrent: log.noLoadCurrent ?? asset.noLoadCurrent,
-                      frequency: asset.frequency,
-                      speedRpm: asset.speedRpm,
-                      poles: asset.poles,
-                      frameSize: asset.frameSize,
-                      mountingType: asset.mountingType,
-                      powerFactor: asset.powerFactor,
-                      efficiency: asset.efficiency,
-                      bearingDE: asset.bearingDE,
-                      bearingNDE: asset.bearingNDE,
-                      windingResistance: log.windingResistance ?? asset.windingResistance,
-                      insulationResistance: log.insulationResistance ?? asset.insulationResistance,
-                      polarizationIndex: log.polarizationIndex ?? asset.polarizationIndex,
-                      vibration: log.vibration ?? asset.vibration,
-                      isCritical: asset.isCritical,
-                      applicableParentEquipmentIds: asset.applicableParentEquipmentIds,
-                      spareLocation: asset.spareLocation,
-                      seqNo: asset.seqNo,
-                      installationDate: asset.installationDate,
-                      healthStatus: hStatus,
-                      lastPulseTime: DateTime.now(),
-                      createdAt: asset.createdAt,
-                      createdBy: asset.createdBy,
-                      modifiedAt: DateTime.now(),
-                      modifiedBy: AuthService().currentUser?.uid,
-                    );
-
-                    await FirestoreService().saveAsset(updatedAsset);
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Diagnostic log recorded successfully!'), backgroundColor: AppColors.success));
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                  child: const Text('Save Test', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _showReplaceWithSpareDialog(BuildContext context, AssetModel asset) async {
     final querySnapshot = await FirebaseFirestore.instance

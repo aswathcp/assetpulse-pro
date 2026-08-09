@@ -52,6 +52,12 @@ class _AssetsTabState extends State<AssetsTab> {
   bool _isManagingAssets = false;
   bool _showHelp = false;
 
+  String _filterStatus = 'All';
+  String _filterType = 'All';
+  String _filterCriticality = 'All';
+
+  bool get _hasActiveFilters => _filterStatus != 'All' || _filterType != 'All' || _filterCriticality != 'All';
+
   List<AssetModel> _assets = [];
 
   @override
@@ -160,6 +166,16 @@ class _AssetsTabState extends State<AssetsTab> {
   List<AssetModel> get _filteredAssets {
     final query = _searchController.text.trim().toLowerCase();
     return _assets.where((a) {
+      if (_filterStatus != 'All') {
+        final normalizedStatus = _filterStatus.toLowerCase().replaceAll(' ', '');
+        if (a.status.name.toLowerCase() != normalizedStatus) return false;
+      }
+      if (_filterType != 'All') {
+        if (a.type.name.toLowerCase() != _filterType.toLowerCase()) return false;
+      }
+      if (_filterCriticality == 'Critical Only' && !a.isCritical) return false;
+      if (_filterCriticality == 'Standard Only' && a.isCritical) return false;
+
       if (query.isEmpty) return true;
       return a.tagNo.toLowerCase().contains(query) ||
           a.name.toLowerCase().contains(query) ||
@@ -168,6 +184,105 @@ class _AssetsTabState extends State<AssetsTab> {
           a.model.toLowerCase().contains(query) ||
           (a.rfidTag?.toLowerCase().contains(query) ?? false);
     }).toList();
+  }
+
+  void _showFilterModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        String tempStatus = _filterStatus;
+        String tempType = _filterType;
+        String tempCrit = _filterCriticality;
+
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Filter Asset Inventory', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            tempStatus = 'All';
+                            tempType = 'All';
+                            tempCrit = 'All';
+                          });
+                        },
+                        child: const Text('Reset All'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  DropdownButtonFormField<String>(
+                    value: tempStatus,
+                    decoration: const InputDecoration(labelText: 'Operational Status', border: OutlineInputBorder(), isDense: true),
+                    items: ['All', 'Active', 'Spare', 'Under Maintenance', 'Scrapped']
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
+                        .toList(),
+                    onChanged: (v) => setModalState(() => tempStatus = v!),
+                  ),
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    value: tempType,
+                    decoration: const InputDecoration(labelText: 'Asset Classification', border: OutlineInputBorder(), isDense: true),
+                    items: ['All', 'Motor', 'Gearbox', 'Pump']
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 12))))
+                        .toList(),
+                    onChanged: (v) => setModalState(() => tempType = v!),
+                  ),
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    value: tempCrit,
+                    decoration: const InputDecoration(labelText: 'Asset Criticality', border: OutlineInputBorder(), isDense: true),
+                    items: ['All', 'Critical Only', 'Standard Only']
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12))))
+                        .toList(),
+                    onChanged: (v) => setModalState(() => tempCrit = v!),
+                  ),
+                  const SizedBox(height: 20),
+
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _filterStatus = tempStatus;
+                        _filterType = tempType;
+                        _filterCriticality = tempCrit;
+                      });
+                      Navigator.pop(modalCtx);
+                    },
+                    child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // --- KPI STATS ---
@@ -562,7 +677,7 @@ class _AssetsTabState extends State<AssetsTab> {
               ).animate().fadeIn(duration: 350.ms),
               const SizedBox(height: 16),
 
-              // 3. Search Bar & Help/Settings Buttons (Matching Screenshot)
+              // 3. Search Bar & Filter [tune] / Help [?] / Settings [gear] Buttons
               Row(
                 children: [
                   Expanded(
@@ -578,6 +693,32 @@ class _AssetsTabState extends State<AssetsTab> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  Stack(
+                    children: [
+                      IconButton.filled(
+                        style: IconButton.styleFrom(
+                          backgroundColor: _hasActiveFilters ? AppColors.accent : AppColors.primary,
+                        ),
+                        icon: const Icon(Icons.tune, color: Colors.white),
+                        tooltip: 'Filter Asset Inventory',
+                        onPressed: _showFilterModal,
+                      ),
+                      if (_hasActiveFilters)
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: Container(
+                            width: 9,
+                            height: 9,
+                            decoration: const BoxDecoration(
+                              color: Colors.greenAccent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
                   IconButton.filled(
                     style: IconButton.styleFrom(backgroundColor: AppColors.primary),
                     icon: const Icon(Icons.help_outline, color: Colors.white),
