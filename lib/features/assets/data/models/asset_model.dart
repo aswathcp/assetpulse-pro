@@ -202,64 +202,62 @@ class AssetModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      // Identity
+    final map = <String, dynamic>{
       'masterEquipmentId': masterEquipmentId,
       'tagNo': tagNo,
       'name': name,
-      'make': make,
-      'model': model,
-      'serialNo': serialNo,
-      'rfidTag': rfidTag,
-      'poNo': poNo,
-      'manufacturingYear': manufacturingYear,
-      'imageUrl': imageUrl,
-      'description': description,
-
-      // Enum Strings
-      'type': type.name, 
+      'type': type.name,
       'status': status.name,
-      'healthStatus': healthStatus.name, // NEW
-
-      // Specs
-      'specs': specs, // NEW
-      'powerKw': powerKw,
-      'voltage': voltage,
-      'fullLoadCurrent': fullLoadCurrent,
-      'noLoadCurrent': noLoadCurrent,
-      'speedRpm': speedRpm,
-      'poles': poles,
-      'frequency': frequency,
-      'efficiency': efficiency,
-      'powerFactor': powerFactor,
-      'frameSize': frameSize,
-      'mountingType': mountingType,
-
-      // Health
-      'windingResistance': windingResistance,
-      'insulationResistance': insulationResistance,
-      'polarizationIndex': polarizationIndex,
-      'vibration': vibration,
-      'lastPulseTime': lastPulseTime, // NEW
-
-      // Mechanical
-      'bearingDE': bearingDE,
-      'bearingNDE': bearingNDE,
-
-      // Context
       'isCritical': isCritical,
-      'applicableParentEquipmentIds': applicableParentEquipmentIds,
-      'spareLocation': spareLocation,
-      'seqNo': seqNo,
-
-      // Dates (Auto-converted to Timestamp by Firestore if DateTime)
-      'installationDate': installationDate,
-      'lastServiceDate': lastServiceDate,
-      'nextServiceDue': nextServiceDue,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
-      'createdBy': createdBy,
       'modifiedAt': modifiedAt ?? FieldValue.serverTimestamp(),
-      'modifiedBy': modifiedBy,
     };
+
+    if (make.isNotEmpty) map['make'] = make;
+    if (model.isNotEmpty) map['model'] = model;
+    if (serialNo.isNotEmpty) map['serialNo'] = serialNo;
+    if (rfidTag != null && rfidTag!.isNotEmpty) map['rfidTag'] = rfidTag;
+    if (poNo != null && poNo!.isNotEmpty) map['poNo'] = poNo;
+    if (manufacturingYear != null) map['manufacturingYear'] = manufacturingYear;
+    if (imageUrl.isNotEmpty) map['imageUrl'] = imageUrl;
+    if (description.isNotEmpty) map['description'] = description;
+
+    if (healthStatus != AssetHealthStatus.unknown) {
+      map['healthStatus'] = healthStatus.name;
+    }
+
+    if (specs != null && specs!.isNotEmpty) map['specs'] = specs;
+    if (powerKw != null) map['powerKw'] = powerKw;
+    if (voltage != null) map['voltage'] = voltage;
+    if (fullLoadCurrent != null) map['fullLoadCurrent'] = fullLoadCurrent;
+    if (noLoadCurrent != null) map['noLoadCurrent'] = noLoadCurrent;
+    if (speedRpm != null) map['speedRpm'] = speedRpm;
+    if (poles != null) map['poles'] = poles;
+    if (frequency != null) map['frequency'] = frequency;
+    if (efficiency != null) map['efficiency'] = efficiency;
+    if (powerFactor != null) map['powerFactor'] = powerFactor;
+    if (frameSize != null && frameSize!.isNotEmpty) map['frameSize'] = frameSize;
+    if (mountingType != null && mountingType!.isNotEmpty) map['mountingType'] = mountingType;
+
+    if (bearingDE != null && bearingDE!.isNotEmpty) map['bearingDE'] = bearingDE;
+    if (bearingNDE != null && bearingNDE!.isNotEmpty) map['bearingNDE'] = bearingNDE;
+
+    if (applicableParentEquipmentIds != null && applicableParentEquipmentIds!.isNotEmpty) {
+      map['applicableParentEquipmentIds'] = applicableParentEquipmentIds;
+    }
+    if (spareLocation != null && spareLocation!.isNotEmpty) {
+      map['spareLocation'] = spareLocation;
+    }
+    if (seqNo != null && seqNo!.isNotEmpty) {
+      map['seqNo'] = seqNo;
+    }
+
+    if (installationDate != null) map['installationDate'] = installationDate;
+    if (lastServiceDate != null) map['lastServiceDate'] = lastServiceDate;
+    if (nextServiceDue != null) map['nextServiceDue'] = nextServiceDue;
+    if (createdBy != null && createdBy!.isNotEmpty) map['createdBy'] = createdBy;
+    if (modifiedBy != null && modifiedBy!.isNotEmpty) map['modifiedBy'] = modifiedBy;
+
+    return map;
   }
 }
