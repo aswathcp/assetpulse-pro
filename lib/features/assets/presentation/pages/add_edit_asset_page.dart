@@ -1006,6 +1006,39 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
           ),
           const SizedBox(height: 14),
 
+          // Site Installation Date (For Active Assets at Site)
+          if (_selectedStatus == AssetStatus.active) ...[
+            InkWell(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _installationDate ?? DateTime.now(),
+                  firstDate: DateTime(1980),
+                  lastDate: DateTime(2050),
+                );
+                if (d != null) setState(() => _installationDate = d);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Site Installation Date',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_month, color: AppColors.accent),
+                ),
+                child: Text(
+                  _installationDate != null
+                      ? '${_installationDate!.day.toString().padLeft(2, '0')}/${_installationDate!.month.toString().padLeft(2, '0')}/${_installationDate!.year}'
+                      : 'Tap to set site installation date',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _installationDate != null ? Colors.white : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
           // Make & Model
           Row(
             children: [
@@ -1458,64 +1491,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             ],
           ),
           const SizedBox(height: 16),
-
-          // Lifecycle Dates
-          const Text('Lifecycle & Service Scheduling', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.calendar_today, size: 16),
-                  label: Text(_installationDate != null ? 'Installed: ${_installationDate!.toLocal().toString().split(' ').first}' : 'Install Date',
-                      style: const TextStyle(fontSize: 11)),
-                  onPressed: () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: _installationDate ?? DateTime.now(),
-                      firstDate: DateTime(1980),
-                      lastDate: DateTime(2050),
-                    );
-                    if (d != null) setState(() => _installationDate = d);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.build, size: 16),
-                  label: Text(_lastServiceDate != null ? 'Last: ${_lastServiceDate!.toLocal().toString().split(' ').first}' : 'Last Serviced',
-                      style: const TextStyle(fontSize: 11)),
-                  onPressed: () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: _lastServiceDate ?? DateTime.now(),
-                      firstDate: DateTime(1980),
-                      lastDate: DateTime(2050),
-                    );
-                    if (d != null) setState(() => _lastServiceDate = d);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.event, size: 16),
-                  label: Text(_nextServiceDue != null ? 'Due: ${_nextServiceDue!.toLocal().toString().split(' ').first}' : 'Next Due',
-                      style: const TextStyle(fontSize: 11)),
-                  onPressed: () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: _nextServiceDue ?? DateTime.now().add(const Duration(days: 90)),
-                      firstDate: DateTime(1980),
-                      lastDate: DateTime(2050),
-                    );
-                    if (d != null) setState(() => _nextServiceDue = d);
-                  },
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
