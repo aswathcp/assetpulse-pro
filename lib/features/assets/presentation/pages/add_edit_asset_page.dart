@@ -62,33 +62,47 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _imageController = TextEditingController();
   final _descController = TextEditingController();
   final _rfidController = TextEditingController();
+  final _spareLocationController = TextEditingController();
 
-  // Specs Controllers
+  // Motor Technical Specs (FLC, Power, etc.)
   final _powerController = TextEditingController();
   final _voltageController = TextEditingController();
-  final _currentController = TextEditingController();
+  final _flcCurrentController = TextEditingController(); // FLC (Full Load Current)
+  final _noLoadCurrentController = TextEditingController();
   final _speedController = TextEditingController();
   final _frequencyController = TextEditingController();
-  final _noLoadCurrentController = TextEditingController();
   final _frameController = TextEditingController();
   final _mountingController = TextEditingController();
   final _polesController = TextEditingController();
   final _pfController = TextEditingController();
   final _efficiencyController = TextEditingController();
+  final _motorGreaseTypeController = TextEditingController();
 
-  // Gearbox Specs
+  // Gearbox Dynamic Specs
+  final _gearboxPowerController = TextEditingController();
+  final _inputSpeedController = TextEditingController();
+  final _outputSpeedController = TextEditingController();
   final _gearRatioController = TextEditingController();
   final _oilTypeController = TextEditingController();
   final _oilCapacityController = TextEditingController();
+  final _inputShaftController = TextEditingController();
+  final _outputShaftController = TextEditingController();
+  final _lubricationMethodController = TextEditingController();
+  final _gearboxMountingController = TextEditingController();
 
-  // Pump Specs
+  // Pump Dynamic Specs
   final _flowRateController = TextEditingController();
   final _headController = TextEditingController();
+  final _pumpSpeedController = TextEditingController();
   final _impellerSizeController = TextEditingController();
   final _pumpPowerController = TextEditingController();
-  final _greaseTypeController = TextEditingController();
+  final _suctionFlangeController = TextEditingController();
+  final _dischargeFlangeController = TextEditingController();
+  final _sealTypeController = TextEditingController();
+  final _casingMaterialController = TextEditingController();
+  final _pumpGreaseTypeController = TextEditingController();
 
-  // Construction Bearings
+  // Construction Bearings (Common)
   final _bearingDEController = TextEditingController();
   final _bearingNDEController = TextEditingController();
 
@@ -97,33 +111,10 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   DateTime? _lastServiceDate;
   DateTime? _nextServiceDue;
 
-  // Health & Diagnostics
-  final _resRYController = TextEditingController();
-  final _resYBController = TextEditingController();
-  final _resRBController = TextEditingController();
-
-  final _irRyController = TextEditingController();
-  final _irYbController = TextEditingController();
-  final _irBrController = TextEditingController();
-  final _irReController = TextEditingController();
-  final _irYeController = TextEditingController();
-  final _irBeController = TextEditingController();
-
-  final _piController = TextEditingController();
-
-  // Vibration
-  final _vibDeHController = TextEditingController();
-  final _vibDeVController = TextEditingController();
-  final _vibDeAController = TextEditingController();
-  final _vibNdeHController = TextEditingController();
-  final _vibNdeVController = TextEditingController();
-  final _vibNdeAController = TextEditingController();
-  final _vibGController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
 
     _loadUserProfile();
     _loadMasterData();
@@ -235,6 +226,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _isCritical = a.isCritical;
     _selectedParentId = a.masterEquipmentId;
     _selectedParentIdsForSpares = List<String>.from(a.applicableParentEquipmentIds ?? []);
+    _spareLocationController.text = a.spareLocation ?? '';
 
     final parts = a.tagNo.split('-');
     if (parts.length >= 4) {
@@ -253,9 +245,10 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _imageController.text = a.imageUrl;
     _rfidController.text = a.rfidTag ?? '';
 
+    // Motor Specs
     _powerController.text = a.powerKw?.toString() ?? '';
     _voltageController.text = a.voltage?.toString() ?? '';
-    _currentController.text = a.fullLoadCurrent?.toString() ?? '';
+    _flcCurrentController.text = a.fullLoadCurrent?.toString() ?? '';
     _frequencyController.text = a.frequency?.toString() ?? '';
     _noLoadCurrentController.text = a.noLoadCurrent?.toString() ?? '';
     _speedController.text = a.speedRpm?.toString() ?? '';
@@ -271,44 +264,34 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _lastServiceDate = a.lastServiceDate;
     _nextServiceDue = a.nextServiceDue;
 
-    // Dynamic Specs
+    // Dynamic Specs for Gearbox / Pump
     if (a.specs != null) {
-      _gearRatioController.text = a.specs!['gearRatio']?.toString() ?? '';
-      _oilTypeController.text = a.specs!['oilType']?.toString() ?? '';
-      _oilCapacityController.text = a.specs!['oilCapacity']?.toString() ?? '';
-      _flowRateController.text = a.specs!['flowRate']?.toString() ?? '';
-      _headController.text = a.specs!['head']?.toString() ?? '';
-      _impellerSizeController.text = a.specs!['impellerSize']?.toString() ?? '';
-      _pumpPowerController.text = a.specs!['pumpPower']?.toString() ?? '';
-      _greaseTypeController.text = a.specs!['greaseType']?.toString() ?? '';
-    }
+      final s = a.specs!;
+      _motorGreaseTypeController.text = s['greaseType']?.toString() ?? '';
 
-    // Resistance Maps
-    if (a.windingResistance != null) {
-      _resRYController.text = a.windingResistance!['R-Y']?.toString() ?? '';
-      _resYBController.text = a.windingResistance!['Y-B']?.toString() ?? '';
-      _resRBController.text = a.windingResistance!['R-B']?.toString() ?? '';
-    }
+      // Gearbox
+      _gearboxPowerController.text = s['inputPowerKw']?.toString() ?? a.powerKw?.toString() ?? '';
+      _inputSpeedController.text = s['inputSpeedRpm']?.toString() ?? '';
+      _outputSpeedController.text = s['outputSpeedRpm']?.toString() ?? '';
+      _gearRatioController.text = s['gearRatio']?.toString() ?? '';
+      _oilTypeController.text = s['oilType']?.toString() ?? '';
+      _oilCapacityController.text = s['oilCapacity']?.toString() ?? '';
+      _inputShaftController.text = s['inputShaftMm']?.toString() ?? '';
+      _outputShaftController.text = s['outputShaftMm']?.toString() ?? '';
+      _lubricationMethodController.text = s['lubricationMethod']?.toString() ?? '';
+      _gearboxMountingController.text = s['mountingOrientation']?.toString() ?? '';
 
-    if (a.insulationResistance != null) {
-      _irRyController.text = a.insulationResistance!['R-Y']?.toString() ?? '';
-      _irYbController.text = a.insulationResistance!['Y-B']?.toString() ?? '';
-      _irBrController.text = a.insulationResistance!['B-R']?.toString() ?? '';
-      _irReController.text = a.insulationResistance!['R-E']?.toString() ?? '';
-      _irYeController.text = a.insulationResistance!['Y-E']?.toString() ?? '';
-      _irBeController.text = a.insulationResistance!['B-E']?.toString() ?? '';
-    }
-
-    _piController.text = a.polarizationIndex?.toString() ?? '';
-
-    if (a.vibration != null) {
-      _vibDeHController.text = a.vibration!['DE_H']?.toString() ?? '';
-      _vibDeVController.text = a.vibration!['DE_V']?.toString() ?? '';
-      _vibDeAController.text = a.vibration!['DE_A']?.toString() ?? '';
-      _vibNdeHController.text = a.vibration!['NDE_H']?.toString() ?? '';
-      _vibNdeVController.text = a.vibration!['NDE_V']?.toString() ?? '';
-      _vibNdeAController.text = a.vibration!['NDE_A']?.toString() ?? '';
-      _vibGController.text = a.vibration!['G_Value']?.toString() ?? '';
+      // Pump
+      _flowRateController.text = s['flowRate']?.toString() ?? '';
+      _headController.text = s['head']?.toString() ?? '';
+      _pumpSpeedController.text = s['pumpSpeedRpm']?.toString() ?? a.speedRpm?.toString() ?? '';
+      _impellerSizeController.text = s['impellerSize']?.toString() ?? '';
+      _pumpPowerController.text = s['pumpPower']?.toString() ?? a.powerKw?.toString() ?? '';
+      _suctionFlangeController.text = s['suctionFlangeMm']?.toString() ?? '';
+      _dischargeFlangeController.text = s['dischargeFlangeMm']?.toString() ?? '';
+      _sealTypeController.text = s['sealType']?.toString() ?? '';
+      _casingMaterialController.text = s['casingMaterial']?.toString() ?? '';
+      _pumpGreaseTypeController.text = s['greaseType']?.toString() ?? '';
     }
   }
 
@@ -324,47 +307,41 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _imageController.dispose();
     _powerController.dispose();
     _voltageController.dispose();
-    _currentController.dispose();
+    _flcCurrentController.dispose();
     _speedController.dispose();
     _frameController.dispose();
     _frequencyController.dispose();
     _noLoadCurrentController.dispose();
     _rfidController.dispose();
     _poController.dispose();
-    _greaseTypeController.dispose();
+    _spareLocationController.dispose();
+    _motorGreaseTypeController.dispose();
+    _gearboxPowerController.dispose();
+    _inputSpeedController.dispose();
+    _outputSpeedController.dispose();
+    _gearRatioController.dispose();
+    _oilTypeController.dispose();
     _oilCapacityController.dispose();
+    _inputShaftController.dispose();
+    _outputShaftController.dispose();
+    _lubricationMethodController.dispose();
+    _gearboxMountingController.dispose();
+    _flowRateController.dispose();
+    _headController.dispose();
+    _pumpSpeedController.dispose();
+    _impellerSizeController.dispose();
     _pumpPowerController.dispose();
+    _suctionFlangeController.dispose();
+    _dischargeFlangeController.dispose();
+    _sealTypeController.dispose();
+    _casingMaterialController.dispose();
+    _pumpGreaseTypeController.dispose();
     _mountingController.dispose();
     _polesController.dispose();
     _pfController.dispose();
     _efficiencyController.dispose();
     _bearingDEController.dispose();
     _bearingNDEController.dispose();
-    _resRYController.dispose();
-    _resYBController.dispose();
-    _resRBController.dispose();
-
-    _irRyController.dispose();
-    _irYbController.dispose();
-    _irBrController.dispose();
-    _irReController.dispose();
-    _irYeController.dispose();
-    _irBeController.dispose();
-    _piController.dispose();
-
-    _vibDeHController.dispose();
-    _vibDeVController.dispose();
-    _vibDeAController.dispose();
-    _vibNdeHController.dispose();
-    _vibNdeVController.dispose();
-    _vibNdeAController.dispose();
-    _vibGController.dispose();
-
-    _gearRatioController.dispose();
-    _oilTypeController.dispose();
-    _flowRateController.dispose();
-    _headController.dispose();
-    _impellerSizeController.dispose();
     _descController.dispose();
 
     super.dispose();
@@ -409,7 +386,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated Radar Wave
                 Container(
                   width: 84,
                   height: 84,
@@ -588,45 +564,48 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         throw Exception("You do not have permission to modify database items in this scope.");
       }
 
-      // Build Specs Map
+      // Build Specs Map Custom per Asset Type
       final Map<String, dynamic> dynamicSpecs = {};
-      if (_selectedType == AssetType.gearbox) {
+
+      if (_selectedType == AssetType.motor) {
+        if (_motorGreaseTypeController.text.isNotEmpty) dynamicSpecs['greaseType'] = _motorGreaseTypeController.text.trim();
+      } else if (_selectedType == AssetType.gearbox) {
+        if (_gearboxPowerController.text.isNotEmpty) dynamicSpecs['inputPowerKw'] = double.tryParse(_gearboxPowerController.text.trim());
+        if (_inputSpeedController.text.isNotEmpty) dynamicSpecs['inputSpeedRpm'] = double.tryParse(_inputSpeedController.text.trim());
+        if (_outputSpeedController.text.isNotEmpty) dynamicSpecs['outputSpeedRpm'] = double.tryParse(_outputSpeedController.text.trim());
         if (_gearRatioController.text.isNotEmpty) dynamicSpecs['gearRatio'] = _gearRatioController.text.trim();
         if (_oilTypeController.text.isNotEmpty) dynamicSpecs['oilType'] = _oilTypeController.text.trim();
         if (_oilCapacityController.text.isNotEmpty) dynamicSpecs['oilCapacity'] = double.tryParse(_oilCapacityController.text.trim());
+        if (_inputShaftController.text.isNotEmpty) dynamicSpecs['inputShaftMm'] = double.tryParse(_inputShaftController.text.trim());
+        if (_outputShaftController.text.isNotEmpty) dynamicSpecs['outputShaftMm'] = double.tryParse(_outputShaftController.text.trim());
+        if (_lubricationMethodController.text.isNotEmpty) dynamicSpecs['lubricationMethod'] = _lubricationMethodController.text.trim();
+        if (_gearboxMountingController.text.isNotEmpty) dynamicSpecs['mountingOrientation'] = _gearboxMountingController.text.trim();
       } else if (_selectedType == AssetType.pump) {
         if (_flowRateController.text.isNotEmpty) dynamicSpecs['flowRate'] = double.tryParse(_flowRateController.text.trim());
         if (_headController.text.isNotEmpty) dynamicSpecs['head'] = double.tryParse(_headController.text.trim());
+        if (_pumpSpeedController.text.isNotEmpty) dynamicSpecs['pumpSpeedRpm'] = double.tryParse(_pumpSpeedController.text.trim());
         if (_impellerSizeController.text.isNotEmpty) dynamicSpecs['impellerSize'] = _impellerSizeController.text.trim();
         if (_pumpPowerController.text.isNotEmpty) dynamicSpecs['pumpPower'] = double.tryParse(_pumpPowerController.text.trim());
-        if (_greaseTypeController.text.isNotEmpty) dynamicSpecs['greaseType'] = _greaseTypeController.text.trim();
+        if (_suctionFlangeController.text.isNotEmpty) dynamicSpecs['suctionFlangeMm'] = double.tryParse(_suctionFlangeController.text.trim());
+        if (_dischargeFlangeController.text.isNotEmpty) dynamicSpecs['dischargeFlangeMm'] = double.tryParse(_dischargeFlangeController.text.trim());
+        if (_sealTypeController.text.isNotEmpty) dynamicSpecs['sealType'] = _sealTypeController.text.trim();
+        if (_casingMaterialController.text.isNotEmpty) dynamicSpecs['casingMaterial'] = _casingMaterialController.text.trim();
+        if (_pumpGreaseTypeController.text.isNotEmpty) dynamicSpecs['greaseType'] = _pumpGreaseTypeController.text.trim();
       }
 
-      // Resistance Maps
-      final Map<String, dynamic> windingRes = {};
-      if (_resRYController.text.isNotEmpty) windingRes['R-Y'] = double.tryParse(_resRYController.text);
-      if (_resYBController.text.isNotEmpty) windingRes['Y-B'] = double.tryParse(_resYBController.text);
-      if (_resRBController.text.isNotEmpty) windingRes['R-B'] = double.tryParse(_resRBController.text);
-
-      final Map<String, dynamic> insulationRes = {};
-      if (_irRyController.text.isNotEmpty) insulationRes['R-Y'] = double.tryParse(_irRyController.text);
-      if (_irYbController.text.isNotEmpty) insulationRes['Y-B'] = double.tryParse(_irYbController.text);
-      if (_irBrController.text.isNotEmpty) insulationRes['B-R'] = double.tryParse(_irBrController.text);
-      if (_irReController.text.isNotEmpty) insulationRes['R-E'] = double.tryParse(_irReController.text);
-      if (_irYeController.text.isNotEmpty) insulationRes['Y-E'] = double.tryParse(_irYeController.text);
-      if (_irBeController.text.isNotEmpty) insulationRes['B-E'] = double.tryParse(_irBeController.text);
-
-      // Vibration Map
-      final Map<String, dynamic> vibData = {};
-      if (_vibDeHController.text.isNotEmpty) vibData['DE_H'] = double.tryParse(_vibDeHController.text);
-      if (_vibDeVController.text.isNotEmpty) vibData['DE_V'] = double.tryParse(_vibDeVController.text);
-      if (_vibDeAController.text.isNotEmpty) vibData['DE_A'] = double.tryParse(_vibDeAController.text);
-      if (_vibNdeHController.text.isNotEmpty) vibData['NDE_H'] = double.tryParse(_vibNdeHController.text);
-      if (_vibNdeVController.text.isNotEmpty) vibData['NDE_V'] = double.tryParse(_vibNdeVController.text);
-      if (_vibNdeAController.text.isNotEmpty) vibData['NDE_A'] = double.tryParse(_vibNdeAController.text);
-      if (_vibGController.text.isNotEmpty) vibData['G_Value'] = double.tryParse(_vibGController.text);
-
       final primaryParentId = _selectedParentId ?? (_selectedParentIdsForSpares.isNotEmpty ? _selectedParentIdsForSpares.first : '');
+
+      final double? effectivePowerKw = _selectedType == AssetType.motor
+          ? double.tryParse(_powerController.text)
+          : _selectedType == AssetType.gearbox
+              ? double.tryParse(_gearboxPowerController.text)
+              : double.tryParse(_pumpPowerController.text);
+
+      final double? effectiveSpeedRpm = _selectedType == AssetType.motor
+          ? double.tryParse(_speedController.text)
+          : _selectedType == AssetType.gearbox
+              ? double.tryParse(_inputSpeedController.text)
+              : double.tryParse(_pumpSpeedController.text);
 
       final asset = AssetModel(
         id: widget.asset?.id ?? targetTagId,
@@ -644,25 +623,22 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         type: _selectedType,
         status: _selectedStatus,
         specs: dynamicSpecs.isNotEmpty ? dynamicSpecs : null,
-        powerKw: double.tryParse(_powerController.text),
+        powerKw: effectivePowerKw,
         voltage: double.tryParse(_voltageController.text),
-        fullLoadCurrent: double.tryParse(_currentController.text),
+        fullLoadCurrent: double.tryParse(_flcCurrentController.text),
         noLoadCurrent: double.tryParse(_noLoadCurrentController.text),
-        speedRpm: double.tryParse(_speedController.text),
+        speedRpm: effectiveSpeedRpm,
         poles: int.tryParse(_polesController.text),
         frequency: double.tryParse(_frequencyController.text),
         efficiency: double.tryParse(_efficiencyController.text),
         powerFactor: double.tryParse(_pfController.text),
         frameSize: _frameController.text.trim().isNotEmpty ? _frameController.text.trim() : null,
         mountingType: _mountingController.text.trim().isNotEmpty ? _mountingController.text.trim() : null,
-        windingResistance: windingRes.isNotEmpty ? windingRes : null,
-        insulationResistance: insulationRes.isNotEmpty ? insulationRes : null,
-        polarizationIndex: double.tryParse(_piController.text),
-        vibration: vibData.isNotEmpty ? vibData : null,
         bearingDE: _bearingDEController.text.trim().isNotEmpty ? _bearingDEController.text.trim() : null,
         bearingNDE: _bearingNDEController.text.trim().isNotEmpty ? _bearingNDEController.text.trim() : null,
         isCritical: _isCritical,
         applicableParentEquipmentIds: _selectedParentIdsForSpares.isNotEmpty ? _selectedParentIdsForSpares : null,
+        spareLocation: _selectedStatus == AssetStatus.spare ? _spareLocationController.text.trim() : null,
         seqNo: _seqController.text.trim(),
         installationDate: _installationDate,
         lastServiceDate: _lastServiceDate,
@@ -701,8 +677,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final prefix = '$_currentPlantId-$_currentUnitId-${_getTypeCode(_selectedType)}-';
-
     return Scaffold(
       extendBodyBehindAppBar: false,
       appBar: AppBar(
@@ -717,84 +691,108 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 key: _formKey,
                 child: Column(
                   children: [
-                    // --- TOP SECTION: STATUS, TYPE & CRITICALITY ---
+                    // --- COMPACT OPTIMIZED STATUS & CONTEXT HEADER (SPACE EFFICIENT) ---
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                       child: GlassContainer(
-                        borderRadius: 16,
+                        borderRadius: 14,
                         child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Asset Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                                  Row(
+                              // 1. Asset Status Dropdown
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<AssetStatus>(
+                                  value: _selectedStatus,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Status',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  ),
+                                  items: AssetStatus.values.map((st) {
+                                    Color c = Colors.grey;
+                                    if (st == AssetStatus.active) c = Colors.greenAccent;
+                                    if (st == AssetStatus.spare) c = Colors.cyanAccent;
+                                    if (st == AssetStatus.underMaintenance) c = Colors.orangeAccent;
+                                    if (st == AssetStatus.scrapped) c = Colors.redAccent;
+
+                                    return DropdownMenuItem(
+                                      value: st,
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.circle, color: c, size: 10),
+                                          const SizedBox(width: 6),
+                                          Text(st.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedStatus = val);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // 2. Asset Classification Dropdown
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<AssetType>(
+                                  value: _selectedType,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Type',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  ),
+                                  items: AssetType.values.map((tp) {
+                                    return DropdownMenuItem(
+                                      value: tp,
+                                      child: Text(tp.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedType = val;
+                                        _calculateNextSeqNo();
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // 3. Critical Toggle Pill
+                              InkWell(
+                                onTap: () => setState(() => _isCritical = !_isCritical),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _isCritical ? Colors.redAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: _isCritical ? Colors.redAccent : Colors.grey.shade700),
+                                  ),
+                                  child: Row(
                                     children: [
-                                      const Icon(Icons.warning_amber, color: Colors.orangeAccent, size: 16),
+                                      Icon(Icons.warning_amber, size: 16, color: _isCritical ? Colors.redAccent : Colors.grey),
                                       const SizedBox(width: 4),
-                                      const Text('Critical Asset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                      Switch(
-                                        value: _isCritical,
-                                        activeColor: Colors.redAccent,
-                                        onChanged: (val) => setState(() => _isCritical = val),
+                                      Text(
+                                        'CRITICAL',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: _isCritical ? Colors.redAccent : Colors.grey,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                children: AssetStatus.values.map((st) {
-                                  final isSelected = _selectedStatus == st;
-                                  Color stColor = Colors.grey;
-                                  if (st == AssetStatus.active) stColor = Colors.greenAccent;
-                                  if (st == AssetStatus.spare) stColor = Colors.cyanAccent;
-                                  if (st == AssetStatus.underMaintenance) stColor = Colors.orangeAccent;
-                                  if (st == AssetStatus.scrapped) stColor = Colors.redAccent;
-
-                                  return ChoiceChip(
-                                    label: Text(st.name.toUpperCase(),
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.black : Colors.white)),
-                                    selected: isSelected,
-                                    selectedColor: stColor,
-                                    onSelected: (val) {
-                                      if (val) setState(() => _selectedStatus = st);
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text('Asset Classification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                children: AssetType.values.map((tp) {
-                                  final isSelected = _selectedType == tp;
-                                  return ChoiceChip(
-                                    label: Text(tp.name.toUpperCase(),
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.black : Colors.white)),
-                                    selected: isSelected,
-                                    selectedColor: AppColors.primary,
-                                    onSelected: (val) {
-                                      if (val) {
-                                        setState(() {
-                                          _selectedType = tp;
-                                          _calculateNextSeqNo();
-                                        });
-                                      }
-                                    },
-                                  );
-                                }).toList(),
+                                ),
                               ),
                             ],
                           ),
@@ -806,7 +804,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
@@ -814,19 +812,19 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.tag, color: AppColors.accent, size: 20),
+                            const Icon(Icons.tag, color: AppColors.accent, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('LOCKED ASSET TAG ID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent)),
-                                  Text(_computedTagId, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                  const Text('LOCKED ASSET TAG ID', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.accent)),
+                                  Text(_computedTagId, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
                             SizedBox(
-                              width: 90,
+                              width: 80,
                               child: TextFormField(
                                 controller: _seqController,
                                 keyboardType: TextInputType.number,
@@ -834,6 +832,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                                   labelText: 'Seq No',
                                   isDense: true,
                                   border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                 ),
                                 onChanged: (_) => _updateComputedTagId(),
                               ),
@@ -843,14 +842,13 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                       ),
                     ),
 
-                    // 3 Tabs
+                    // 2 Clean Tabs (Diagnostics Removed)
                     TabBar(
                       controller: _tabController,
                       indicatorColor: AppColors.accent,
                       tabs: const [
                         Tab(text: "Identity & General"),
-                        Tab(text: "Specifications"),
-                        Tab(text: "Diagnostics & Health"),
+                        Tab(text: "Technical Specs"),
                       ],
                     ),
 
@@ -859,9 +857,8 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                       child: TabBarView(
                         controller: _tabController,
                         children: [
-                          _buildIdentityTab(prefix),
+                          _buildIdentityTab(),
                           _buildSpecsTab(),
-                          _buildDiagnosticsTab(),
                         ],
                       ),
                     ),
@@ -893,14 +890,31 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   }
 
   // --- TAB 1: IDENTITY & GENERAL ---
-  Widget _buildIdentityTab(String prefix) {
+  Widget _buildIdentityTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Parent Machine / Spare Linking
+          // Spare Storage Location & Parent Linking
           if (_selectedStatus == AssetStatus.spare) ...[
+            TextFormField(
+              controller: _spareLocationController,
+              decoration: const InputDecoration(
+                labelText: 'Spare Storage Location / Rack / Bay *',
+                hintText: 'e.g. Central Warehouse - Bay 3, Rack A2',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.warehouse, color: Colors.cyanAccent),
+              ),
+              validator: (v) {
+                if (_selectedStatus == AssetStatus.spare && (v == null || v.trim().isEmpty)) {
+                  return 'Please specify spare storage location';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -914,7 +928,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('SPARE POOL: APPLICABLE PARENT MACHINES',
+                      const Text('APPLICABLE PARENT MACHINES',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.cyanAccent)),
                       TextButton.icon(
                         icon: const Icon(Icons.add_link, size: 16, color: Colors.cyanAccent),
@@ -925,7 +939,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   ),
                   const SizedBox(height: 4),
                   _selectedParentIdsForSpares.isEmpty
-                      ? const Text('No parent machines linked yet. Tap above to assign multiple compatible parent equipments.',
+                      ? const Text('No parent machines linked. Tap above to assign multiple compatible parent equipments.',
                           style: TextStyle(fontSize: 11, color: Colors.grey))
                       : Wrap(
                           spacing: 6,
@@ -1088,15 +1102,17 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     );
   }
 
-  // --- TAB 2: TECHNICAL SPECIFICATIONS & DYNAMICS ---
+  // --- TAB 2: TECHNICAL SPECIFICATIONS (CUSTOM PER ASSET TYPE) ---
   Widget _buildSpecsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. MOTOR SPECIFICATIONS
           if (_selectedType == AssetType.motor) ...[
-            const Text('Motor Electrical Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const Text('Motor Electrical & Mechanical Specifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1104,7 +1120,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _powerController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Power (kW)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Rated Power (kW) *', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1112,7 +1128,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _voltageController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Voltage (V)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Rated Voltage (V) *', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1122,9 +1138,9 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _currentController,
+                    controller: _flcCurrentController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'FLA (Amps)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'FLC (Amps) *', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1144,7 +1160,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _speedController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Speed (RPM)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Rated Speed (RPM) *', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1152,7 +1168,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _polesController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Poles', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Poles (e.g. 2, 4, 6)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1172,7 +1188,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _pfController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Power Factor (PF)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Power Factor (cos φ)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1191,44 +1207,137 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 Expanded(
                   child: TextFormField(
                     controller: _frameController,
-                    decoration: const InputDecoration(labelText: 'Frame Size', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Frame Size (e.g. 280M)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _mountingController,
-              decoration: const InputDecoration(labelText: 'Mounting Type (B3 / B5 / V1)', border: OutlineInputBorder()),
-            ),
-          ] else if (_selectedType == AssetType.gearbox) ...[
-            const Text('Gearbox Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _gearRatioController,
-                    decoration: const InputDecoration(labelText: 'Gear Ratio (e.g. 1:25)', border: OutlineInputBorder()),
+                    controller: _mountingController,
+                    decoration: const InputDecoration(labelText: 'Mounting Type (B3 / B5 / V1)', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _oilTypeController,
-                    decoration: const InputDecoration(labelText: 'Oil Grade (VG 320 / 460)', border: OutlineInputBorder()),
+                    controller: _motorGreaseTypeController,
+                    decoration: const InputDecoration(labelText: 'Grease Type & Quantity (g)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+          ]
+
+          // 2. GEARBOX SPECIFICATIONS
+          else if (_selectedType == AssetType.gearbox) ...[
+            const Text('Gearbox Transmission & Lubrication Specifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _gearboxPowerController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Input Power Rating (kW) *', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _gearRatioController,
+                    decoration: const InputDecoration(labelText: 'Gear Ratio (e.g. 1:25.4) *', border: OutlineInputBorder()),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _oilCapacityController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Oil Capacity (Liters)', border: OutlineInputBorder()),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _inputSpeedController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Input Speed (RPM)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _outputSpeedController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Output Speed (RPM)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
             ),
-          ] else if (_selectedType == AssetType.pump) ...[
-            const Text('Pump Hydraulic Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _oilTypeController,
+                    decoration: const InputDecoration(labelText: 'Oil Grade (VG 320 / 460) *', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _oilCapacityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Oil Sump Capacity (Liters)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _inputShaftController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Input Shaft Ø (mm)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _outputShaftController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Output Shaft Ø (mm)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _lubricationMethodController,
+                    decoration: const InputDecoration(labelText: 'Lubrication (Splash / Forced)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _gearboxMountingController,
+                    decoration: const InputDecoration(labelText: 'Mounting (Horizontal / Vertical)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+          ]
+
+          // 3. PUMP SPECIFICATIONS
+          else if (_selectedType == AssetType.pump) ...[
+            const Text('Pump Hydraulic & Mechanical Specifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1236,7 +1345,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _flowRateController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Flow Rate (m³/hr)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Flow Rate / Capacity (m³/hr) *', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1244,7 +1353,27 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _headController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Head (Meters)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Total Head (Meters) *', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _pumpSpeedController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Pump Speed (RPM)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _pumpPowerController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Pump Shaft Power (kW)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1255,28 +1384,60 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 Expanded(
                   child: TextFormField(
                     controller: _impellerSizeController,
-                    decoration: const InputDecoration(labelText: 'Impeller Size (mm)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Impeller Diameter (mm)', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _pumpPowerController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Pump Power (kW)', border: OutlineInputBorder()),
+                    controller: _sealTypeController,
+                    decoration: const InputDecoration(labelText: 'Seal Type (Mechanical / Gland)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _greaseTypeController,
-              decoration: const InputDecoration(labelText: 'Grease Type / Lubrication', border: OutlineInputBorder()),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _suctionFlangeController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Suction Flange Ø (mm)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _dischargeFlangeController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Discharge Flange Ø (mm)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _casingMaterialController,
+                    decoration: const InputDecoration(labelText: 'Casing Material (CI / SS / Bronze)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _pumpGreaseTypeController,
+                    decoration: const InputDecoration(labelText: 'Grease / Lubricant Grade', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
             ),
           ],
           const SizedBox(height: 16),
 
-          // Construction Bearings
+          // Common Bearing Specifications
           const Text('Bearing Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
           const SizedBox(height: 10),
           Row(
@@ -1354,100 +1515,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- TAB 3: DIAGNOSTICS & HEALTH ---
-  Widget _buildDiagnosticsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Winding Resistance
-          const Text('Winding Resistance (Ω)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: TextFormField(controller: _resRYController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y (Ω)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _resYBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B (Ω)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _resRBController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-B (Ω)', border: OutlineInputBorder()))),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 2. Insulation Resistance Phase-Phase
-          const Text('Insulation Resistance: Phase-Phase (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: TextFormField(controller: _irRyController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-Y (MΩ)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irYbController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-B (MΩ)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irBrController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-R (MΩ)', border: OutlineInputBorder()))),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 3. Insulation Resistance Phase-Earth
-          const Text('Insulation Resistance: Phase-Earth (MΩ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: TextFormField(controller: _irReController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'R-E (MΩ)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irYeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Y-E (MΩ)', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _irBeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'B-E (MΩ)', border: OutlineInputBorder()))),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 4. Polarization Index
-          TextFormField(
-            controller: _piController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Polarization Index (PI 10m/1m)', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 16),
-
-          // 5. Vibration Analysis
-          const Text('Vibration Analysis (ISO 10816 / IS 12075)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          const Text('Drive End (DE) Vibration (mm/s):', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(child: TextFormField(controller: _vibDeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Horizontal', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _vibDeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Vertical', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _vibDeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'DE Axial', border: OutlineInputBorder()))),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text('Non-Drive End (NDE) Vibration (mm/s):', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(child: TextFormField(controller: _vibNdeHController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Horizontal', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _vibNdeVController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Vertical', border: OutlineInputBorder()))),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: _vibNdeAController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'NDE Axial', border: OutlineInputBorder()))),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _vibGController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Peak Acceleration G-Value (g)', border: OutlineInputBorder()),
           ),
         ],
       ),

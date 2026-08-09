@@ -12,7 +12,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../features/home/presentation/widgets/custom_app_bar.dart';
 import '../../../../core/services/firestore_service.dart';
-import '../../../../core/utils/permission_helper.dart';
 import '../../data/models/asset_model.dart';
 import '../widgets/asset_card.dart';
 import '../../../../core/services/hierarchy_service.dart';
@@ -444,15 +443,6 @@ class _AssetsTabState extends State<AssetsTab> {
       );
     }
 
-    final canEdit = PermissionHelper.canEditDatabaseItem(
-      userRole: _userRole,
-      isAdmin: _isAdmin,
-      userPlantId: _userPlantId,
-      userUnitId: _userUnitId,
-      itemPlantId: _selectedPlantId,
-      itemUnitId: _selectedUnitId,
-    );
-
     final filtered = _filteredAssets;
 
     return Scaffold(
@@ -480,7 +470,7 @@ class _AssetsTabState extends State<AssetsTab> {
                           items: _plants
                               .map((e) => DropdownMenuItem(
                                   value: e,
-                                  child: Text(HierarchyService().getPlantNames()[e] ?? e,
+                                  child: Text(e,
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                       overflow: TextOverflow.ellipsis)))
                               .toList(),
@@ -508,7 +498,7 @@ class _AssetsTabState extends State<AssetsTab> {
                           items: _units
                               .map((e) => DropdownMenuItem(
                                   value: e,
-                                  child: Text(HierarchyService().getUnitNamesForPlant(_selectedPlantId ?? '')[e] ?? e,
+                                  child: Text(e,
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                       overflow: TextOverflow.ellipsis)))
                               .toList(),
@@ -607,7 +597,7 @@ class _AssetsTabState extends State<AssetsTab> {
               ).animate().fadeIn(duration: 400.ms),
               const SizedBox(height: 16),
 
-              // 4. Header Row with Title & Excel / PDF / Add Asset Buttons
+              // 4. Header Row with Title & Excel / PDF Action Buttons (RCCB / Lux Style)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -628,26 +618,6 @@ class _AssetsTabState extends State<AssetsTab> {
                         icon: const Icon(Icons.picture_as_pdf, size: 16, color: Colors.redAccent),
                         label: const Text('PDF Report', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
-                      if (canEdit) ...[
-                        const SizedBox(width: 4),
-                        TextButton.icon(
-                          onPressed: () {
-                            if (_selectedUnitId != null && _selectedPlantId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddEditAssetPage(
-                                    unitId: _selectedUnitId,
-                                    plantId: _selectedPlantId,
-                                  ),
-                                ),
-                              ).then((_) => _fetchAssets());
-                            }
-                          },
-                          icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.accent),
-                          label: const Text('Add Asset', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
                     ],
                   ),
                 ],

@@ -57,6 +57,7 @@ class AssetModel {
   // Operational Context
   final bool isCritical;
   final List<String>? applicableParentEquipmentIds; // Multiple parent equipments for spares
+  final String? spareLocation; // Storage location when asset is a spare
   final String? seqNo;
   
   // Lifecycle
@@ -114,6 +115,7 @@ class AssetModel {
     
     this.isCritical = false,
     this.applicableParentEquipmentIds,
+    this.spareLocation,
     this.seqNo,
     
     this.installationDate,
@@ -186,6 +188,7 @@ class AssetModel {
       
       isCritical: map['isCritical'] ?? false,
       applicableParentEquipmentIds: parents,
+      spareLocation: map['spareLocation'] as String?,
       seqNo: map['seqNo']?.toString(),
       
       installationDate: (map['installationDate'] as dynamic)?.toDate(),
@@ -246,6 +249,7 @@ class AssetModel {
       // Context
       'isCritical': isCritical,
       'applicableParentEquipmentIds': applicableParentEquipmentIds,
+      'spareLocation': spareLocation,
       'seqNo': seqNo,
 
       // Dates (Auto-converted to Timestamp by Firestore if DateTime)
