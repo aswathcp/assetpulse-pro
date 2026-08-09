@@ -20,72 +20,82 @@ class OperationsTab extends StatelessWidget {
       appBar: const CustomAppBar(title: 'Operations Center'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Modules',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 16),
-              GridView.count(
-                crossAxisCount: ResponsiveLayout.isDesktop(context) ? 4 : 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.25 : 0.82,
-              children: [
-                StreamBuilder<List<IsolationPermitModel>>(
-                  stream: FirestoreService().getActiveIsolationsStream(
-                    businessId: HierarchyService().currentBusinessId
-                  ),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data?.length ?? 0;
-                    return _buildDashboardCard(
-                      context,
-                      title: 'Isolation\nManagement',
-                      icon: Icons.lock_outline,
-                      color: Colors.blueAccent,
-                      badgeCount: count > 0 ? count : null,
-                      onTap: () => Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (_) => const IsolationManagementPage())
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Modules',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
-                    );
-                  }
+                      const SizedBox(height: 16),
+                      GridView.count(
+                        crossAxisCount: ResponsiveLayout.isDesktop(context) ? 4 : 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.25 : 0.85,
+                        children: [
+                          StreamBuilder<List<IsolationPermitModel>>(
+                            stream: FirestoreService().getActiveIsolationsStream(
+                              businessId: HierarchyService().currentBusinessId
+                            ),
+                            builder: (context, snapshot) {
+                              final count = snapshot.data?.length ?? 0;
+                              return _buildDashboardCard(
+                                context,
+                                title: 'Isolation\nManagement',
+                                icon: Icons.lock_outline,
+                                color: Colors.blueAccent,
+                                badgeCount: count > 0 ? count : null,
+                                onTap: () => Navigator.push(
+                                  context, 
+                                  MaterialPageRoute(builder: (_) => const IsolationManagementPage())
+                                ),
+                              );
+                            }
+                          ),
+                          _buildDashboardCard(
+                            context,
+                            title: 'Log\nManagement',
+                            icon: Icons.menu_book,
+                            color: AppColors.primaryLight,
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LogManagementDashboard())),
+                          ),
+                          _buildDashboardCard(
+                            context,
+                            title: 'Checklist\nManagement',
+                            icon: Icons.checklist_rtl,
+                            color: Colors.green,
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChecklistManagementDashboard())),
+                          ),
+                          _buildDashboardCard(
+                            context,
+                            title: 'Safety Interlock\nBypass',
+                            icon: Icons.security,
+                            color: Colors.grey.shade400,
+                            isComingSoon: true,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                _buildDashboardCard(
-                  context,
-                  title: 'Log\nManagement',
-                  icon: Icons.menu_book,
-                  color: AppColors.primaryLight,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LogManagementDashboard())),
-                ),
-                _buildDashboardCard(
-                  context,
-                  title: 'Checklist\nManagement',
-                  icon: Icons.checklist_rtl,
-                  color: Colors.green,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChecklistManagementDashboard())),
-                ),
-                _buildDashboardCard(
-                  context,
-                  title: 'Safety Interlock\nBypass',
-                  icon: Icons.security,
-                  color: Colors.grey.shade400,
-                  isComingSoon: true,
-                ),
-              ],
-            ),
-          ],
+              ),
+            );
+          },
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildDashboardCard(
     BuildContext context, {
