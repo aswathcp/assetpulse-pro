@@ -440,25 +440,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
           Divider(color: Theme.of(context).dividerColor, height: 32),
           _sectionHeader('Context & Operational Placement'),
 
-          if (asset.status == AssetStatus.spare) ...[
-            _buildDetailBox(context, 'Spare Storage Location / Rack', asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Not Specified'),
-            const SizedBox(height: 12),
-            const Text('Compatible Parent Machines:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            asset.applicableParentEquipmentIds != null && asset.applicableParentEquipmentIds!.isNotEmpty
-                ? Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: asset.applicableParentEquipmentIds!
-                        .map((pid) => Chip(
-                              label: Text(pid, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              backgroundColor: Colors.cyan.withValues(alpha: 0.15),
-                              side: const BorderSide(color: Colors.cyanAccent),
-                            ))
-                        .toList(),
-                  )
-                : const Text('No parent machines assigned for this spare pool.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ] else ...[
+          if (asset.status == AssetStatus.active) ...[
             Row(
               children: [
                 Expanded(child: _buildDetailBox(context, 'Installed Parent Equipment', asset.masterEquipmentId.isNotEmpty ? asset.masterEquipmentId : 'Unassigned')),
@@ -466,7 +448,33 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 Expanded(child: _buildDetailBox(context, 'Site Installation Date', asset.installationDate != null ? _formatDate(asset.installationDate!) : '-')),
               ],
             ),
+          ] else ...[
+            _buildDetailBox(
+              context,
+              asset.status == AssetStatus.spare ? 'Spare Storage Location / Rack' : 'Maintenance / Workshop Location',
+              asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Not Specified',
+            ),
           ],
+
+          const SizedBox(height: 12),
+          const Text('Applicable / Compatible Parent Machines:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          asset.applicableParentEquipmentIds != null && asset.applicableParentEquipmentIds!.isNotEmpty
+              ? Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: asset.applicableParentEquipmentIds!
+                      .map((pid) => Chip(
+                            label: Text(pid, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            backgroundColor: Colors.cyan.withValues(alpha: 0.15),
+                            side: const BorderSide(color: Colors.cyanAccent),
+                          ))
+                      .toList(),
+                )
+              : Text(
+                  asset.status == AssetStatus.active ? 'No additional spare compatibility machines linked.' : 'No parent machines assigned for this equipment.',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
         ],
       ),
     );
@@ -920,6 +928,15 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
 
     final spares = querySnapshot.docs.map((doc) => AssetModel.fromMap(doc.data(), doc.id)).toList();
 
+    // Sort spares so that assets specifically mapped to this machine appear at the top
+    spares.sort((a, b) {
+      final aMatch = a.applicableParentEquipmentIds?.contains(asset.masterEquipmentId) ?? false;
+      final bMatch = b.applicableParentEquipmentIds?.contains(asset.masterEquipmentId) ?? false;
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return a.tagNo.compareTo(b.tagNo);
+    });
+
     if (!context.mounted) return;
 
     if (spares.isEmpty) {
@@ -937,7 +954,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
       return;
     }
 
-    AssetModel? selectedSpare;
+    AssetModel? selectedSpare = spares.isNotEmpty ? spares.first : null;
 
     showDialog(
       context: context,
@@ -951,7 +968,8 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Select a compatible spare ${asset.type.name} to deploy:', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                  Text('Select a compatible spare ${asset.type.name} to deploy at ${asset.masterEquipmentId}:',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<AssetModel>(
                     dropdownColor: Theme.of(context).colorScheme.surface,
@@ -959,9 +977,14 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                     decoration: const InputDecoration(labelText: 'Select Spare Asset', border: OutlineInputBorder()),
                     items: spares.map((s) {
+                      final isDirectMatch = s.applicableParentEquipmentIds?.contains(asset.masterEquipmentId) ?? false;
                       return DropdownMenuItem<AssetModel>(
                         value: s,
-                        child: Text('${s.tagNo} - ${s.make} (${s.model})', overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          '${s.tagNo} - ${s.name} ${isDirectMatch ? "⭐ [Assigned Spare]" : ""}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: isDirectMatch ? FontWeight.bold : FontWeight.normal, fontSize: 12),
+                        ),
                       );
                     }).toList(),
                     onChanged: (v) {
@@ -972,7 +995,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Note: Upon confirmation, the current asset (${asset.tagNo}) will be marked as "Under Maintenance" and moved to standby. The selected spare (${selectedSpare?.tagNo ?? "..."}) will become ACTIVE at this machine location.',
+                    'Note: Upon confirmation, the current asset (${asset.tagNo}) will transition to "UNDER MAINTENANCE" and retain its link to ${asset.masterEquipmentId} for future redeployment. The spare (${selectedSpare?.tagNo ?? "..."}) will become ACTIVE at this machine.',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontStyle: FontStyle.italic),
                   ),
                 ],
@@ -989,22 +1012,38 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                           final currentRef = db.collection('assets').doc(asset.id);
                           final spareRef = db.collection('assets').doc(selectedSpare!.id);
 
-                          // 1. Move current asset to underMaintenance and clear parent
+                          // 1. Move current asset to underMaintenance and ensure previous parent is kept in its applicableParentEquipmentIds pool!
+                          final Set<String> oldAssetParents = {
+                            ...?asset.applicableParentEquipmentIds,
+                            if (asset.masterEquipmentId.isNotEmpty) asset.masterEquipmentId,
+                          };
+
                           batch.update(currentRef, {
                             'status': AssetStatus.underMaintenance.name,
                             'masterEquipmentId': '',
+                            'applicableParentEquipmentIds': oldAssetParents.toList(),
+                            'spareLocation': 'Electrical Maintenance Workshop',
                             'modifiedAt': FieldValue.serverTimestamp(),
-                            'modifiedBy': AuthService().currentUser?.uid,
+                            'modifiedBy': AuthService().currentUser?.email ?? 'Tech',
                           });
 
-                          // 2. Move spare to active and set parent
-                          batch.update(spareRef, {
+                          // 2. Move spare to active and set parent machine
+                          final Set<String> newAssetParents = {
+                            ...?selectedSpare!.applicableParentEquipmentIds,
+                            if (asset.masterEquipmentId.isNotEmpty) asset.masterEquipmentId,
+                          };
+
+                          final Map<String, dynamic> spareUpdates = {
                             'status': AssetStatus.active.name,
                             'masterEquipmentId': asset.masterEquipmentId,
+                            'applicableParentEquipmentIds': newAssetParents.toList(),
                             'installationDate': FieldValue.serverTimestamp(),
                             'modifiedAt': FieldValue.serverTimestamp(),
-                            'modifiedBy': AuthService().currentUser?.uid,
-                          });
+                            'modifiedBy': AuthService().currentUser?.email ?? 'Tech',
+                            'spareLocation': FieldValue.delete(),
+                          };
+
+                          batch.update(spareRef, spareUpdates);
 
                           await batch.commit();
 

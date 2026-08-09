@@ -890,15 +890,15 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Spare Storage Location & Parent Linking
-          if (_selectedStatus == AssetStatus.spare) ...[
+          // Location & Parent Linking (Universal across Active, Spare, and Under Maintenance)
+          if (_selectedStatus == AssetStatus.spare || _selectedStatus == AssetStatus.underMaintenance) ...[
             TextFormField(
               controller: _spareLocationController,
-              decoration: const InputDecoration(
-                labelText: 'Spare Storage Location / Rack / Bay *',
-                hintText: 'e.g. Central Warehouse - Bay 3, Rack A2',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.warehouse, color: Colors.cyanAccent),
+              decoration: InputDecoration(
+                labelText: _selectedStatus == AssetStatus.spare ? 'Spare Storage Location / Rack / Bay *' : 'Workshop / Maintenance Bay Location',
+                hintText: _selectedStatus == AssetStatus.spare ? 'e.g. Central Warehouse - Bay 3, Rack A2' : 'e.g. Electrical Maintenance Bay 1',
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(_selectedStatus == AssetStatus.spare ? Icons.warehouse : Icons.build_circle, color: Colors.cyanAccent),
               ),
               validator: (v) {
                 if (_selectedStatus == AssetStatus.spare && (v == null || v.trim().isEmpty)) {
@@ -906,65 +906,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 }
                 return null;
               },
-            ),
-            const SizedBox(height: 14),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.cyan.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('APPLICABLE PARENT MACHINES',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.cyanAccent)),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_link, size: 16, color: Colors.cyanAccent),
-                        label: const Text('Select Machines', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-                        onPressed: _showSpareParentsSelector,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  _selectedParentIdsForSpares.isEmpty
-                      ? const Text('No parent machines linked. Tap above to assign multiple compatible parent equipments.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey))
-                      : Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: _selectedParentIdsForSpares.map((pid) {
-                            final eq = _masterEquipments.firstWhere(
-                              (e) => e.id == pid,
-                              orElse: () => MasterEquipmentModel(
-                                id: pid,
-                                name: pid,
-                                plantId: '',
-                                unitId: '',
-                                locationId: '',
-                                area: '',
-                                type: 'mechanical',
-                                createdAt: DateTime.now(),
-                              ),
-                            );
-                            return Chip(
-                              label: Text('${eq.name} (${eq.id})', style: const TextStyle(fontSize: 11)),
-                              deleteIcon: const Icon(Icons.close, size: 14),
-                              onDeleted: () {
-                                setState(() {
-                                  _selectedParentIdsForSpares.remove(pid);
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-                ],
-              ),
             ),
             const SizedBox(height: 14),
           ] else ...[
@@ -981,9 +922,16 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: Text('${e.name} (${e.id})', overflow: TextOverflow.ellipsis),
                 );
               }).toList(),
-              onChanged: (val) => setState(() => _selectedParentId = val),
+              onChanged: (val) {
+                setState(() {
+                  _selectedParentId = val;
+                  if (val != null && !_selectedParentIdsForSpares.contains(val)) {
+                    _selectedParentIdsForSpares.add(val);
+                  }
+                });
+              },
               validator: (val) {
-                if (_selectedStatus != AssetStatus.spare && (val == null || val.isEmpty)) {
+                if (_selectedStatus == AssetStatus.active && (val == null || val.isEmpty)) {
                   return 'Please select parent equipment';
                 }
                 return null;
@@ -991,6 +939,70 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             ),
             const SizedBox(height: 14),
           ],
+
+          // Applicable / Compatible Parent Machines (Available for ANY status!)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.cyan.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _selectedStatus == AssetStatus.active
+                          ? 'COMPATIBLE SPARE MACHINES POOL'
+                          : 'APPLICABLE / COMPATIBLE MACHINES',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.cyanAccent),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.add_link, size: 16, color: Colors.cyanAccent),
+                      label: const Text('Select Machines', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+                      onPressed: _showSpareParentsSelector,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                _selectedParentIdsForSpares.isEmpty
+                    ? const Text('No parent machines linked. Tap "Select Machines" above to assign compatible equipments.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey))
+                    : Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _selectedParentIdsForSpares.map((pid) {
+                          final eq = _masterEquipments.firstWhere(
+                            (e) => e.id == pid,
+                            orElse: () => MasterEquipmentModel(
+                              id: pid,
+                              name: pid,
+                              plantId: '',
+                              unitId: '',
+                              locationId: '',
+                              area: '',
+                              type: 'mechanical',
+                              createdAt: DateTime.now(),
+                            ),
+                          );
+                          return Chip(
+                            label: Text('${eq.name} (${eq.id})', style: const TextStyle(fontSize: 11)),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            onDeleted: () {
+                              setState(() {
+                                _selectedParentIdsForSpares.remove(pid);
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // Name
           TextFormField(
