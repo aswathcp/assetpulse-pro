@@ -163,8 +163,8 @@ class _DataImportPageState extends State<DataImportPage> {
         };
       case 'assets':
         return {
-          'Cols': 'id, tagNo, name, make, model, serialNo, type, status, masterEquipmentId',
-          'Note': 'Assets must link to a valid Master Equipment Tag in the masterEquipmentId column.'
+          'Cols': 'type, name, make, model, serialNo, powerKw, voltage, speedRpm, status, seqNo',
+          'Note': 'Plant Asset & Equipment Registry (Motors, Gearboxes, Pumps).\n• type: motor, gearbox, or pump\n• name: Equipment Name (e.g. Primary Sizer Motor, Cooling Tower Pump)\n• make / model / serialNo: Manufacturer details\n• powerKw / voltage / speedRpm: Technical specifications\n• status: active, spare, underMaintenance, or scrapped\n• seqNo: 3-digit sequence (e.g. 001, 002 - Optional).\n* Tag ID is auto-generated as [Plant]-[Unit]-[MTR/GBX/PMP]-[seqNo]!'
         };
       case 'lighting_dbs':
         return {
@@ -191,11 +191,6 @@ class _DataImportPageState extends State<DataImportPage> {
         return {
           'Cols': 'tagId, equipmentType, owner, department, location, seqNo',
           'Note': 'Power Tools & Equipment Registry (IS/CEA Industrial Standard).\n• tagId: Tag ID / Document Key (e.g. PLANT-UNIT-WM-001, optional - auto-generated if left blank)\n• equipmentType / type: Standard equipment name (e.g. Welding Machine, Grinding Machine, Cutting Machine, Hand Drilling Machine, Pedestal Drill Machine, Extension Board, Mancooler, etc.)\n• owner / contractor: Owner or Vendor name (e.g. Vedanta, Monomark, V.Desai, Bhavana, Devika, Ishan Logistics)\n• department: Department (e.g. Electrical, Mechanical, Civil, Production, Instrumentation, HSE)\n• location: Area name (e.g. Cast House Floor Bay 1)\n• seqNo: 3-digit sequence number (e.g. 001, 002).'
-        };
-      case 'assets':
-        return {
-          'Cols': 'type, name, make, model, serialNo, powerKw, voltage, speedRpm, status, seqNo',
-          'Note': 'Plant Asset & Equipment Registry (Motors, Gearboxes, Pumps).\n• type: motor, gearbox, or pump\n• name: Equipment Name (e.g. Primary Sizer Motor, Cooling Tower Pump)\n• make / model / serialNo: Manufacturer details\n• powerKw / voltage / speedRpm: Technical specifications\n• status: active, spare, underMaintenance, or scrapped\n• seqNo: 3-digit sequence (e.g. 001, 002 - Optional).\n* Tag ID is auto-generated as [Plant]-[Unit]-[MTR/GBX/PMP]-[seqNo]!'
         };
       default:
         return {

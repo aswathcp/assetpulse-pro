@@ -20,7 +20,6 @@ import '../../../../core/utils/file_download_helper.dart';
 import '../../../admin/presentation/pages/data_import_page.dart';
 import 'asset_detail_page.dart';
 import 'add_edit_asset_page.dart';
-import '../../data/models/master_equipment_model.dart';
 
 class AssetsTab extends StatefulWidget {
   const AssetsTab({super.key});
@@ -50,7 +49,6 @@ class _AssetsTabState extends State<AssetsTab> {
 
   bool _isLoading = true;
   Stream<List<AssetModel>>? _assetsStream;
-  List<MasterEquipmentModel> _scopeEquipments = [];
 
   @override
   void initState() {
@@ -131,14 +129,6 @@ class _AssetsTabState extends State<AssetsTab> {
   void _refreshStreams() {
     setState(() {
       _assetsStream = _firestoreService.getAssetsStream(_selectedUnitId, _selectedPlantId);
-    });
-
-    _firestoreService.getAllMasterEquipmentsStream(_selectedUnitId, _selectedPlantId).listen((equipments) {
-      if (mounted) {
-        setState(() {
-          _scopeEquipments = equipments;
-        });
-      }
     });
   }
 
@@ -231,7 +221,7 @@ class _AssetsTabState extends State<AssetsTab> {
       final bytes = excel.save();
       if (bytes != null) {
         final fileName = 'Asset_Inventory_${_selectedPlantId}_${_selectedUnitId}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-        final savedPath = await FileDownloadHelper.downloadFile(bytes, fileName);
+        final savedPath = await downloadFile(bytes, fileName);
         if (savedPath != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Excel exported: $fileName'), backgroundColor: AppColors.success),
@@ -290,7 +280,12 @@ class _AssetsTabState extends State<AssetsTab> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const DataImportPage(collectionId: 'assets'),
+                          builder: (_) => DataImportPage(
+                            collectionId: 'assets',
+                            title: 'Asset Inventory Import',
+                            plantId: _selectedPlantId,
+                            unitId: _selectedUnitId,
+                          ),
                         ),
                       );
                     } else {
@@ -351,7 +346,7 @@ class _AssetsTabState extends State<AssetsTab> {
             ],
           ),
           content: Text(
-            'Are you sure you want to permanently delete all ${assets.length} assets in ${_selectedPlantId} / ${_selectedUnitId}?\nThis action cannot be undone.',
+            'Are you sure you want to permanently delete all ${assets.length} assets in $_selectedPlantId / $_selectedUnitId?\nThis action cannot be undone.',
           ),
           actions: [
             TextButton(
@@ -760,7 +755,7 @@ class _AssetsTabState extends State<AssetsTab> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AssetDetailPage(assetId: asset.id),
+                builder: (context) => AssetDetailPage(asset: asset),
               ),
             );
           },

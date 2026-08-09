@@ -374,7 +374,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
 
                           return CheckboxListTile(
                             title: Text(eq.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                            subtitle: Text('${eq.equipmentCode} • Location: ${eq.locationId}', style: const TextStyle(fontSize: 11)),
+                            subtitle: Text('${eq.id} • Location: ${eq.locationId}', style: const TextStyle(fontSize: 11)),
                             value: isSelected,
                             activeColor: AppColors.primary,
                             onChanged: (checked) {
@@ -786,9 +786,21 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                           spacing: 6,
                           runSpacing: 4,
                           children: _selectedParentIdsForSpares.map((pid) {
-                            final eq = _masterEquipments.firstWhere((e) => e.id == pid, orElse: () => MasterEquipmentModel(id: pid, name: pid, equipmentCode: pid, plantId: '', unitId: '', locationId: '', isCritical: false, createdAt: DateTime.now()));
+                            final eq = _masterEquipments.firstWhere(
+                              (e) => e.id == pid,
+                              orElse: () => MasterEquipmentModel(
+                                id: pid,
+                                name: pid,
+                                plantId: '',
+                                unitId: '',
+                                locationId: '',
+                                area: '',
+                                type: 'mechanical',
+                                createdAt: DateTime.now(),
+                              ),
+                            );
                             return Chip(
-                              label: Text('${eq.name} (${eq.equipmentCode})', style: const TextStyle(fontSize: 11)),
+                              label: Text('${eq.name} (${eq.id})', style: const TextStyle(fontSize: 11)),
                               deleteIcon: const Icon(Icons.close, size: 14),
                               onDeleted: () {
                                 setState(() {
@@ -813,7 +825,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
               items: _masterEquipments.map((e) {
                 return DropdownMenuItem(
                   value: e.id,
-                  child: Text('${e.name} (${e.equipmentCode})', overflow: TextOverflow.ellipsis),
+                  child: Text('${e.name} (${e.id})', overflow: TextOverflow.ellipsis),
                 );
               }).toList(),
               onChanged: (val) => setState(() => _selectedParentId = val),
