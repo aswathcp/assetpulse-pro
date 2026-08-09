@@ -1,5 +1,3 @@
-
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -163,8 +161,8 @@ class _DataImportPageState extends State<DataImportPage> {
         };
       case 'assets':
         return {
-          'Cols': 'type, name, make, model, serialNo, powerKw, voltage, speedRpm, status, seqNo',
-          'Note': 'Plant Asset & Equipment Registry (Motors, Gearboxes, Pumps).\n• type: motor, gearbox, or pump\n• name: Equipment Name (e.g. Primary Sizer Motor, Cooling Tower Pump)\n• make / model / serialNo: Manufacturer details\n• powerKw / voltage / speedRpm: Technical specifications\n• status: active, spare, underMaintenance, or scrapped\n• seqNo: 3-digit sequence (e.g. 001, 002 - Optional).\n* Tag ID is auto-generated as [Plant]-[Unit]-[MTR/GBX/PMP]-[seqNo]!'
+          'Cols': 'Dedicated templates available for Motors, Gearboxes, and Pumps!',
+          'Note': 'Choose your specific Asset Type template below to download the exact technical specification columns.\n• Motors: kW, Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease\n• Gearboxes: Ratio, Sump Capacity, Oil Grade, Shafts, Lubrication, Bearings\n• Pumps: Flow Rate, Head, Speed, Impeller, Flange Sizes, Seal Type\n• Spares: Define warehouse location and compatible parent machines (e.g. CB-1; CB-2)!'
         };
       case 'lighting_dbs':
         return {
@@ -201,6 +199,11 @@ class _DataImportPageState extends State<DataImportPage> {
   }
 
   Future<void> _downloadTemplate() async {
+    if (widget.collectionId == 'assets') {
+      _showAssetTemplateModal();
+      return;
+    }
+
     if (_userUnitId == null || _userPlantId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: Select scope first.'), backgroundColor: AppColors.error),
@@ -612,6 +615,387 @@ class _DataImportPageState extends State<DataImportPage> {
     }
   }
 
+  Future<void> _downloadAssetTemplate([String type = 'all']) async {
+    if (_userUnitId == null || _userPlantId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Select scope first.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    try {
+      var excel = Excel.createExcel();
+      String defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
+
+      // 1. Motors Sheet
+      if (type == 'all' || type == 'motor') {
+        final sheetName = type == 'all' ? 'Motors' : 'Motor_Template';
+        if (excel.sheets.containsKey(defaultSheet)) {
+          excel.rename(defaultSheet, sheetName);
+        }
+        Sheet motorSheet = excel[sheetName];
+
+        final motorCols = [
+          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'powerKw', 'voltage', 'fullLoadCurrent', 'noLoadCurrent', 'speedRpm', 'frequency', 'poles',
+          'frameSize', 'mountingType', 'efficiency', 'powerFactor', 'greaseType', 'bearingDE', 'bearingNDE',
+          'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
+        ];
+        motorSheet.appendRow(motorCols.map((e) => TextCellValue(e)).toList());
+
+        // Sample Motor 1: Active
+        motorSheet.appendRow([
+          TextCellValue('motor'),
+          TextCellValue('BF 1 Sizer Drive Motor'),
+          TextCellValue('active'),
+          TextCellValue('BF1-SIZER-01'),
+          TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
+          TextCellValue(''),
+          TextCellValue('YES'),
+          TextCellValue('75'),
+          TextCellValue('415'),
+          TextCellValue('130.5'),
+          TextCellValue('38.0'),
+          TextCellValue('1480'),
+          TextCellValue('50'),
+          TextCellValue('4'),
+          TextCellValue('280M'),
+          TextCellValue('B3 Foot Mounted'),
+          TextCellValue('95.2'),
+          TextCellValue('0.88'),
+          TextCellValue('Mobilith SHC 100'),
+          TextCellValue('6316 C3'),
+          TextCellValue('6316 C3'),
+          TextCellValue('ABB'),
+          TextCellValue('M3BP 280SMB'),
+          TextCellValue('SN-882310'),
+          TextCellValue('2022'),
+          TextCellValue('PO-450012'),
+          TextCellValue('E28011700000020A'),
+          TextCellValue('001'),
+        ]);
+
+        // Sample Motor 2: Spare
+        motorSheet.appendRow([
+          TextCellValue('motor'),
+          TextCellValue('75kW Standby Spare Motor'),
+          TextCellValue('spare'),
+          TextCellValue(''),
+          TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
+          TextCellValue('Central Warehouse - Bay 3, Rack A2'),
+          TextCellValue('YES'),
+          TextCellValue('75'),
+          TextCellValue('415'),
+          TextCellValue('130.5'),
+          TextCellValue('38.0'),
+          TextCellValue('1480'),
+          TextCellValue('50'),
+          TextCellValue('4'),
+          TextCellValue('280M'),
+          TextCellValue('B3 Foot Mounted'),
+          TextCellValue('95.2'),
+          TextCellValue('0.88'),
+          TextCellValue('Mobilith SHC 100'),
+          TextCellValue('6316 C3'),
+          TextCellValue('6316 C3'),
+          TextCellValue('Siemens'),
+          TextCellValue('1LE1001-1DB2'),
+          TextCellValue('SN-994120'),
+          TextCellValue('2023'),
+          TextCellValue('PO-450088'),
+          TextCellValue(''),
+          TextCellValue('002'),
+        ]);
+      }
+
+      // 2. Gearboxes Sheet
+      if (type == 'all' || type == 'gearbox') {
+        final sheetName = type == 'all' ? 'Gearboxes' : (type == 'gearbox' && !excel.sheets.containsKey('Gearbox_Template') ? 'Gearbox_Template' : 'Gearboxes');
+        if (type == 'gearbox' && excel.sheets.containsKey(defaultSheet)) {
+          excel.rename(defaultSheet, 'Gearbox_Template');
+        }
+        Sheet gbxSheet = excel[type == 'gearbox' ? 'Gearbox_Template' : sheetName];
+
+        final gbxCols = [
+          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'powerKw', 'gearRatio', 'inputSpeedRpm', 'outputSpeedRpm', 'oilType', 'oilCapacity',
+          'inputShaftMm', 'outputShaftMm', 'lubricationMethod', 'mountingOrientation', 'bearingDE', 'bearingNDE',
+          'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
+        ];
+        gbxSheet.appendRow(gbxCols.map((e) => TextCellValue(e)).toList());
+
+        // Sample Gearbox 1: Active
+        gbxSheet.appendRow([
+          TextCellValue('gearbox'),
+          TextCellValue('Primary Sizer Speed Reducer Gearbox'),
+          TextCellValue('active'),
+          TextCellValue('BF1-SIZER-01'),
+          TextCellValue('BF1-SIZER-01'),
+          TextCellValue(''),
+          TextCellValue('YES'),
+          TextCellValue('90'),
+          TextCellValue('25:1'),
+          TextCellValue('1480'),
+          TextCellValue('59.2'),
+          TextCellValue('Mobilgear 600 XP 220'),
+          TextCellValue('45.0'),
+          TextCellValue('65'),
+          TextCellValue('140'),
+          TextCellValue('Splash Lubrication'),
+          TextCellValue('Horizontal Foot Mounted'),
+          TextCellValue('22218 EK'),
+          TextCellValue('22216 EK'),
+          TextCellValue('Elecon'),
+          TextCellValue('SNH-315'),
+          TextCellValue('SN-129033'),
+          TextCellValue('2021'),
+          TextCellValue('PO-450033'),
+          TextCellValue('E28011700000030B'),
+          TextCellValue('001'),
+        ]);
+
+        // Sample Gearbox 2: Spare
+        gbxSheet.appendRow([
+          TextCellValue('gearbox'),
+          TextCellValue('SNH-315 Helical Gearbox Spare'),
+          TextCellValue('spare'),
+          TextCellValue(''),
+          TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
+          TextCellValue('Mechanical Yard - Bay 2'),
+          TextCellValue('YES'),
+          TextCellValue('90'),
+          TextCellValue('25:1'),
+          TextCellValue('1480'),
+          TextCellValue('59.2'),
+          TextCellValue('Mobilgear 600 XP 220'),
+          TextCellValue('45.0'),
+          TextCellValue('65'),
+          TextCellValue('140'),
+          TextCellValue('Splash Lubrication'),
+          TextCellValue('Horizontal Foot Mounted'),
+          TextCellValue('22218 EK'),
+          TextCellValue('22216 EK'),
+          TextCellValue('Radicon'),
+          TextCellValue('PZ-250'),
+          TextCellValue('SN-443912'),
+          TextCellValue('2022'),
+          TextCellValue('PO-450091'),
+          TextCellValue(''),
+          TextCellValue('002'),
+        ]);
+      }
+
+      // 3. Pumps Sheet
+      if (type == 'all' || type == 'pump') {
+        final sheetName = type == 'all' ? 'Pumps' : (type == 'pump' && !excel.sheets.containsKey('Pump_Template') ? 'Pump_Template' : 'Pumps');
+        if (type == 'pump' && excel.sheets.containsKey(defaultSheet)) {
+          excel.rename(defaultSheet, 'Pump_Template');
+        }
+        Sheet pumpSheet = excel[type == 'pump' ? 'Pump_Template' : sheetName];
+
+        final pumpCols = [
+          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'flowRate', 'head', 'pumpSpeed', 'powerKw', 'impellerSize', 'suctionFlangeMm', 'dischargeFlangeMm',
+          'sealType', 'casingMaterial', 'greaseType', 'bearingDE', 'bearingNDE',
+          'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
+        ];
+        pumpSheet.appendRow(pumpCols.map((e) => TextCellValue(e)).toList());
+
+        // Sample Pump 1: Active
+        pumpSheet.appendRow([
+          TextCellValue('pump'),
+          TextCellValue('Cooling Tower Circulation Pump 1'),
+          TextCellValue('active'),
+          TextCellValue('CT-PUMP-01'),
+          TextCellValue('CT-PUMP-01; CT-PUMP-02'),
+          TextCellValue(''),
+          TextCellValue('YES'),
+          TextCellValue('250'),
+          TextCellValue('45.0'),
+          TextCellValue('1450'),
+          TextCellValue('45'),
+          TextCellValue('260'),
+          TextCellValue('150'),
+          TextCellValue('100'),
+          TextCellValue('Mechanical Seal (Cartridge)'),
+          TextCellValue('Cast Iron FG 260'),
+          TextCellValue('Servo Gem 3'),
+          TextCellValue('6312 C3'),
+          TextCellValue('6312 C3'),
+          TextCellValue('Kirloskar'),
+          TextCellValue('DB 100/26'),
+          TextCellValue('SN-441920'),
+          TextCellValue('2021'),
+          TextCellValue('PO-450044'),
+          TextCellValue('E28011700000040C'),
+          TextCellValue('001'),
+        ]);
+
+        // Sample Pump 2: Spare
+        pumpSheet.appendRow([
+          TextCellValue('pump'),
+          TextCellValue('DB 100/26 Bare Shaft Pump Spare'),
+          TextCellValue('spare'),
+          TextCellValue(''),
+          TextCellValue('CT-PUMP-01; CT-PUMP-02'),
+          TextCellValue('Pump Store - Rack C1'),
+          TextCellValue('YES'),
+          TextCellValue('250'),
+          TextCellValue('45.0'),
+          TextCellValue('1450'),
+          TextCellValue('45'),
+          TextCellValue('260'),
+          TextCellValue('150'),
+          TextCellValue('100'),
+          TextCellValue('Mechanical Seal (Cartridge)'),
+          TextCellValue('Cast Iron FG 260'),
+          TextCellValue('Servo Gem 3'),
+          TextCellValue('6312 C3'),
+          TextCellValue('6312 C3'),
+          TextCellValue('KSB'),
+          TextCellValue('MegaCPK 080-050-200'),
+          TextCellValue('SN-772189'),
+          TextCellValue('2023'),
+          TextCellValue('PO-450099'),
+          TextCellValue(''),
+          TextCellValue('002'),
+        ]);
+      }
+
+      // 4. Reference Options Sheet
+      Sheet refSheet = excel['Reference Guide'];
+      refSheet.appendRow([TextCellValue('AVAILABLE MASTER EQUIPMENTS IN UNIT (Use in parentEquipment / compatibleSpares)')]);
+      refSheet.appendRow([TextCellValue('Equipment Tag (Raw)'), TextCellValue('Full Tag ID'), TextCellValue('Equipment Name')]);
+      final snapshot = await FirebaseFirestore.instance
+          .collection('master_equipments')
+          .where('plantId', isEqualTo: _userPlantId)
+          .where('unitId', isEqualTo: _userUnitId)
+          .get();
+      for (final doc in snapshot.docs) {
+        final rawId = HierarchyService.stripPrefix(doc.id, _userPlantId!, _userUnitId!);
+        refSheet.appendRow([TextCellValue(rawId), TextCellValue(doc.id), TextCellValue(doc.data()['name'] ?? '')]);
+      }
+
+      final filename = type == 'motor'
+          ? 'Motor_Import_Template.xlsx'
+          : type == 'gearbox'
+              ? 'Gearbox_Import_Template.xlsx'
+              : type == 'pump'
+                  ? 'Pump_Import_Template.xlsx'
+                  : 'Asset_Master_Templates.xlsx';
+
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        final savedPath = await downloadFile(fileBytes, filename);
+        if (mounted) {
+          final message = savedPath != null
+              ? 'Saved template to: $savedPath'
+              : 'Template generated successfully!';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message), backgroundColor: AppColors.success, duration: const Duration(seconds: 6)),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating asset template: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  void _showAssetTemplateModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Choose Asset Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('Download tailored Excel templates with exact technical specification columns per asset classification:',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: const Icon(Icons.bolt, color: Colors.amberAccent),
+              ),
+              title: const Text('Electric Motors Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Power (kW), Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease Grade', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.download, size: 18, color: Colors.amberAccent),
+              onTap: () {
+                Navigator.pop(ctx);
+                _downloadAssetTemplate('motor');
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: const Icon(Icons.settings, color: Colors.orangeAccent),
+              ),
+              title: const Text('Industrial Gearboxes Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Gear Ratio, Sump Capacity, Oil Grade, Input/Output Shafts, Speeds, Bearings', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.download, size: 18, color: Colors.orangeAccent),
+              onTap: () {
+                Navigator.pop(ctx);
+                _downloadAssetTemplate('gearbox');
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: const Icon(Icons.water_drop, color: Colors.blueAccent),
+              ),
+              title: const Text('Process & Water Pumps Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Flow Rate (m³/h), Head, Speed, Impeller, Suction/Discharge Flanges, Seal Type', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.download, size: 18, color: Colors.blueAccent),
+              onTap: () {
+                Navigator.pop(ctx);
+                _downloadAssetTemplate('pump');
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: const Icon(Icons.table_chart, color: Colors.greenAccent),
+              ),
+              title: const Text('All-in-One Master Workbook (3 Sheets)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Contains Motors, Gearboxes, Pumps tabs and Parent Equipment Reference Guide', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.download, size: 18, color: Colors.greenAccent),
+              onTap: () {
+                Navigator.pop(ctx);
+                _downloadAssetTemplate('all');
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> _validateImportData(List<Map<String, dynamic>> rawData) async {
     if (_userPlantId == null || _userUnitId == null) return rawData;
 
@@ -752,13 +1136,21 @@ class _DataImportPageState extends State<DataImportPage> {
           status = 'Error: Select Location in header or specify in locationId column.';
         }
       } else if (widget.collectionId == 'assets') {
-        final meId = row['masterEquipmentId']?.toString().trim();
-        if (meId == null || meId.isEmpty) {
-          status = 'Error: masterEquipmentId is missing.';
-        } else {
-          final fullMeId = HierarchyService.prefixId(meId, _userPlantId!, _userUnitId!);
-          if (!validParentIds.contains(fullMeId.toUpperCase())) {
-            status = 'Warning: Master Equipment Tag "$fullMeId" not found in unit.';
+        final name = row['name']?.toString().trim() ?? '';
+        final statusVal = row['status']?.toString().trim().toLowerCase() ?? 'active';
+        final parentRaw = row['parentEquipment']?.toString().trim() ??
+                          row['masterEquipmentId']?.toString().trim() ??
+                          row['installedMachine']?.toString().trim() ??
+                          '';
+
+        if (name.isEmpty) {
+          status = 'Error: Asset name is required.';
+        } else if (statusVal == 'active' && parentRaw.isEmpty) {
+          status = 'Warning: Active asset has no parent machine assigned.';
+        } else if (parentRaw.isNotEmpty) {
+          final fullParent = HierarchyService.prefixId(parentRaw, _userPlantId!, _userUnitId!);
+          if (!validParentIds.contains(fullParent.toUpperCase())) {
+            status = 'Warning: Parent machine "$fullParent" not found in unit registry.';
           }
         }
       } else if (widget.collectionId == 'lighting_dbs') {
@@ -795,33 +1187,29 @@ class _DataImportPageState extends State<DataImportPage> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls'],
-        withData: true,
       );
 
-      if (result != null) {
+      if (result != null && result.files.isNotEmpty) {
+        final pickedFile = result.files.single;
         setState(() {
-          _fileName = result.files.single.name;
+          _fileName = pickedFile.name;
           _isProcessing = true;
           _statusMessage = 'Parsing Excel...';
         });
 
-        final bytes = result.files.single.bytes;
-        List<int>? fileBytes = bytes;
-        if (fileBytes == null && result.files.single.path != null) {
-          fileBytes = await File(result.files.single.path!).readAsBytes();
-        }
+        final fileBytes = await pickedFile.readAsBytes();
 
-        if (fileBytes != null) {
-          final data = _excelService.parseExcel(fileBytes);
-          final validatedData = await _validateImportData(data);
-          setState(() {
-            _previewData = validatedData;
-            _statusMessage = data.isEmpty 
-                ? "Error: No data found in file." 
-                : "Parsed ${data.length} records. Please review warnings/errors below.";
-            _isProcessing = false;
-          });
-        }
+        final data = widget.collectionId == 'assets'
+            ? _excelService.parseAllSheets(fileBytes)
+            : _excelService.parseExcel(fileBytes);
+        final validatedData = await _validateImportData(data);
+        setState(() {
+          _previewData = validatedData;
+          _statusMessage = data.isEmpty 
+              ? "Error: No data found in file." 
+              : "Parsed ${data.length} records. Please review warnings/errors below.";
+          _isProcessing = false;
+        });
       }
     } catch (e) {
       setState(() {
@@ -1094,35 +1482,116 @@ class _DataImportPageState extends State<DataImportPage> {
           data['createdAt'] = data['createdAt'] ?? DateTime.now().toIso8601String();
           data['updatedAt'] = DateTime.now().toIso8601String();
         } else if (widget.collectionId == 'assets') {
-          final typeStr = data['type']?.toString().trim().toLowerCase() ?? 'motor';
+          final rawType = data['type']?.toString().trim().toLowerCase() ?? 'motor';
+          final typeStr = rawType.contains('gear') ? 'gearbox' : rawType.contains('pump') ? 'pump' : 'motor';
           final nameStr = data['name']?.toString().trim() ?? 'Equipment Asset';
-          final makeStr = data['make']?.toString().trim() ?? 'Standard';
+          final makeStr = data['make']?.toString().trim() ?? '';
           final modelStr = data['model']?.toString().trim() ?? '';
-          final serialStr = data['serialNo']?.toString().trim() ?? 'SN-${DateTime.now().millisecondsSinceEpoch}';
-          final statusStr = data['status']?.toString().trim().toLowerCase() ?? 'active';
-          final seqStr = data['seqNo']?.toString().trim() ?? '001';
+          final serialStr = data['serialNo']?.toString().trim() ?? '';
+          final rawStatus = data['status']?.toString().trim().toLowerCase() ?? 'active';
+          final statusStr = rawStatus.contains('spare')
+              ? 'spare'
+              : rawStatus.contains('maint')
+                  ? 'underMaintenance'
+                  : rawStatus.contains('scrap')
+                      ? 'scrapped'
+                      : 'active';
 
-          final typeCode = typeStr.contains('gear') ? 'GBX' : typeStr.contains('pump') ? 'PMP' : 'MTR';
-          final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? '';
+          final seqStr = data['seqNo']?.toString().trim() ??
+                         data['seq']?.toString().trim() ??
+                         '001';
+
+          final typeCode = typeStr == 'gearbox' ? 'GBX' : typeStr == 'pump' ? 'PMP' : 'MTR';
+          final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? data['id']?.toString().trim() ?? '';
           final finalTagId = rawTagId.isNotEmpty
               ? rawTagId
               : '${_userPlantId!}-${_userUnitId!}-$typeCode-${seqStr.padLeft(3, '0')}';
+
+          // Parse Parent Equipment & Compatible Spares list
+          final parentRaw = data['parentEquipment']?.toString().trim() ??
+                            data['masterEquipmentId']?.toString().trim() ??
+                            data['installedMachine']?.toString().trim() ??
+                            '';
+          final fullParentId = parentRaw.isNotEmpty
+              ? HierarchyService.prefixId(parentRaw, _userPlantId!, _userUnitId!)
+              : '';
+
+          final rawSpares = data['compatibleSpares']?.toString().trim() ??
+                            data['applicableParentEquipmentIds']?.toString().trim() ??
+                            '';
+          final List<String> applicableParents = [];
+          if (rawSpares.isNotEmpty) {
+            final parts = rawSpares.split(RegExp(r'[,;]'));
+            for (var p in parts) {
+              final trimmed = p.trim();
+              if (trimmed.isNotEmpty) {
+                applicableParents.add(HierarchyService.prefixId(trimmed, _userPlantId!, _userUnitId!));
+              }
+            }
+          }
+          if (fullParentId.isNotEmpty && !applicableParents.contains(fullParentId)) {
+            applicableParents.add(fullParentId);
+          }
+
+          final isCriticalVal = data['isCritical']?.toString().trim().toLowerCase();
+          final bool isCritical = isCriticalVal == 'true' || isCriticalVal == 'yes' || isCriticalVal == '1';
 
           data['id'] = finalTagId;
           data['tagNo'] = finalTagId;
           data['name'] = nameStr;
           data['type'] = typeStr;
           data['status'] = statusStr;
+          data['masterEquipmentId'] = fullParentId;
+          data['applicableParentEquipmentIds'] = applicableParents;
+          data['spareLocation'] = data['spareLocation']?.toString().trim() ?? data['location']?.toString().trim() ?? '';
+          data['isCritical'] = isCritical;
           data['make'] = makeStr;
           data['model'] = modelStr;
           data['serialNo'] = serialStr;
+          data['manufacturingYear'] = int.tryParse(data['manufacturingYear']?.toString() ?? '');
+          data['poNo'] = data['poNo']?.toString().trim() ?? '';
+          data['rfidTag'] = data['rfidTag']?.toString().trim() ?? '';
+          data['seqNo'] = seqStr.padLeft(3, '0');
           data['powerKw'] = double.tryParse(data['powerKw']?.toString() ?? '');
           data['voltage'] = double.tryParse(data['voltage']?.toString() ?? '');
           data['speedRpm'] = double.tryParse(data['speedRpm']?.toString() ?? '');
-          data['seqNo'] = seqStr.padLeft(3, '0');
-          data['imageUrl'] = data['imageUrl'] ?? '';
-          data['description'] = data['description'] ?? '';
-          data['masterEquipmentId'] = data['masterEquipmentId'] ?? '';
+
+          // Motor Specific Fields
+          data['fullLoadCurrent'] = double.tryParse(data['fullLoadCurrent']?.toString() ?? data['flc']?.toString() ?? '');
+          data['noLoadCurrent'] = double.tryParse(data['noLoadCurrent']?.toString() ?? '');
+          data['frequency'] = double.tryParse(data['frequency']?.toString() ?? '');
+          data['poles'] = int.tryParse(data['poles']?.toString() ?? '');
+          data['frameSize'] = data['frameSize']?.toString().trim() ?? '';
+          data['mountingType'] = data['mountingType']?.toString().trim() ?? '';
+          data['efficiency'] = double.tryParse(data['efficiency']?.toString() ?? '');
+          data['powerFactor'] = double.tryParse(data['powerFactor']?.toString() ?? '');
+
+          // Common Lubrication & Bearings
+          data['greaseType'] = data['greaseType']?.toString().trim() ?? '';
+          data['bearingDE'] = data['bearingDE']?.toString().trim() ?? '';
+          data['bearingNDE'] = data['bearingNDE']?.toString().trim() ?? '';
+
+          // Gearbox Specific Fields
+          data['gearRatio'] = data['gearRatio']?.toString().trim() ?? '';
+          data['oilType'] = data['oilType']?.toString().trim() ?? '';
+          data['oilCapacity'] = double.tryParse(data['oilCapacity']?.toString() ?? '');
+          data['inputSpeedRpm'] = double.tryParse(data['inputSpeedRpm']?.toString() ?? '');
+          data['outputSpeedRpm'] = double.tryParse(data['outputSpeedRpm']?.toString() ?? '');
+          data['inputShaftMm'] = double.tryParse(data['inputShaftMm']?.toString() ?? '');
+          data['outputShaftMm'] = double.tryParse(data['outputShaftMm']?.toString() ?? '');
+          data['lubricationMethod'] = data['lubricationMethod']?.toString().trim() ?? '';
+          data['mountingOrientation'] = data['mountingOrientation']?.toString().trim() ?? '';
+
+          // Pump Specific Fields
+          data['flowRate'] = double.tryParse(data['flowRate']?.toString() ?? '');
+          data['head'] = double.tryParse(data['head']?.toString() ?? '');
+          data['pumpSpeed'] = double.tryParse(data['pumpSpeed']?.toString() ?? '');
+          data['impellerSize'] = double.tryParse(data['impellerSize']?.toString() ?? '');
+          data['suctionFlangeMm'] = double.tryParse(data['suctionFlangeMm']?.toString() ?? '');
+          data['dischargeFlangeMm'] = double.tryParse(data['dischargeFlangeMm']?.toString() ?? '');
+          data['sealType'] = data['sealType']?.toString().trim() ?? '';
+          data['casingMaterial'] = data['casingMaterial']?.toString().trim() ?? '';
+
           data['createdAt'] = data['createdAt'] ?? DateTime.now().toIso8601String();
           data['updatedAt'] = DateTime.now().toIso8601String();
         }
@@ -1257,13 +1726,53 @@ class _DataImportPageState extends State<DataImportPage> {
                                 TextButton.icon(
                                   onPressed: _downloadTemplate,
                                   icon: const Icon(Icons.download, size: 16),
-                                  label: const Text('Template', style: TextStyle(fontSize: 12)),
+                                  label: Text(widget.collectionId == 'assets' ? 'Template Options' : 'Template', style: const TextStyle(fontSize: 12)),
                                   style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text("Required Columns:", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                            if (widget.collectionId == 'assets') ...[
+                              const SizedBox(height: 8),
+                              const Text('Download Specific Template by Asset Type:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ActionChip(
+                                    avatar: const Icon(Icons.bolt, color: Colors.amberAccent, size: 16),
+                                    label: const Text('Motors Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    backgroundColor: Colors.amber.withValues(alpha: 0.15),
+                                    side: const BorderSide(color: Colors.amberAccent),
+                                    onPressed: () => _downloadAssetTemplate('motor'),
+                                  ),
+                                  ActionChip(
+                                    avatar: const Icon(Icons.settings, color: Colors.orangeAccent, size: 16),
+                                    label: const Text('Gearboxes Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    backgroundColor: Colors.orange.withValues(alpha: 0.15),
+                                    side: const BorderSide(color: Colors.orangeAccent),
+                                    onPressed: () => _downloadAssetTemplate('gearbox'),
+                                  ),
+                                  ActionChip(
+                                    avatar: const Icon(Icons.water_drop, color: Colors.blueAccent, size: 16),
+                                    label: const Text('Pumps Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    backgroundColor: Colors.blue.withValues(alpha: 0.15),
+                                    side: const BorderSide(color: Colors.blueAccent),
+                                    onPressed: () => _downloadAssetTemplate('pump'),
+                                  ),
+                                  ActionChip(
+                                    avatar: const Icon(Icons.table_chart, color: Colors.greenAccent, size: 16),
+                                    label: const Text('All-in-One (3 Sheets)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    backgroundColor: Colors.green.withValues(alpha: 0.15),
+                                    side: const BorderSide(color: Colors.greenAccent),
+                                    onPressed: () => _downloadAssetTemplate('all'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(widget.collectionId == 'assets' ? "Template Guidelines:" : "Required Columns:", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                             Text(instructions['Cols']!, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
                             const SizedBox(height: 12),
                             Text("Pro Tip:", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary)),

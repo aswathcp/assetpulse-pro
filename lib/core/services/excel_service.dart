@@ -52,6 +52,69 @@ class ExcelService {
     }
   }
 
+  // Parse All Sheets in Excel Bytes (e.g. Multi-Tab Asset Master Templates)
+  List<Map<String, dynamic>> parseAllSheets(List<int> bytes) {
+    try {
+      var excel = Excel.decodeBytes(bytes);
+      if (excel.tables.isEmpty) return [];
+
+      List<Map<String, dynamic>> results = [];
+
+      for (var tableName in excel.tables.keys) {
+        // Skip reference guide sheets
+        final lowerSheet = tableName.toLowerCase();
+        if (lowerSheet.contains('reference') || lowerSheet.contains('guide') || lowerSheet.contains('option')) {
+          continue;
+        }
+
+        final table = excel.tables[tableName];
+        if (table == null || table.maxRows < 2) continue;
+
+        List<String> headers = [];
+        final headerRow = table.rows.first;
+        for (var cell in headerRow) {
+          headers.add(_extractValue(cell?.value)?.toString().trim() ?? '');
+        }
+
+        for (int i = 1; i < table.rows.length; i++) {
+          final row = table.rows[i];
+          Map<String, dynamic> rowMap = {};
+          bool isEmpty = true;
+
+          for (int j = 0; j < headers.length; j++) {
+            if (headers[j].isEmpty) continue;
+            if (j < row.length) {
+              final primitive = _extractValue(row[j]?.value);
+              rowMap[headers[j]] = primitive;
+              if (primitive != null) isEmpty = false;
+            } else {
+              rowMap[headers[j]] = null;
+            }
+          }
+
+          if (!isEmpty) {
+            // Auto-infer type from sheet name if type column is missing or empty
+            if (rowMap['type'] == null || rowMap['type'].toString().isEmpty) {
+              if (lowerSheet.contains('motor')) {
+                rowMap['type'] = 'motor';
+              } else if (lowerSheet.contains('gear')) {
+                rowMap['type'] = 'gearbox';
+              } else if (lowerSheet.contains('pump')) {
+                rowMap['type'] = 'pump';
+              }
+            }
+            results.add(rowMap);
+          }
+        }
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('Excel Multi-Sheet Parse Error: $e');
+      return [];
+    }
+  }
+
   /// Extracts a plain Dart primitive from excel 4.x CellValue sealed types.
   /// This is required because Firestore cannot serialize CellValue objects.
   dynamic _extractValue(CellValue? cellValue) {
