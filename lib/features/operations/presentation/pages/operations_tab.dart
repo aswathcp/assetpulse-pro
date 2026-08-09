@@ -20,8 +20,8 @@ class OperationsTab extends StatelessWidget {
       appBar: const CustomAppBar(title: 'Operations Center'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -36,7 +36,7 @@ class OperationsTab extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.2 : 0.95,
+                childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.25 : 0.82,
               children: [
                 StreamBuilder<List<IsolationPermitModel>>(
                   stream: FirestoreService().getActiveIsolationsStream(
@@ -105,12 +105,12 @@ class OperationsTab extends StatelessWidget {
         height: null,
         borderRadius: 20,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
@@ -119,28 +119,28 @@ class OperationsTab extends StatelessWidget {
                   label: badgeCount != null ? Text(badgeCount.toString()) : null,
                   isLabelVisible: badgeCount != null,
                   backgroundColor: Colors.red,
-                  child: Icon(icon, color: color, size: 36),
+                  child: Icon(icon, color: color, size: 32),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 13.5,
                 ),
               ),
               if (isComingSoon) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('Coming Soon', style: TextStyle(fontSize: 10, color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+                  child: const Text('Coming Soon', style: TextStyle(fontSize: 9.5, color: Colors.amberAccent, fontWeight: FontWeight.bold)),
                 ),
               ],
             ],
