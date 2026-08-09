@@ -1082,6 +1082,61 @@ class _DataImportPageState extends State<DataImportPage> {
         continue;
       }
 
+      if (widget.collectionId == 'assets') {
+        final name = row['name']?.toString().trim() ??
+                     row['equipmentName']?.toString().trim() ??
+                     row['assetName']?.toString().trim() ?? '';
+        final rawType = row['type']?.toString().trim().toLowerCase() ?? 'motor';
+        final typeStr = rawType.contains('gear') ? 'gearbox' : rawType.contains('pump') ? 'pump' : 'motor';
+        final rawStatus = row['status']?.toString().trim().toLowerCase() ?? 'active';
+        final statusStr = rawStatus.contains('spare')
+            ? 'spare'
+            : rawStatus.contains('maint')
+                ? 'underMaintenance'
+                : rawStatus.contains('scrap')
+                    ? 'scrapped'
+                    : 'active';
+
+        final seqStr = row['seqNo']?.toString().trim() ?? row['seq']?.toString().trim() ?? '';
+        final rawTag = row['tagNo']?.toString().trim() ?? row['tagId']?.toString().trim() ?? row['id']?.toString().trim() ?? '';
+        
+        final typeCode = typeStr == 'gearbox' ? 'GBX' : typeStr == 'pump' ? 'PMP' : 'MTR';
+        final finalTagId = rawTag.isNotEmpty
+            ? rawTag
+            : seqStr.isNotEmpty
+                ? '${_userPlantId!}-${_userUnitId!}-$typeCode-${seqStr.padLeft(3, '0')}'
+                : '${_userPlantId!}-${_userUnitId!}-$typeCode-AUTO';
+
+        String status = 'OK';
+
+        if (name.isEmpty) {
+          status = 'Error: Asset name is missing.';
+        } else if (existingIds.contains(finalTagId.toUpperCase()) && rawTag.isNotEmpty) {
+          status = 'Warning: Tag ID "$finalTagId" exists. Will update record.';
+        } else {
+          // Soft check on parent equipment
+          final parentRaw = row['parentEquipment']?.toString().trim() ??
+                            row['masterEquipmentId']?.toString().trim() ??
+                            row['installedMachine']?.toString().trim() ?? '';
+          
+          if (statusStr == 'active' && parentRaw.isNotEmpty) {
+            final fullParent = HierarchyService.prefixId(parentRaw, _userPlantId!, _userUnitId!);
+            final rawParentUpper = parentRaw.toUpperCase();
+            final fullParentUpper = fullParent.toUpperCase();
+            final matches = validParentIds.contains(fullParentUpper) || validParentIds.contains(rawParentUpper);
+            if (!matches && validParentIds.isNotEmpty) {
+              status = 'Info: Assigned to parent "$parentRaw"';
+            }
+          } else if (statusStr == 'spare') {
+            status = 'OK (Spare Asset)';
+          }
+        }
+
+        row['Validation'] = status;
+        enriched.add(row);
+        continue;
+      }
+
       final rawId = row['id']?.toString().trim() ?? '';
       
       if (rawId.isEmpty) {
@@ -1134,24 +1189,6 @@ class _DataImportPageState extends State<DataImportPage> {
           }
         } else if (_selectedLocationId == null) {
           status = 'Error: Select Location in header or specify in locationId column.';
-        }
-      } else if (widget.collectionId == 'assets') {
-        final name = row['name']?.toString().trim() ?? '';
-        final statusVal = row['status']?.toString().trim().toLowerCase() ?? 'active';
-        final parentRaw = row['parentEquipment']?.toString().trim() ??
-                          row['masterEquipmentId']?.toString().trim() ??
-                          row['installedMachine']?.toString().trim() ??
-                          '';
-
-        if (name.isEmpty) {
-          status = 'Error: Asset name is required.';
-        } else if (statusVal == 'active' && parentRaw.isEmpty) {
-          status = 'Warning: Active asset has no parent machine assigned.';
-        } else if (parentRaw.isNotEmpty) {
-          final fullParent = HierarchyService.prefixId(parentRaw, _userPlantId!, _userUnitId!);
-          if (!validParentIds.contains(fullParent.toUpperCase())) {
-            status = 'Warning: Parent machine "$fullParent" not found in unit registry.';
-          }
         }
       } else if (widget.collectionId == 'lighting_dbs') {
         final rccbVal = row['rccbCount'];
