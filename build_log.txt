@@ -1,0 +1,52 @@
+Running Gradle task 'assembleDebug'...                          
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:51:24: Error: The method 'containsKey' isn't defined for the type 'Object'.
+ - 'Object' is from 'dart:core'.
+Try correcting the name to the name of an existing method, or defining a method named 'containsKey'.
+          if (tag.data.containsKey('ndef')) {
+                       ^^^^^^^^^^^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:52:26: Error: The getter 'Ndef' isn't defined for the type '_NFCScannerPageState'.
+ - '_NFCScannerPageState' is from 'package:asset_pulse_pro/features/scanning/presentation/pages/nfc_scanner_page.dart' ('lib/features/scanning/presentation/pages/nfc_scanner_page.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'Ndef'.
+            final ndef = Ndef.from(tag);
+                         ^^^^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:63:35: Error: The operator '[]' isn't defined for the type 'Object'.
+ - 'Object' is from 'dart:core'.
+Try correcting the operator to an existing operator, or defining a '[]' operator.
+            final tagId = tag.data['nfca']?['identifier'] ?? 
+                                  ^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:64:34: Error: The operator '[]' isn't defined for the type 'Object'.
+ - 'Object' is from 'dart:core'.
+Try correcting the operator to an existing operator, or defining a '[]' operator.
+                         tag.data['nfcb']?['identifier'] ??
+                                 ^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:65:34: Error: The operator '[]' isn't defined for the type 'Object'.
+ - 'Object' is from 'dart:core'.
+Try correcting the operator to an existing operator, or defining a '[]' operator.
+                         tag.data['nfcf']?['identifier'] ??
+                                 ^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:66:34: Error: The operator '[]' isn't defined for the type 'Object'.
+ - 'Object' is from 'dart:core'.
+Try correcting the operator to an existing operator, or defining a '[]' operator.
+                         tag.data['nfcv']?['identifier'];
+                                 ^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:45:45: Error: Required named parameter 'pollingOptions' must be provided.
+      await NfcManager.instance.startSession(
+                                            ^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDebug'.
+> Process 'command '/home/kiwi/flutter/bin/flutter'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4s
+Running Gradle task 'assembleDebug'...                              4.2s
+Gradle task assembleDebug failed with exit code 1

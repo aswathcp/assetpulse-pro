@@ -1,0 +1,27 @@
+Running Gradle task 'assembleDebug'...                          
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:4:8: Error: Error when reading '/home/kiwi/.pub-cache/hosted/pub.dev/nfc_manager-4.1.1/lib/platform_tags.dart': No such file or directory
+import 'package:nfc_manager/platform_tags.dart';
+       ^
+lib/features/scanning/presentation/pages/nfc_scanner_page.dart:54:24: Error: The getter 'Ndef' isn't defined for the type '_NFCScannerPageState'.
+ - '_NFCScannerPageState' is from 'package:asset_pulse_pro/features/scanning/presentation/pages/nfc_scanner_page.dart' ('lib/features/scanning/presentation/pages/nfc_scanner_page.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'Ndef'.
+          final ndef = Ndef.from(tag);
+                       ^^^^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDebug'.
+> Process 'command '/home/kiwi/flutter/bin/flutter'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+Running Gradle task 'assembleDebug'...                              3.5s
+Gradle task assembleDebug failed with exit code 1

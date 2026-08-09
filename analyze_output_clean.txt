@@ -1,0 +1,80 @@
+Analyzing AssetPulse-Pro...                                     
+
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/services/excel_service.dart:51:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/services/firestore_service.dart:29:5 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/services/firestore_service.dart:47:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/services/firestore_service.dart:49:7 • avoid_print
+warning • Unnecessary cast. Try removing the cast • lib/core/services/firestore_service.dart:149:58 • unnecessary_cast
+warning • Unnecessary cast. Try removing the cast • lib/core/services/firestore_service.dart:178:33 • unnecessary_cast
+warning • Unnecessary cast. Try removing the cast • lib/core/services/firestore_service.dart:190:33 • unnecessary_cast
+warning • Unnecessary cast. Try removing the cast • lib/core/services/firestore_service.dart:220:84 • unnecessary_cast
+  error • The name 'CupertinoPageTransitionsBuilder' isn't a class. Try correcting the name to match an existing class • lib/core/theme/app_theme.dart:18:37 • creation_with_non_type
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:9:5 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:14:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:17:9 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:41:11 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:48:11 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:53:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:54:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:55:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:57:9 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:59:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:62:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:69:5 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:79:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:90:9 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:93:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/core/utils/asset_migration.dart:96:7 • avoid_print
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/core/widgets/shimmer_card.dart:55:24 • unnecessary_underscores
+warning • The value of the field '_selectedBusiness' isn't used. Try removing the field, or using it • lib/features/admin/presentation/pages/admin_database_page.dart:149:11 • unused_field
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/features/admin/presentation/pages/admin_database_page.dart:265:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/features/admin/presentation/pages/admin_database_page.dart:267:28 • use_build_context_synchronously
+warning • The declaration '_downloadTemplate' isn't referenced. Try removing the declaration of '_downloadTemplate' • lib/features/admin/presentation/pages/admin_database_page.dart:273:8 • unused_element
+warning • The value of the local variable 'isNarrow' isn't used. Try removing the variable or using it • lib/features/admin/presentation/pages/admin_database_page.dart:312:11 • unused_local_variable
+   info • The private field _refFeeders could be 'final'. Try making the field 'final' • lib/features/admin/presentation/pages/admin_database_page.dart:681:21 • prefer_final_fields
+warning • The value of the field '_refFeeders' isn't used. Try removing the field, or using it • lib/features/admin/presentation/pages/admin_database_page.dart:681:21 • unused_field
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/admin/presentation/pages/admin_database_page.dart:824:44 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/admin/presentation/pages/admin_database_page.dart:826:51 • use_build_context_synchronously
+warning • The declaration '_seedHierarchy' isn't referenced. Try removing the declaration of '_seedHierarchy' • lib/features/admin/presentation/pages/user_management_page.dart:194:16 • unused_element
+   info • The constant name 'in_progress' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/fault_log_model.dart:4:26 • constant_identifier_names
+   info • The constant name 'motor_feeder' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/feeder_model.dart:3:19 • constant_identifier_names
+   info • The constant name 'welding_outlet' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/feeder_model.dart:3:33 • constant_identifier_names
+   info • The constant name 'power_outlet' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/feeder_model.dart:3:49 • constant_identifier_names
+   info • The constant name 'lighting_circuit' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/feeder_model.dart:3:63 • constant_identifier_names
+   info • The constant name 'vfd_feeder' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/feeder_model.dart:3:81 • constant_identifier_names
+   info • The constant name 'panel_room' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/location_model.dart:3:55 • constant_identifier_names
+   info • The constant name 'generic_panel' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/data/models/panel_model.dart:3:33 • constant_identifier_names
+warning • The value of the field '_selectedParentName' isn't used. Try removing the field, or using it • lib/features/assets/presentation/pages/add_edit_asset_page.dart:30:11 • unused_field
+   info • The variable name '_SectionHeader' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style • lib/features/assets/presentation/pages/asset_detail_page.dart:541:10 • non_constant_identifier_names
+warning • The declaration '_buildDetailRow' isn't referenced. Try removing the declaration of '_buildDetailRow' • lib/features/assets/presentation/pages/asset_detail_page.dart:556:10 • unused_element
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/auth/presentation/pages/login_page.dart:153:55 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/auth/presentation/pages/login_page.dart:159:55 • use_build_context_synchronously
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:74:7 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:80:9 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:85:9 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:89:11 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:100:11 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • lib/features/auth/presentation/pages/register_page.dart:117:9 • avoid_print
+warning • Duplicate import. Try removing all but one import of the library • lib/features/home/presentation/pages/profile_page.dart:13:8 • duplicate_import
+warning • The value of the field '_selectedEquipmentName' isn't used. Try removing the field, or using it • lib/features/log_data/presentation/pages/add_fault_log_page.dart:44:11 • unused_field
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/features/log_data/presentation/pages/add_fault_log_page.dart:164:44 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/features/log_data/presentation/pages/add_fault_log_page.dart:165:32 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/features/log_data/presentation/pages/add_fault_log_page.dart:182:23 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/features/log_data/presentation/pages/add_fault_log_page.dart:183:12 • curly_braces_in_flow_control_structures
+warning • The value of the local variable 'businessId' isn't used. Try removing the variable or using it • lib/features/operations/presentation/pages/add_isolation_permit_page.dart:91:11 • unused_local_variable
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/features/operations/presentation/pages/add_isolation_permit_page.dart:317:49 • use_build_context_synchronously
+   info • The local variable '_formKey' starts with an underscore. Try renaming the variable to not start with an underscore • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:145:11 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_targetIdController' starts with an underscore. Try renaming the variable to not start with an underscore • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:146:11 • no_leading_underscores_for_local_identifiers
+warning • The value of the local variable '_targetIdController' isn't used. Try removing the variable or using it • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:146:11 • unused_local_variable
+   info • The local variable '_latController' starts with an underscore. Try renaming the variable to not start with an underscore • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:147:11 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_lngController' starts with an underscore. Try renaming the variable to not start with an underscore • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:148:11 • no_leading_underscores_for_local_identifiers
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:239:52 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/admin_checklist_location_page.dart:241:61 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/shift_checklists_page.dart:61:21 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/shift_checklists_page.dart:64:30 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/shift_checklists_page.dart:72:9 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/shift_checklists_page.dart:84:23 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/features/operations/presentation/pages/checklist/shift_checklists_page.dart:85:30 • use_build_context_synchronously
+  error • A value of type 'NfcAvailability' can't be assigned to a variable of type 'bool'. Try changing the type of the variable, or casting the right-hand type to 'bool' • lib/features/scanning/presentation/pages/nfc_scanner_page.dart:33:24 • invalid_assignment
+  error • The argument type 'Object' can't be assigned to the parameter type 'Map<dynamic, dynamic>'.  • lib/features/scanning/presentation/pages/nfc_scanner_page.dart:54:71 • argument_type_not_assignable
+
