@@ -1785,7 +1785,7 @@ class _HighMastChecklistPageState extends State<HighMastChecklistPage> with Sing
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.cell_tower, color: Colors.amberAccent, size: 16),
+                            Icon(Icons.wb_incandescent, color: Colors.amberAccent, size: 16),
                             SizedBox(width: 6),
                             Text('HIGH MAST TOWER DETAILS',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.amberAccent)),

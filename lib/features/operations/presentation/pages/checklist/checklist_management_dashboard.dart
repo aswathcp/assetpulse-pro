@@ -10,6 +10,7 @@ import 'power_tools_checklist_page.dart';
 import 'panel_room_checklist_page.dart';
 import 'water_cooler_checklist_page.dart';
 import 'high_mast_checklist_page.dart';
+import 'high_mast_trial_page.dart';
 
 class ChecklistManagementDashboard extends StatelessWidget {
   const ChecklistManagementDashboard({super.key});
@@ -97,9 +98,16 @@ class ChecklistManagementDashboard extends StatelessWidget {
                   _buildDashboardCard(
                     context,
                     title: 'High Mast Tower\nChecklist',
-                    icon: Icons.cell_tower,
+                    icon: Icons.wb_incandescent,
                     color: Colors.amberAccent,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HighMastChecklistPage())),
+                  ),
+                  _buildDashboardCard(
+                    context,
+                    title: 'High Mast Tower\n(Trial Pro) ✨',
+                    icon: Icons.stars,
+                    color: Colors.purpleAccent,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HighMastTrialPage())),
                   ),
                 ],
               ),
