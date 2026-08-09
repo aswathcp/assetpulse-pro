@@ -43,18 +43,28 @@ class HealthLogModel {
   }
 
   factory HealthLogModel.fromMap(Map<String, dynamic> map, String docId) {
+    DateTime parsedDate = DateTime.now();
+    final rawDate = map['testDate'];
+    if (rawDate is Timestamp) {
+      parsedDate = rawDate.toDate();
+    } else if (rawDate is DateTime) {
+      parsedDate = rawDate;
+    } else if (rawDate is String) {
+      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+    }
+
     return HealthLogModel(
       id: docId,
-      assetId: map['assetId'] ?? '',
-      testDate: (map['testDate'] as Timestamp).toDate(),
-      testedBy: map['testedBy'] ?? '',
+      assetId: map['assetId']?.toString() ?? '',
+      testDate: parsedDate,
+      testedBy: map['testedBy']?.toString() ?? '',
       noLoadCurrent: (map['noLoadCurrent'] as num?)?.toDouble(),
-      windingResistance: map['windingResistance'] != null ? Map<String, dynamic>.from(map['windingResistance']) : null,
-      insulationResistance: map['insulationResistance'] != null ? Map<String, dynamic>.from(map['insulationResistance']) : null,
+      windingResistance: map['windingResistance'] is Map ? Map<String, dynamic>.from(map['windingResistance'] as Map) : null,
+      insulationResistance: map['insulationResistance'] is Map ? Map<String, dynamic>.from(map['insulationResistance'] as Map) : null,
       polarizationIndex: (map['polarizationIndex'] as num?)?.toDouble(),
-      vibration: map['vibration'] != null ? Map<String, dynamic>.from(map['vibration']) : null,
-      remarks: map['remarks'] ?? '',
-      healthStatus: map['healthStatus'] ?? 'healthy',
+      vibration: map['vibration'] is Map ? Map<String, dynamic>.from(map['vibration'] as Map) : null,
+      remarks: map['remarks']?.toString() ?? '',
+      healthStatus: map['healthStatus']?.toString() ?? 'healthy',
     );
   }
 }

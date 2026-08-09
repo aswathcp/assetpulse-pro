@@ -176,12 +176,24 @@ class FirestoreService {
   }
 
   // Get Health Logs Stream for an Asset
-  Stream<List<HealthLogModel>> getHealthLogsStream(String assetId) {
-    return _db.collection('health_logs')
-        .where('assetId', isEqualTo: assetId)
-        .orderBy('testDate', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => HealthLogModel.fromMap(doc.data(), doc.id)).toList());
+  Stream<List<HealthLogModel>> getHealthLogsStream(String assetId, {String? tagNo}) {
+    final Set<String> targetIds = {assetId};
+    if (tagNo != null && tagNo.isNotEmpty) {
+      targetIds.add(tagNo);
+    }
+
+    Query query = _db.collection('health_logs');
+    if (targetIds.length == 1) {
+      query = query.where('assetId', isEqualTo: targetIds.first);
+    } else {
+      query = query.where('assetId', whereIn: targetIds.toList());
+    }
+
+    return query.snapshots().map((snapshot) {
+      final list = snapshot.docs.map((doc) => HealthLogModel.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+      list.sort((a, b) => b.testDate.compareTo(a.testDate));
+      return list;
+    });
   }
 
   // Get Single Asset

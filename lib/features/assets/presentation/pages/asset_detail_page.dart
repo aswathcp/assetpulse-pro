@@ -88,7 +88,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -669,10 +669,18 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
         ),
         Expanded(
           child: StreamBuilder<List<HealthLogModel>>(
-            stream: FirestoreService().getHealthLogsStream(asset.id),
+            stream: FirestoreService().getHealthLogsStream(asset.id, tagNo: asset.tagNo),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: PulseLoading(size: 40));
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text('Error loading test logs: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  ),
+                );
               }
               final logs = snapshot.data ?? [];
               if (logs.isEmpty) {
@@ -902,8 +910,6 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
       ),
     );
   }
-
-
 
   void _showReplaceWithSpareDialog(BuildContext context, AssetModel asset) async {
     final querySnapshot = await FirebaseFirestore.instance
