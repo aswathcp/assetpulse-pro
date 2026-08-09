@@ -3,34 +3,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum AssetStatus { active, spare, underMaintenance, scrapped }
 enum AssetType { motor, gearbox, pump }
-enum AssetHealthStatus { healthy, warning, critical, unknown } // NEW
+enum AssetHealthStatus { healthy, warning, critical, unknown }
 
 class AssetModel {
   // Identity
   final String id;
-  final String masterEquipmentId; // The single source of context (instead of Unit/Plant/Location)
+  final String masterEquipmentId;
   final String tagNo;
   final String name;
   final String make;
   final String model;
   final String serialNo;
   final String? rfidTag;
-  final String? poNo; // NEW: Purchase Order No
+  final String? poNo;
   final int? manufacturingYear;
   final String imageUrl;
-  final String description; // NEW: Standard Audit
+  final String description;
 
   // Type & Status
   final AssetType type;
   final AssetStatus status;
 
-  // Universal Specs (Dynamic Data for Gearboxes, Pumps etc)
-  final Map<String, dynamic>? specs; // NEW
+  // Universal Specs (Dynamic Data for Gearboxes, Pumps etc - kept for backward compatibility)
+  final Map<String, dynamic>? specs;
 
-  // Technical Specs (Motor Specific - Kept for backward compat & strong typing)
+  // Motor Technical Specs
   final double? powerKw;
-  final double? voltage; // Input/Rated Voltage
-  final double? fullLoadCurrent; // FLA / Output Current
+  final double? voltage;
+  final double? fullLoadCurrent; // FLC (Amps)
   final double? noLoadCurrent;
   final double? speedRpm;
   final int? poles;
@@ -39,16 +39,36 @@ class AssetModel {
   final double? powerFactor;
   final String? frameSize;
   final String? mountingType;
+  final String? greaseType; // Direct top level
 
-  // Diagnostics / Health
-  final AssetHealthStatus healthStatus; // NEW
-  final DateTime? lastPulseTime; // NEW
+  // Gearbox Dynamic Specs
+  final String? gearRatio;
+  final String? oilType;
+  final double? oilCapacity;
+  final double? inputSpeedRpm;
+  final double? outputSpeedRpm;
+  final double? inputShaftMm;
+  final double? outputShaftMm;
+  final String? lubricationMethod;
+  final String? mountingOrientation;
+
+  // Pump Dynamic Specs
+  final double? flowRate;
+  final double? head;
+  final String? impellerSize;
+  final double? pumpPower;
+  final double? suctionFlangeMm;
+  final double? dischargeFlangeMm;
+  final String? sealType;
+  final String? casingMaterial;
+
+  // Diagnostics / Health (Derived from health_logs)
+  final AssetHealthStatus healthStatus;
+  final DateTime? lastPulseTime;
   final Map<String, dynamic>? windingResistance;
-  final Map<String, dynamic>? insulationResistance; // Extended: R-Y, Y-B, B-R, R-E, Y-E, B-E
+  final Map<String, dynamic>? insulationResistance;
   final double? polarizationIndex;
-  
-  // Vibration
-  final Map<String, dynamic>? vibration; // { "DE_H": 2.1, "DE_V": 1.5, "DE_A": 0.8, "NDE_H": 1.9 ... "G_Value": 0.5 }
+  final Map<String, dynamic>? vibration;
 
   // Construction
   final String? bearingDE;
@@ -56,8 +76,8 @@ class AssetModel {
 
   // Operational Context
   final bool isCritical;
-  final List<String>? applicableParentEquipmentIds; // Multiple parent equipments for spares
-  final String? spareLocation; // Storage location when asset is a spare
+  final List<String>? applicableParentEquipmentIds;
+  final String? spareLocation;
   final String? seqNo;
   
   // Lifecycle
@@ -88,7 +108,7 @@ class AssetModel {
     required this.type,
     required this.status,
     
-    this.specs, // NEW
+    this.specs,
     
     this.powerKw,
     this.voltage,
@@ -101,9 +121,29 @@ class AssetModel {
     this.powerFactor,
     this.frameSize,
     this.mountingType,
+    this.greaseType,
     
-    this.healthStatus = AssetHealthStatus.unknown, // NEW
-    this.lastPulseTime, // NEW
+    this.gearRatio,
+    this.oilType,
+    this.oilCapacity,
+    this.inputSpeedRpm,
+    this.outputSpeedRpm,
+    this.inputShaftMm,
+    this.outputShaftMm,
+    this.lubricationMethod,
+    this.mountingOrientation,
+    
+    this.flowRate,
+    this.head,
+    this.impellerSize,
+    this.pumpPower,
+    this.suctionFlangeMm,
+    this.dischargeFlangeMm,
+    this.sealType,
+    this.casingMaterial,
+    
+    this.healthStatus = AssetHealthStatus.unknown,
+    this.lastPulseTime,
 
     this.windingResistance,
     this.insulationResistance,
@@ -135,6 +175,8 @@ class AssetModel {
       parents = rawParents.map((e) => e.toString()).toList();
     }
 
+    final dynamic legacySpecs = map['specs'] is Map ? Map<String, dynamic>.from(map['specs'] as Map) : null;
+
     return AssetModel(
       id: docId,
       masterEquipmentId: map['masterEquipmentId'] ?? '',
@@ -146,7 +188,7 @@ class AssetModel {
       serialNo: map['serialNo'] ?? '',
       rfidTag: map['rfidTag'],
       poNo: map['poNo'],
-      manufacturingYear: map['manufacturingYear'],
+      manufacturingYear: map['manufacturingYear'] is num ? (map['manufacturingYear'] as num).toInt() : int.tryParse(map['manufacturingYear']?.toString() ?? ''),
       imageUrl: map['imageUrl'] ?? '',
       
       type: AssetType.values.firstWhere(
@@ -158,33 +200,53 @@ class AssetModel {
         orElse: () => AssetStatus.spare,
       ),
       
-      specs: map['specs'] as Map<String, dynamic>?, // NEW
+      specs: legacySpecs,
       
-      powerKw: (map['powerKw'] as num?)?.toDouble(),
+      powerKw: (map['powerKw'] as num?)?.toDouble() ?? (legacySpecs?['pumpPower'] as num?)?.toDouble() ?? (legacySpecs?['inputPowerKw'] as num?)?.toDouble(),
       voltage: (map['voltage'] as num?)?.toDouble(),
       fullLoadCurrent: (map['fullLoadCurrent'] as num?)?.toDouble(),
       noLoadCurrent: (map['noLoadCurrent'] as num?)?.toDouble(),
-      speedRpm: (map['speedRpm'] as num?)?.toDouble(),
-      poles: map['poles'] as int?,
+      speedRpm: (map['speedRpm'] as num?)?.toDouble() ?? (legacySpecs?['pumpSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['inputSpeedRpm'] as num?)?.toDouble(),
+      poles: (map['poles'] as num?)?.toInt(),
       frequency: (map['frequency'] as num?)?.toDouble(),
       efficiency: (map['efficiency'] as num?)?.toDouble(),
       powerFactor: (map['powerFactor'] as num?)?.toDouble(),
-      frameSize: map['frameSize'],
-      mountingType: map['mountingType'],
+      frameSize: map['frameSize']?.toString(),
+      mountingType: map['mountingType']?.toString(),
+      greaseType: map['greaseType']?.toString() ?? legacySpecs?['greaseType']?.toString(),
       
-      healthStatus: AssetHealthStatus.values.firstWhere( // NEW
+      gearRatio: map['gearRatio']?.toString() ?? legacySpecs?['gearRatio']?.toString(),
+      oilType: map['oilType']?.toString() ?? legacySpecs?['oilType']?.toString(),
+      oilCapacity: (map['oilCapacity'] as num?)?.toDouble() ?? (legacySpecs?['oilCapacity'] as num?)?.toDouble(),
+      inputSpeedRpm: (map['inputSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['inputSpeedRpm'] as num?)?.toDouble(),
+      outputSpeedRpm: (map['outputSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['outputSpeedRpm'] as num?)?.toDouble(),
+      inputShaftMm: (map['inputShaftMm'] as num?)?.toDouble() ?? (legacySpecs?['inputShaftMm'] as num?)?.toDouble(),
+      outputShaftMm: (map['outputShaftMm'] as num?)?.toDouble() ?? (legacySpecs?['outputShaftMm'] as num?)?.toDouble(),
+      lubricationMethod: map['lubricationMethod']?.toString() ?? legacySpecs?['lubricationMethod']?.toString(),
+      mountingOrientation: map['mountingOrientation']?.toString() ?? legacySpecs?['mountingOrientation']?.toString(),
+      
+      flowRate: (map['flowRate'] as num?)?.toDouble() ?? (legacySpecs?['flowRate'] as num?)?.toDouble(),
+      head: (map['head'] as num?)?.toDouble() ?? (legacySpecs?['head'] as num?)?.toDouble(),
+      impellerSize: map['impellerSize']?.toString() ?? legacySpecs?['impellerSize']?.toString(),
+      pumpPower: (map['pumpPower'] as num?)?.toDouble() ?? (legacySpecs?['pumpPower'] as num?)?.toDouble(),
+      suctionFlangeMm: (map['suctionFlangeMm'] as num?)?.toDouble() ?? (legacySpecs?['suctionFlangeMm'] as num?)?.toDouble(),
+      dischargeFlangeMm: (map['dischargeFlangeMm'] as num?)?.toDouble() ?? (legacySpecs?['dischargeFlangeMm'] as num?)?.toDouble(),
+      sealType: map['sealType']?.toString() ?? legacySpecs?['sealType']?.toString(),
+      casingMaterial: map['casingMaterial']?.toString() ?? legacySpecs?['casingMaterial']?.toString(),
+      
+      healthStatus: AssetHealthStatus.values.firstWhere(
         (e) => e.name == (map['healthStatus'] ?? 'unknown'),
         orElse: () => AssetHealthStatus.unknown,
       ),
-      lastPulseTime: (map['lastPulseTime'] as dynamic)?.toDate(), // NEW
+      lastPulseTime: (map['lastPulseTime'] as dynamic)?.toDate(),
 
       windingResistance: map['windingResistance'] as Map<String, dynamic>?,
       insulationResistance: map['insulationResistance'] as Map<String, dynamic>?,
       polarizationIndex: (map['polarizationIndex'] as num?)?.toDouble(),
       vibration: map['vibration'] as Map<String, dynamic>?,
       
-      bearingDE: map['bearingDE'],
-      bearingNDE: map['bearingNDE'],
+      bearingDE: map['bearingDE']?.toString(),
+      bearingNDE: map['bearingNDE']?.toString(),
       
       isCritical: map['isCritical'] ?? false,
       applicableParentEquipmentIds: parents,
@@ -196,7 +258,7 @@ class AssetModel {
       nextServiceDue: (map['nextServiceDue'] as dynamic)?.toDate(),
       createdAt: (map['createdAt'] as dynamic)?.toDate(),
       createdBy: map['createdBy'],
-      modifiedAt: (map['modifiedAt'] as dynamic)?.toDate() ?? (map['updatedAt'] as dynamic)?.toDate(), // fallback to old updatedAt
+      modifiedAt: (map['modifiedAt'] as dynamic)?.toDate() ?? (map['updatedAt'] as dynamic)?.toDate(),
       modifiedBy: map['modifiedBy'],
     );
   }
@@ -226,7 +288,7 @@ class AssetModel {
       map['healthStatus'] = healthStatus.name;
     }
 
-    if (specs != null && specs!.isNotEmpty) map['specs'] = specs;
+    // Direct Motor Specs
     if (powerKw != null) map['powerKw'] = powerKw;
     if (voltage != null) map['voltage'] = voltage;
     if (fullLoadCurrent != null) map['fullLoadCurrent'] = fullLoadCurrent;
@@ -238,10 +300,34 @@ class AssetModel {
     if (powerFactor != null) map['powerFactor'] = powerFactor;
     if (frameSize != null && frameSize!.isNotEmpty) map['frameSize'] = frameSize;
     if (mountingType != null && mountingType!.isNotEmpty) map['mountingType'] = mountingType;
+    if (greaseType != null && greaseType!.isNotEmpty) map['greaseType'] = greaseType;
 
+    // Direct Gearbox Specs
+    if (gearRatio != null && gearRatio!.isNotEmpty) map['gearRatio'] = gearRatio;
+    if (oilType != null && oilType!.isNotEmpty) map['oilType'] = oilType;
+    if (oilCapacity != null) map['oilCapacity'] = oilCapacity;
+    if (inputSpeedRpm != null) map['inputSpeedRpm'] = inputSpeedRpm;
+    if (outputSpeedRpm != null) map['outputSpeedRpm'] = outputSpeedRpm;
+    if (inputShaftMm != null) map['inputShaftMm'] = inputShaftMm;
+    if (outputShaftMm != null) map['outputShaftMm'] = outputShaftMm;
+    if (lubricationMethod != null && lubricationMethod!.isNotEmpty) map['lubricationMethod'] = lubricationMethod;
+    if (mountingOrientation != null && mountingOrientation!.isNotEmpty) map['mountingOrientation'] = mountingOrientation;
+
+    // Direct Pump Specs
+    if (flowRate != null) map['flowRate'] = flowRate;
+    if (head != null) map['head'] = head;
+    if (impellerSize != null && impellerSize!.isNotEmpty) map['impellerSize'] = impellerSize;
+    if (pumpPower != null) map['pumpPower'] = pumpPower;
+    if (suctionFlangeMm != null) map['suctionFlangeMm'] = suctionFlangeMm;
+    if (dischargeFlangeMm != null) map['dischargeFlangeMm'] = dischargeFlangeMm;
+    if (sealType != null && sealType!.isNotEmpty) map['sealType'] = sealType;
+    if (casingMaterial != null && casingMaterial!.isNotEmpty) map['casingMaterial'] = casingMaterial;
+
+    // Mechanical
     if (bearingDE != null && bearingDE!.isNotEmpty) map['bearingDE'] = bearingDE;
     if (bearingNDE != null && bearingNDE!.isNotEmpty) map['bearingNDE'] = bearingNDE;
 
+    // Operational Context
     if (applicableParentEquipmentIds != null && applicableParentEquipmentIds!.isNotEmpty) {
       map['applicableParentEquipmentIds'] = applicableParentEquipmentIds;
     }

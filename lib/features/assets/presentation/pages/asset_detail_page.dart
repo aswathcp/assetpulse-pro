@@ -529,7 +529,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
               children: [
                 Expanded(child: _buildDetailBox(context, 'Mounting Type', asset.mountingType ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Grease Type / Grade', asset.specs?['greaseType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Grease Type / Grade', asset.greaseType ?? asset.specs?['greaseType'] ?? '-')),
               ],
             ),
           ]
@@ -539,41 +539,41 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             _sectionHeader('Gearbox Transmission Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Power Rating', (asset.specs?['inputPowerKw'] ?? asset.powerKw) != null ? '${asset.specs?['inputPowerKw'] ?? asset.powerKw} kW' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Power Rating', asset.powerKw != null ? '${asset.powerKw} kW' : (asset.specs?['inputPowerKw'] != null ? '${asset.specs!['inputPowerKw']} kW' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Gear Ratio (i)', asset.specs?['gearRatio']?.toString() ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Gear Ratio (i)', asset.gearRatio ?? asset.specs?['gearRatio']?.toString() ?? '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Speed', (asset.specs?['inputSpeedRpm'] ?? asset.speedRpm) != null ? '${asset.specs?['inputSpeedRpm'] ?? asset.speedRpm} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Speed', asset.inputSpeedRpm != null ? '${asset.inputSpeedRpm} RPM' : (asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Output Speed', asset.specs?['outputSpeedRpm'] != null ? '${asset.specs!['outputSpeedRpm']} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Output Speed', asset.outputSpeedRpm != null ? '${asset.outputSpeedRpm} RPM' : (asset.specs?['outputSpeedRpm'] != null ? '${asset.specs!['outputSpeedRpm']} RPM' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Recommended Oil Grade', asset.specs?['oilType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Recommended Oil Grade', asset.oilType ?? asset.specs?['oilType'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Oil Sump Capacity', asset.specs?['oilCapacity'] != null ? '${asset.specs!['oilCapacity']} L' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Oil Sump Capacity', asset.oilCapacity != null ? '${asset.oilCapacity} L' : (asset.specs?['oilCapacity'] != null ? '${asset.specs!['oilCapacity']} L' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Shaft Ø', asset.specs?['inputShaftMm'] != null ? '${asset.specs!['inputShaftMm']} mm' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Shaft Ø', asset.inputShaftMm != null ? '${asset.inputShaftMm} mm' : (asset.specs?['inputShaftMm'] != null ? '${asset.specs!['inputShaftMm']} mm' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Output Shaft Ø', asset.specs?['outputShaftMm'] != null ? '${asset.specs!['outputShaftMm']} mm' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Output Shaft Ø', asset.outputShaftMm != null ? '${asset.outputShaftMm} mm' : (asset.specs?['outputShaftMm'] != null ? '${asset.specs!['outputShaftMm']} mm' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Lubrication Method', asset.specs?['lubricationMethod'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Lubrication Method', asset.lubricationMethod ?? asset.specs?['lubricationMethod'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Mounting Orientation', asset.specs?['mountingOrientation'] ?? asset.mountingType ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Mounting Orientation', asset.mountingOrientation ?? asset.mountingType ?? '-')),
               ],
             ),
           ]
@@ -583,41 +583,41 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             _sectionHeader('Pump Hydraulic Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Flow Rate / Capacity', asset.specs?['flowRate'] != null ? '${asset.specs!['flowRate']} m³/hr' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Flow Rate / Capacity', asset.flowRate != null ? '${asset.flowRate} m³/hr' : (asset.specs?['flowRate'] != null ? '${asset.specs!['flowRate']} m³/hr' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Total Dynamic Head', asset.specs?['head'] != null ? '${asset.specs!['head']} m' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Total Dynamic Head', asset.head != null ? '${asset.head} m' : (asset.specs?['head'] != null ? '${asset.specs!['head']} m' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Pump Speed', (asset.specs?['pumpSpeedRpm'] ?? asset.speedRpm) != null ? '${asset.specs?['pumpSpeedRpm'] ?? asset.speedRpm} RPM' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Pump Speed', asset.speedRpm != null ? '${asset.speedRpm} RPM' : (asset.specs?['pumpSpeedRpm'] != null ? '${asset.specs!['pumpSpeedRpm']} RPM' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Shaft Power Required', (asset.specs?['pumpPower'] ?? asset.powerKw) != null ? '${asset.specs?['pumpPower'] ?? asset.powerKw} kW' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Shaft Power Required', asset.pumpPower != null ? '${asset.pumpPower} kW' : (asset.powerKw != null ? '${asset.powerKw} kW' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Impeller Diameter', asset.specs?['impellerSize'] != null ? '${asset.specs!['impellerSize']} mm' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Impeller Diameter', asset.impellerSize != null && asset.impellerSize!.isNotEmpty ? '${asset.impellerSize} mm' : (asset.specs?['impellerSize'] != null ? '${asset.specs!['impellerSize']} mm' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Seal Type', asset.specs?['sealType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Seal Type', asset.sealType ?? asset.specs?['sealType'] ?? '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Suction Flange Ø', asset.specs?['suctionFlangeMm'] != null ? '${asset.specs!['suctionFlangeMm']} mm' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Suction Flange Ø', asset.suctionFlangeMm != null ? '${asset.suctionFlangeMm} mm' : (asset.specs?['suctionFlangeMm'] != null ? '${asset.specs!['suctionFlangeMm']} mm' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Discharge Flange Ø', asset.specs?['dischargeFlangeMm'] != null ? '${asset.specs!['dischargeFlangeMm']} mm' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Discharge Flange Ø', asset.dischargeFlangeMm != null ? '${asset.dischargeFlangeMm} mm' : (asset.specs?['dischargeFlangeMm'] != null ? '${asset.specs!['dischargeFlangeMm']} mm' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Casing Material', asset.specs?['casingMaterial'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Casing Material', asset.casingMaterial ?? asset.specs?['casingMaterial'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Grease / Lubricant', asset.specs?['greaseType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Grease / Lubricant', asset.greaseType ?? asset.specs?['greaseType'] ?? '-')),
               ],
             ),
           ],

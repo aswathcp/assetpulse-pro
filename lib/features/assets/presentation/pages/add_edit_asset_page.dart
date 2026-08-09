@@ -264,35 +264,32 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _lastServiceDate = a.lastServiceDate;
     _nextServiceDue = a.nextServiceDue;
 
-    // Dynamic Specs for Gearbox / Pump
-    if (a.specs != null) {
-      final s = a.specs!;
-      _motorGreaseTypeController.text = s['greaseType']?.toString() ?? '';
+    // Direct & Dynamic Specs
+    _motorGreaseTypeController.text = a.greaseType ?? a.specs?['greaseType']?.toString() ?? '';
 
-      // Gearbox
-      _gearboxPowerController.text = s['inputPowerKw']?.toString() ?? a.powerKw?.toString() ?? '';
-      _inputSpeedController.text = s['inputSpeedRpm']?.toString() ?? '';
-      _outputSpeedController.text = s['outputSpeedRpm']?.toString() ?? '';
-      _gearRatioController.text = s['gearRatio']?.toString() ?? '';
-      _oilTypeController.text = s['oilType']?.toString() ?? '';
-      _oilCapacityController.text = s['oilCapacity']?.toString() ?? '';
-      _inputShaftController.text = s['inputShaftMm']?.toString() ?? '';
-      _outputShaftController.text = s['outputShaftMm']?.toString() ?? '';
-      _lubricationMethodController.text = s['lubricationMethod']?.toString() ?? '';
-      _gearboxMountingController.text = s['mountingOrientation']?.toString() ?? '';
+    // Gearbox
+    _gearboxPowerController.text = a.powerKw?.toString() ?? a.specs?['inputPowerKw']?.toString() ?? '';
+    _inputSpeedController.text = a.inputSpeedRpm?.toString() ?? a.specs?['inputSpeedRpm']?.toString() ?? '';
+    _outputSpeedController.text = a.outputSpeedRpm?.toString() ?? a.specs?['outputSpeedRpm']?.toString() ?? '';
+    _gearRatioController.text = a.gearRatio ?? a.specs?['gearRatio']?.toString() ?? '';
+    _oilTypeController.text = a.oilType ?? a.specs?['oilType']?.toString() ?? '';
+    _oilCapacityController.text = a.oilCapacity?.toString() ?? a.specs?['oilCapacity']?.toString() ?? '';
+    _inputShaftController.text = a.inputShaftMm?.toString() ?? a.specs?['inputShaftMm']?.toString() ?? '';
+    _outputShaftController.text = a.outputShaftMm?.toString() ?? a.specs?['outputShaftMm']?.toString() ?? '';
+    _lubricationMethodController.text = a.lubricationMethod ?? a.specs?['lubricationMethod']?.toString() ?? '';
+    _gearboxMountingController.text = a.mountingOrientation ?? a.specs?['mountingOrientation']?.toString() ?? '';
 
-      // Pump
-      _flowRateController.text = s['flowRate']?.toString() ?? '';
-      _headController.text = s['head']?.toString() ?? '';
-      _pumpSpeedController.text = s['pumpSpeedRpm']?.toString() ?? a.speedRpm?.toString() ?? '';
-      _impellerSizeController.text = s['impellerSize']?.toString() ?? '';
-      _pumpPowerController.text = s['pumpPower']?.toString() ?? a.powerKw?.toString() ?? '';
-      _suctionFlangeController.text = s['suctionFlangeMm']?.toString() ?? '';
-      _dischargeFlangeController.text = s['dischargeFlangeMm']?.toString() ?? '';
-      _sealTypeController.text = s['sealType']?.toString() ?? '';
-      _casingMaterialController.text = s['casingMaterial']?.toString() ?? '';
-      _pumpGreaseTypeController.text = s['greaseType']?.toString() ?? '';
-    }
+    // Pump
+    _flowRateController.text = a.flowRate?.toString() ?? a.specs?['flowRate']?.toString() ?? '';
+    _headController.text = a.head?.toString() ?? a.specs?['head']?.toString() ?? '';
+    _pumpSpeedController.text = a.speedRpm?.toString() ?? a.specs?['pumpSpeedRpm']?.toString() ?? '';
+    _impellerSizeController.text = a.impellerSize ?? a.specs?['impellerSize']?.toString() ?? '';
+    _pumpPowerController.text = a.pumpPower?.toString() ?? a.powerKw?.toString() ?? a.specs?['pumpPower']?.toString() ?? '';
+    _suctionFlangeController.text = a.suctionFlangeMm?.toString() ?? a.specs?['suctionFlangeMm']?.toString() ?? '';
+    _dischargeFlangeController.text = a.dischargeFlangeMm?.toString() ?? a.specs?['dischargeFlangeMm']?.toString() ?? '';
+    _sealTypeController.text = a.sealType ?? a.specs?['sealType']?.toString() ?? '';
+    _casingMaterialController.text = a.casingMaterial ?? a.specs?['casingMaterial']?.toString() ?? '';
+    _pumpGreaseTypeController.text = a.greaseType ?? a.specs?['greaseType']?.toString() ?? '';
   }
 
   @override
@@ -564,35 +561,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         throw Exception("You do not have permission to modify database items in this scope.");
       }
 
-      // Build Specs Map Custom per Asset Type
-      final Map<String, dynamic> dynamicSpecs = {};
-
-      if (_selectedType == AssetType.motor) {
-        if (_motorGreaseTypeController.text.isNotEmpty) dynamicSpecs['greaseType'] = _motorGreaseTypeController.text.trim();
-      } else if (_selectedType == AssetType.gearbox) {
-        if (_gearboxPowerController.text.isNotEmpty) dynamicSpecs['inputPowerKw'] = double.tryParse(_gearboxPowerController.text.trim());
-        if (_inputSpeedController.text.isNotEmpty) dynamicSpecs['inputSpeedRpm'] = double.tryParse(_inputSpeedController.text.trim());
-        if (_outputSpeedController.text.isNotEmpty) dynamicSpecs['outputSpeedRpm'] = double.tryParse(_outputSpeedController.text.trim());
-        if (_gearRatioController.text.isNotEmpty) dynamicSpecs['gearRatio'] = _gearRatioController.text.trim();
-        if (_oilTypeController.text.isNotEmpty) dynamicSpecs['oilType'] = _oilTypeController.text.trim();
-        if (_oilCapacityController.text.isNotEmpty) dynamicSpecs['oilCapacity'] = double.tryParse(_oilCapacityController.text.trim());
-        if (_inputShaftController.text.isNotEmpty) dynamicSpecs['inputShaftMm'] = double.tryParse(_inputShaftController.text.trim());
-        if (_outputShaftController.text.isNotEmpty) dynamicSpecs['outputShaftMm'] = double.tryParse(_outputShaftController.text.trim());
-        if (_lubricationMethodController.text.isNotEmpty) dynamicSpecs['lubricationMethod'] = _lubricationMethodController.text.trim();
-        if (_gearboxMountingController.text.isNotEmpty) dynamicSpecs['mountingOrientation'] = _gearboxMountingController.text.trim();
-      } else if (_selectedType == AssetType.pump) {
-        if (_flowRateController.text.isNotEmpty) dynamicSpecs['flowRate'] = double.tryParse(_flowRateController.text.trim());
-        if (_headController.text.isNotEmpty) dynamicSpecs['head'] = double.tryParse(_headController.text.trim());
-        if (_pumpSpeedController.text.isNotEmpty) dynamicSpecs['pumpSpeedRpm'] = double.tryParse(_pumpSpeedController.text.trim());
-        if (_impellerSizeController.text.isNotEmpty) dynamicSpecs['impellerSize'] = _impellerSizeController.text.trim();
-        if (_pumpPowerController.text.isNotEmpty) dynamicSpecs['pumpPower'] = double.tryParse(_pumpPowerController.text.trim());
-        if (_suctionFlangeController.text.isNotEmpty) dynamicSpecs['suctionFlangeMm'] = double.tryParse(_suctionFlangeController.text.trim());
-        if (_dischargeFlangeController.text.isNotEmpty) dynamicSpecs['dischargeFlangeMm'] = double.tryParse(_dischargeFlangeController.text.trim());
-        if (_sealTypeController.text.isNotEmpty) dynamicSpecs['sealType'] = _sealTypeController.text.trim();
-        if (_casingMaterialController.text.isNotEmpty) dynamicSpecs['casingMaterial'] = _casingMaterialController.text.trim();
-        if (_pumpGreaseTypeController.text.isNotEmpty) dynamicSpecs['greaseType'] = _pumpGreaseTypeController.text.trim();
-      }
-
       final primaryParentId = _selectedParentId ?? (_selectedParentIdsForSpares.isNotEmpty ? _selectedParentIdsForSpares.first : '');
 
       final double? effectivePowerKw = _selectedType == AssetType.motor
@@ -606,6 +574,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
           : _selectedType == AssetType.gearbox
               ? double.tryParse(_inputSpeedController.text)
               : double.tryParse(_pumpSpeedController.text);
+
+      final String? directGreaseType = _selectedType == AssetType.motor
+          ? (_motorGreaseTypeController.text.trim().isNotEmpty ? _motorGreaseTypeController.text.trim() : null)
+          : _selectedType == AssetType.pump
+              ? (_pumpGreaseTypeController.text.trim().isNotEmpty ? _pumpGreaseTypeController.text.trim() : null)
+              : null;
 
       final asset = AssetModel(
         id: widget.asset?.id ?? targetTagId,
@@ -622,7 +596,6 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         imageUrl: _imageController.text.trim(),
         type: _selectedType,
         status: _selectedStatus,
-        specs: dynamicSpecs.isNotEmpty ? dynamicSpecs : null,
         powerKw: effectivePowerKw,
         voltage: double.tryParse(_voltageController.text),
         fullLoadCurrent: double.tryParse(_flcCurrentController.text),
@@ -634,6 +607,27 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         powerFactor: double.tryParse(_pfController.text),
         frameSize: _frameController.text.trim().isNotEmpty ? _frameController.text.trim() : null,
         mountingType: _mountingController.text.trim().isNotEmpty ? _mountingController.text.trim() : null,
+        greaseType: directGreaseType,
+
+        gearRatio: _gearRatioController.text.trim().isNotEmpty ? _gearRatioController.text.trim() : null,
+        oilType: _oilTypeController.text.trim().isNotEmpty ? _oilTypeController.text.trim() : null,
+        oilCapacity: double.tryParse(_oilCapacityController.text),
+        inputSpeedRpm: double.tryParse(_inputSpeedController.text),
+        outputSpeedRpm: double.tryParse(_outputSpeedController.text),
+        inputShaftMm: double.tryParse(_inputShaftController.text),
+        outputShaftMm: double.tryParse(_outputShaftController.text),
+        lubricationMethod: _lubricationMethodController.text.trim().isNotEmpty ? _lubricationMethodController.text.trim() : null,
+        mountingOrientation: _gearboxMountingController.text.trim().isNotEmpty ? _gearboxMountingController.text.trim() : null,
+
+        flowRate: double.tryParse(_flowRateController.text),
+        head: double.tryParse(_headController.text),
+        impellerSize: _impellerSizeController.text.trim().isNotEmpty ? _impellerSizeController.text.trim() : null,
+        pumpPower: double.tryParse(_pumpPowerController.text),
+        suctionFlangeMm: double.tryParse(_suctionFlangeController.text),
+        dischargeFlangeMm: double.tryParse(_dischargeFlangeController.text),
+        sealType: _sealTypeController.text.trim().isNotEmpty ? _sealTypeController.text.trim() : null,
+        casingMaterial: _casingMaterialController.text.trim().isNotEmpty ? _casingMaterialController.text.trim() : null,
+
         bearingDE: _bearingDEController.text.trim().isNotEmpty ? _bearingDEController.text.trim() : null,
         bearingNDE: _bearingNDEController.text.trim().isNotEmpty ? _bearingNDEController.text.trim() : null,
         isCritical: _isCritical,
