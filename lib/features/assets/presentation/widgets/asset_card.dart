@@ -43,118 +43,144 @@ class AssetCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         child: GlassContainer(
           width: double.infinity,
-          height: 100, // Compact height
           borderRadius: 16,
           border: 0.5,
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Live Status / Health Indicator Bar
-                Container(
-                  width: 5,
-                  height: double.infinity,
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: indicatorColor,
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: indicatorColor.withValues(alpha: 0.4),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  // Live Status / Health Indicator Bar
+                  Container(
+                    width: 5,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: indicatorColor,
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: indicatorColor.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            asset.name,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(asset.status).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _getStatusColor(asset.status).withValues(alpha: 0.5)),
-                            ),
-                            child: Text(
-                              _getStatusText(asset.status),
-                              style: TextStyle(
-                                color: _getStatusColor(asset.status),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                  
+                  // Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                asset.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              asset.type.name.toUpperCase(),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontSize: 10, 
-                                fontWeight: FontWeight.w600
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(asset.status).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: _getStatusColor(asset.status).withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                _getStatusText(asset.status),
+                                style: TextStyle(
+                                  color: _getStatusColor(asset.status),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            asset.tagNo,
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            asset.masterEquipmentId.isNotEmpty 
-                              ? 'Eq: ${asset.masterEquipmentId}'
-                              : 'No Equipment Assigned',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
-                          ),
-                          const Spacer(),
-                           // Pulse Time
-                           if (asset.lastPulseTime != null)
-                             Text(
-                               'Pulse: ${asset.lastPulseTime!.minute}m ago', // Simplified relative time logic? Nah, just simplistic for now.
-                               style: const TextStyle(color: Colors.white38, fontSize: 10),
-                             ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                asset.type.name.toUpperCase(),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 10, 
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                asset.tagNo,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(Icons.precision_manufacturing_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                asset.masterEquipmentId.isNotEmpty 
+                                  ? 'Parent: ${asset.masterEquipmentId}'
+                                  : (asset.status == AssetStatus.spare 
+                                      ? (asset.spareLocation?.isNotEmpty == true ? 'Spare @ ${asset.spareLocation}' : 'Spare (Available)')
+                                      : 'No Equipment Assigned'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 11),
+                              ),
+                            ),
+                            if (asset.isCritical) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: const Text(
+                                  'CRITICAL',
+                                  style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                
-                // Arrow
-                Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
-              ],
+                  
+                  // Arrow
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), size: 20),
+                ],
+              ),
             ),
           ),
         ),
