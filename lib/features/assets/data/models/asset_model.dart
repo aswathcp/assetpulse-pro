@@ -238,7 +238,7 @@ class AssetModel {
         (e) => e.name == (map['healthStatus'] ?? 'unknown'),
         orElse: () => AssetHealthStatus.unknown,
       ),
-      lastPulseTime: (map['lastPulseTime'] as dynamic)?.toDate(),
+      lastPulseTime: _parseDate(map['lastPulseTime']),
 
       windingResistance: map['windingResistance'] as Map<String, dynamic>?,
       insulationResistance: map['insulationResistance'] as Map<String, dynamic>?,
@@ -253,14 +253,22 @@ class AssetModel {
       spareLocation: map['spareLocation'] as String?,
       seqNo: map['seqNo']?.toString(),
       
-      installationDate: (map['installationDate'] as dynamic)?.toDate(),
-      lastServiceDate: (map['lastServiceDate'] as dynamic)?.toDate(),
-      nextServiceDue: (map['nextServiceDue'] as dynamic)?.toDate(),
-      createdAt: (map['createdAt'] as dynamic)?.toDate(),
+      installationDate: _parseDate(map['installationDate']),
+      lastServiceDate: _parseDate(map['lastServiceDate']),
+      nextServiceDue: _parseDate(map['nextServiceDue']),
+      createdAt: _parseDate(map['createdAt']),
       createdBy: map['createdBy'],
-      modifiedAt: (map['modifiedAt'] as dynamic)?.toDate() ?? (map['updatedAt'] as dynamic)?.toDate(),
+      modifiedAt: _parseDate(map['modifiedAt']) ?? _parseDate(map['updatedAt']),
       modifiedBy: map['modifiedBy'],
     );
+  }
+
+  static DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is Timestamp) return val.toDate();
+    if (val is DateTime) return val;
+    if (val is String && val.isNotEmpty) return DateTime.tryParse(val);
+    return null;
   }
 
   Map<String, dynamic> toMap() {

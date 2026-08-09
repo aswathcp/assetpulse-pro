@@ -140,12 +140,26 @@ class _AssetsTabState extends State<AssetsTab> {
     if (_selectedPlantId == null || _selectedUnitId == null) return;
     try {
       final snap = await _firestore.collection('assets').get();
-      final prefix = '$_selectedPlantId-$_selectedUnitId-';
+      final prefix = '$_selectedPlantId-$_selectedUnitId-'.toUpperCase();
 
-      final list = snap.docs
-          .map((d) => AssetModel.fromMap(d.data(), d.id))
-          .where((a) => a.id.startsWith(prefix) || a.tagNo.startsWith(prefix))
-          .toList();
+      final list = <AssetModel>[];
+      for (final doc in snap.docs) {
+        try {
+          final data = doc.data();
+          final plant = (data['plantId'] ?? '').toString().toUpperCase();
+          final unit = (data['unitId'] ?? '').toString().toUpperCase();
+          final idUpper = doc.id.toUpperCase();
+          final tagUpper = (data['tagNo'] ?? '').toString().toUpperCase();
+
+          if (idUpper.startsWith(prefix) ||
+              tagUpper.startsWith(prefix) ||
+              (plant == _selectedPlantId!.toUpperCase() && unit == _selectedUnitId!.toUpperCase())) {
+            list.add(AssetModel.fromMap(data, doc.id));
+          }
+        } catch (itemErr) {
+          debugPrint('Error parsing asset ${doc.id}: $itemErr');
+        }
+      }
 
       if (mounted) {
         setState(() {

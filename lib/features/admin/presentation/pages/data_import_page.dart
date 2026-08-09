@@ -1540,9 +1540,14 @@ class _DataImportPageState extends State<DataImportPage> {
 
           final typeCode = typeStr == 'gearbox' ? 'GBX' : typeStr == 'pump' ? 'PMP' : 'MTR';
           final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? data['id']?.toString().trim() ?? '';
-          final finalTagId = rawTagId.isNotEmpty
+          String finalTagId = rawTagId.isNotEmpty
               ? rawTagId
               : '${_userPlantId!}-${_userUnitId!}-$typeCode-${seqStr.padLeft(3, '0')}';
+          
+          // Ensure tag is prefixed with plant and unit
+          if (!finalTagId.toUpperCase().startsWith('${_userPlantId!.toUpperCase()}-${_userUnitId!.toUpperCase()}-')) {
+            finalTagId = '${_userPlantId!}-${_userUnitId!}-$finalTagId';
+          }
 
           // Parse Parent Equipment & Compatible Spares list
           final parentRaw = data['parentEquipment']?.toString().trim() ??
@@ -1575,6 +1580,8 @@ class _DataImportPageState extends State<DataImportPage> {
 
           data['id'] = finalTagId;
           data['tagNo'] = finalTagId;
+          data['plantId'] = _userPlantId!;
+          data['unitId'] = _userUnitId!;
           data['name'] = nameStr;
           data['type'] = typeStr;
           data['status'] = statusStr;
@@ -1629,10 +1636,11 @@ class _DataImportPageState extends State<DataImportPage> {
           data['sealType'] = data['sealType']?.toString().trim() ?? '';
           data['casingMaterial'] = data['casingMaterial']?.toString().trim() ?? '';
 
-          data['createdAt'] = data['createdAt'] ?? DateTime.now().toIso8601String();
-          data['updatedAt'] = DateTime.now().toIso8601String();
+          data['createdAt'] = FieldValue.serverTimestamp();
+          data['modifiedAt'] = FieldValue.serverTimestamp();
         }
         
+        data.remove('Validation');
         return data;
       }).toList();
 
