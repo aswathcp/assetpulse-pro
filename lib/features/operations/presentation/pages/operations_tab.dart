@@ -20,9 +20,8 @@ class OperationsTab extends StatelessWidget {
       appBar: const CustomAppBar(title: 'Operations Center'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -37,7 +36,7 @@ class OperationsTab extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.2 : 0.85,
+                childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.2 : 0.95,
               children: [
                 StreamBuilder<List<IsolationPermitModel>>(
                   stream: FirestoreService().getActiveIsolationsStream(
