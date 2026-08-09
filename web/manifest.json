@@ -1,11 +1,11 @@
 {
-    "name": "asset_pulse_pro",
-    "short_name": "asset_pulse_pro",
+    "name": "AssetPulse Pro",
+    "short_name": "AssetPulse",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B0F19",
+    "theme_color": "#6366F1",
+    "description": "AssetPulse Pro - Industrial Safety & Asset Management Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

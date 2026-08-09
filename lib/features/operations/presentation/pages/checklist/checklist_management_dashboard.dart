@@ -22,7 +22,8 @@ class ChecklistManagementDashboard extends StatelessWidget {
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
