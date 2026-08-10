@@ -972,10 +972,15 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<AssetModel>(
+                    isExpanded: true,
                     dropdownColor: Theme.of(context).colorScheme.surface,
                     value: selectedSpare,
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                    decoration: const InputDecoration(labelText: 'Select Spare Asset', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Select Spare Asset',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
                     items: spares.map((s) {
                       final isDirectMatch = s.applicableParentEquipmentIds?.contains(asset.masterEquipmentId) ?? false;
                       return DropdownMenuItem<AssetModel>(
@@ -983,10 +988,21 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                         child: Text(
                           '${s.tagNo} - ${s.name} ${isDirectMatch ? "⭐ [Assigned Spare]" : ""}',
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                           style: TextStyle(fontWeight: isDirectMatch ? FontWeight.bold : FontWeight.normal, fontSize: 12),
                         ),
                       );
                     }).toList(),
+                    selectedItemBuilder: (context) {
+                      return spares.map((s) {
+                        return Text(
+                          '${s.tagNo} - ${s.name}',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        );
+                      }).toList();
+                    },
                     onChanged: (v) {
                       setDialogState(() {
                         selectedSpare = v;

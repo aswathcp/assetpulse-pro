@@ -342,16 +342,22 @@ class FirestoreService {
     if (masterEquipmentId.isEmpty) return const Stream.empty();
     return _db.collection('fault_logs')
         .where('masterEquipmentId', isEqualTo: masterEquipmentId)
-        .orderBy('reportedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => FaultLogModel.fromMap(d.data(), d.id)).toList());
+        .map((s) {
+          final list = s.docs.map((d) => FaultLogModel.fromMap(d.data(), d.id)).toList();
+          list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+          return list;
+        });
   }
 
   Stream<List<FaultLogModel>> getAllFaultLogsStream() {
     return _db.collection('fault_logs')
-        .orderBy('reportedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => FaultLogModel.fromMap(d.data(), d.id)).toList());
+        .map((s) {
+          final list = s.docs.map((d) => FaultLogModel.fromMap(d.data(), d.id)).toList();
+          list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+          return list;
+        });
   }
 
   // Generic Batch Save for Bulk Upload

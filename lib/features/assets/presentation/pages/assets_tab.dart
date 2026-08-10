@@ -299,12 +299,13 @@ class _AssetsTabState extends State<AssetsTab> {
     );
   }
 
-  // --- KPI STATS ---
+  // --- ASSET FLEET OPERATIONAL METRICS (ISO 55000) ---
   int get _totalAssets => _assets.length;
   int get _activeCount => _assets.where((a) => a.status == AssetStatus.active).length;
-  int get _maintenanceCount => _assets.where((a) => a.status == AssetStatus.underMaintenance || a.isCritical).length;
   int get _spareCount => _assets.where((a) => a.status == AssetStatus.spare).length;
-  double get _activeRate => _totalAssets == 0 ? 0.0 : (_activeCount / _totalAssets) * 100;
+  int get _maintenanceCount => _assets.where((a) => a.status == AssetStatus.underMaintenance).length;
+  int get _criticalCount => _assets.where((a) => a.isCritical).length;
+  double get _fleetReadiness => _totalAssets == 0 ? 0.0 : ((_activeCount + _spareCount) / _totalAssets) * 100;
 
   // --- EXCEL REPORT EXPORT ---
   Future<void> _exportExcelReport() async {
@@ -582,7 +583,7 @@ class _AssetsTabState extends State<AssetsTab> {
         maxWidth: 1320,
         child: SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 70),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -651,47 +652,97 @@ class _AssetsTabState extends State<AssetsTab> {
                   ),
                 ),
               ).animate().fadeIn(duration: 300.ms),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // 2. Metrics Overview Dashboard Card (Matching Screenshot)
+              // 2. Metrics Overview Dashboard Card (Optimized for Plant Asset Fleet Management)
               GlassContainer(
                 borderRadius: 20,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Asset Inventory Overview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.hub_outlined, color: AppColors.accent, size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Asset Fleet Overview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  Text('Operational Readiness & Fleet Health', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                            ],
+                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: _activeRate >= 80.0 ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
+                              color: _fleetReadiness >= 85.0 ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _fleetReadiness >= 85.0 ? Colors.greenAccent.withValues(alpha: 0.4) : Colors.orangeAccent.withValues(alpha: 0.4),
+                              ),
                             ),
-                            child: Text(
-                              '${_activeRate.toStringAsFixed(1)}%',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: _activeRate >= 80.0 ? Colors.greenAccent : Colors.redAccent),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: _fleetReadiness >= 85.0 ? Colors.greenAccent : Colors.orangeAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${_fleetReadiness.toStringAsFixed(0)}% Ready',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: _fleetReadiness >= 85.0 ? Colors.greenAccent : Colors.orangeAccent,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('Total Assets', '$_totalAssets', Colors.white),
-                          _buildStatItem('Active / Healthy', '$_activeCount', Colors.greenAccent),
-                          _buildStatItem('Maintenance / Critical', '$_maintenanceCount', Colors.redAccent),
-                          _buildStatItem('Spares', '$_spareCount', Colors.orangeAccent),
+                          Expanded(child: _buildStatItem('Total Fleet', '$_totalAssets', Colors.white, Icons.storage_outlined)),
+                          const SizedBox(width: 6),
+                          Expanded(child: _buildStatItem('In-Service', '$_activeCount', Colors.greenAccent, Icons.bolt_outlined)),
+                          const SizedBox(width: 6),
+                          Expanded(child: _buildStatItem('Spares', '$_spareCount', Colors.cyanAccent, Icons.inventory_2_outlined)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildStatItem(
+                              _maintenanceCount > 0 ? 'Maintenance' : 'Critical Path',
+                              _maintenanceCount > 0 ? '$_maintenanceCount' : '$_criticalCount',
+                              _maintenanceCount > 0 ? Colors.redAccent : Colors.orangeAccent,
+                              _maintenanceCount > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
               ).animate().fadeIn(duration: 350.ms),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // 3. Search Bar & Filter [tune] / Help [?] / Settings [gear] Buttons
               Row(
@@ -752,7 +803,7 @@ class _AssetsTabState extends State<AssetsTab> {
                   ],
                 ],
               ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // 4. Header Row with Title & Excel / PDF Action Buttons (RCCB / Lux Style)
               Row(
@@ -779,9 +830,9 @@ class _AssetsTabState extends State<AssetsTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // 5. Asset Cards List
+              // 5. Asset Cards List (Direct Column without nested ScrollView to prevent overscrolling)
               filtered.isEmpty
                   ? Container(
                       padding: const EdgeInsets.all(32),
@@ -798,12 +849,10 @@ class _AssetsTabState extends State<AssetsTab> {
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final asset = filtered[index];
+                  : Column(
+                      children: filtered.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final asset = entry.value;
                         return AssetCard(
                           asset: asset,
                           onTap: () {
@@ -814,8 +863,8 @@ class _AssetsTabState extends State<AssetsTab> {
                               ),
                             ).then((_) => _fetchAssets());
                           },
-                        ).animate(delay: (index * 30).ms).fadeIn(duration: 300.ms).slideY(begin: 0.08, end: 0);
-                      },
+                        ).animate(delay: (index * 20).ms).fadeIn(duration: 200.ms).slideY(begin: 0.04, end: 0);
+                      }).toList(),
                     ),
             ],
           ),
@@ -1032,13 +1081,36 @@ class _AssetsTabState extends State<AssetsTab> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-      ],
+  Widget _buildStatItem(String label, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 }
