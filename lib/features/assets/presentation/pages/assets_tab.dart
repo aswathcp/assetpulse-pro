@@ -608,7 +608,7 @@ class _AssetsTabState extends State<AssetsTab> {
         maxWidth: 1320,
         child: SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -778,8 +778,17 @@ class _AssetsTabState extends State<AssetsTab> {
                       decoration: InputDecoration(
                         hintText: 'Search tag, name or ID...',
                         prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -828,7 +837,24 @@ class _AssetsTabState extends State<AssetsTab> {
                   ],
                 ],
               ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+
+              // Asset Type Quick Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildMainTypeChip('All', 'All (${_assets.length})'),
+                    const SizedBox(width: 6),
+                    _buildMainTypeChip('motor', 'Motors (${_assets.where((a) => a.type == AssetType.motor).length})'),
+                    const SizedBox(width: 6),
+                    _buildMainTypeChip('gearbox', 'Gearboxes (${_assets.where((a) => a.type == AssetType.gearbox).length})'),
+                    const SizedBox(width: 6),
+                    _buildMainTypeChip('pump', 'Pumps (${_assets.where((a) => a.type == AssetType.pump).length})'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // 4. Header Row with Title & Excel / PDF Action Buttons (RCCB / Lux Style)
               Row(
@@ -904,7 +930,7 @@ class _AssetsTabState extends State<AssetsTab> {
 
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1152,6 +1178,35 @@ class _AssetsTabState extends State<AssetsTab> {
     );
   }
 
+  Widget _buildMainTypeChip(String typeKey, String label) {
+    final isSelected = _filterType.toLowerCase() == typeKey.toLowerCase();
+    return FilterChip(
+      selected: isSelected,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.white : Colors.white70,
+        ),
+      ),
+      selectedColor: AppColors.primary,
+      backgroundColor: Colors.white.withValues(alpha: 0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: isSelected ? AppColors.accent : Colors.white.withValues(alpha: 0.1),
+        ),
+      ),
+      checkmarkColor: AppColors.accent,
+      onSelected: (_) {
+        setState(() {
+          _filterType = isSelected && typeKey != 'All' ? 'All' : typeKey;
+        });
+      },
+    );
+  }
+
   void _confirmDeleteSingleAsset(AssetModel a) {
     showDialog(
       context: context,
@@ -1188,7 +1243,7 @@ class _AssetsTabState extends State<AssetsTab> {
   Widget _buildHelpView() {
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
