@@ -13,7 +13,6 @@ import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/pages/register_page.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/home/presentation/pages/splash_page.dart';
-import 'features/admin/migration_page.dart';
 import 'core/widgets/pulse_loading.dart';
 import 'core/widgets/glass_container.dart';
 import 'core/widgets/animated_gradient_background.dart';
@@ -57,7 +56,6 @@ class AssetPulseApp extends StatelessWidget {
               '/login': (context) => const LoginPage(),
               '/register': (context) => const RegisterPage(),
               '/home': (context) => const HomePage(),
-              '/migration': (context) => const MigrationPage(),
             },
           );
         },

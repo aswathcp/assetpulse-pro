@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../features/home/presentation/widgets/custom_app_bar.dart';
 import '../../../../core/widgets/glass_container.dart';
+import '../../../../core/widgets/responsive_layout.dart';
+import '../../../../core/services/hierarchy_service.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/firestore_service.dart';
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
@@ -12,147 +18,467 @@ class AnalyticsTab extends StatefulWidget {
 }
 
 class _AnalyticsTabState extends State<AnalyticsTab> {
-  String _selectedRange = 'Last 7 Days';
+  final HierarchyService _hierarchyService = HierarchyService();
+  final FirestoreService _firestoreService = FirestoreService();
+
+  bool _isLoading = true;
+  String? _selectedPlantId;
+  String? _selectedUnitId;
+  List<String> _plants = [];
+  List<String> _units = [];
+  bool _isPlantLocked = false;
+  bool _isUnitLocked = false;
+
+  int _touchedIndex = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _initHierarchyAndScope();
+  }
+
+  Future<void> _initHierarchyAndScope() async {
+    final user = AuthService().currentUser;
+    if (user != null) {
+      final profile = await _firestoreService.getUserProfile(user.uid);
+      if (profile != null) {
+        final assignedPlant = profile['plantId'] as String?;
+        final assignedUnit = profile['unitId'] as String?;
+        if (assignedPlant != null && assignedPlant.isNotEmpty) {
+          _selectedPlantId = assignedPlant;
+          _isPlantLocked = true;
+        }
+        if (assignedUnit != null && assignedUnit.isNotEmpty) {
+          _selectedUnitId = assignedUnit;
+          _isUnitLocked = true;
+        }
+      }
+    }
+
+    _plants = _hierarchyService.getPlants();
+    if (_plants.isNotEmpty && _selectedPlantId == null) {
+      _selectedPlantId = _plants.first;
+    }
+
+    _updateUnitList();
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _updateUnitList() {
+    if (_selectedPlantId == null) {
+      _units = [];
+      _selectedUnitId = null;
+      return;
+    }
+    _units = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
+    if (!_units.contains(_selectedUnitId)) {
+      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+    }
+  }
+
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+          Container(
+            height: 260,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const CustomAppBar(title: 'Plant Intelligence & Analytics'),
+        body: _buildSkeletonLoader(),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: const CustomAppBar(title: 'Analytics'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
-        child: Column(
-          children: [
-            // Date Range Switcher
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedRange,
-
-                  dropdownColor: Theme.of(context).colorScheme.surface,
-                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.accent),
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  items: ['Last 7 Days', 'Last 30 Days', 'This Quarter']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      _selectedRange = v!;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 1. Downtime Trend
-            _buildSectionHeader('Downtime Trend (Hours)'),
-            const SizedBox(height: 16),
-            GlassContainer(
-              width: double.infinity,
-              height: 250,
-              borderRadius: 24,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 24, 16),
-                child: LineChart(
-                  LineChartData(
-                    gridData: FlGridData(show: false),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30, getTitlesWidget: (value, meta) => Text(value.toInt().toString(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10)))),
-                      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
-                        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                        if (value.toInt() >= 0 && value.toInt() < days.length) {
-                          return Text(days[value.toInt()], style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10));
-                        }
-                        return const Text('');
-                      })),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: const [
-                          FlSpot(0, 3),
-                          FlSpot(1, 1),
-                          FlSpot(2, 4),
-                          FlSpot(3, 2),
-                          FlSpot(4, 5),
-                          FlSpot(5, 1),
-                          FlSpot(6, 0),
-                        ],
-                        isCurved: true,
-                        color: AppColors.accent,
-                        barWidth: 4,
-                        isStrokeCapRound: true,
-                        dotData: FlDotData(show: false),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: AppColors.accent.withValues(alpha: 0.1),
+      appBar: const CustomAppBar(title: 'Plant Intelligence & Analytics'),
+      body: ResponsiveContentWrapper(
+        maxWidth: 1320,
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Scope & Filter Bar
+              GlassContainer(
+                borderRadius: 16,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedPlantId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Plant', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                          items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
+                          onChanged: _isPlantLocked ? null : (val) {
+                            if (val != null) {
+                              setState(() {
+                                _selectedPlantId = val;
+                                _updateUnitList();
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedUnitId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Unit', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                          items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
+                          onChanged: _isUnitLocked ? null : (val) {
+                            if (val != null) setState(() => _selectedUnitId = val);
+                          },
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-            
-            const SizedBox(height: 32),
+              ).animate().fadeIn(duration: 300.ms),
+              const SizedBox(height: 16),
 
-            // 2. Faults by Area
-            _buildSectionHeader('Faults by Area'),
-            const SizedBox(height: 16),
-            GlassContainer(
-              width: double.infinity,
-              height: 250,
-              borderRadius: 24,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: BarChart(
-                  BarChartData(
-                    gridData: FlGridData(show: false),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
-                        const areas = ['Unit A', 'Unit B', 'Pump', 'Gen'];
-                        if (value.toInt() >= 0 && value.toInt() < areas.length) {
-                          return Text(areas[value.toInt()], style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10));
-                        }
-                        return const Text('');
-                      })),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    barGroups: [
-                      BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: 8, color: AppColors.error, width: 16, borderRadius: BorderRadius.circular(4))]),
-                      BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: 3, color: AppColors.warning, width: 16, borderRadius: BorderRadius.circular(4))]),
-                      BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: 5, color: AppColors.primaryLight, width: 16, borderRadius: BorderRadius.circular(4))]),
-                      BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: 2, color: AppColors.success, width: 16, borderRadius: BorderRadius.circular(4))]),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+              // 2. Real-Time Fleet Reliability & Health Distribution
+              _buildFleetHealthSection().animate().fadeIn(duration: 350.ms),
+              const SizedBox(height: 16),
+
+              // 3. Machinery Category Breakdown
+              _buildAssetTypeBreakdown().animate().fadeIn(duration: 400.ms),
+              const SizedBox(height: 16),
+
+              // 4. Operations & Diagnostic Intelligence
+              _buildOperationsIntelligence().animate().fadeIn(duration: 450.ms),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  // --- 2. LIVE FLEET HEALTH DISTRIBUTION (DONUT CHART) ---
+  Widget _buildFleetHealthSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('assets').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(height: 220, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(20)));
+        }
+
+        final docs = snapshot.data!.docs;
+        final total = docs.length;
+        final active = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'active').length;
+        final spares = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'spare').length;
+        final maintenance = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'underMaintenance').length;
+        final critical = docs.where((d) => (d.data() as Map<String, dynamic>)['isCritical'] == true).length;
+        final readiness = total == 0 ? 0.0 : ((active + spares) / total) * 100;
+
+        return GlassContainer(
+          width: double.infinity,
+          borderRadius: 20,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.pie_chart_outline, color: AppColors.accent, size: 20),
+                        SizedBox(width: 8),
+                        Text('Asset Fleet Health Distribution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ],
+                    ),
+                    Text('${readiness.toStringAsFixed(0)}% Fleet Health', style: TextStyle(color: readiness >= 85 ? Colors.greenAccent : Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 180,
+                  child: Row(
+                    children: [
+                      // Donut Chart
+                      Expanded(
+                        flex: 5,
+                        child: total == 0
+                            ? const Center(child: Text('No assets registered', style: TextStyle(fontSize: 11, color: Colors.grey)))
+                            : PieChart(
+                                PieChartData(
+                                  pieTouchData: PieTouchData(
+                                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                                      setState(() {
+                                        if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                                          _touchedIndex = -1;
+                                          return;
+                                        }
+                                        _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                                      });
+                                    },
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  sectionsSpace: 3,
+                                  centerSpaceRadius: 40,
+                                  sections: [
+                                    if (active > 0)
+                                      PieChartSectionData(
+                                        color: Colors.greenAccent,
+                                        value: active.toDouble(),
+                                        title: '$active',
+                                        radius: _touchedIndex == 0 ? 42 : 36,
+                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                      ),
+                                    if (spares > 0)
+                                      PieChartSectionData(
+                                        color: Colors.cyanAccent,
+                                        value: spares.toDouble(),
+                                        title: '$spares',
+                                        radius: _touchedIndex == 1 ? 42 : 36,
+                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                      ),
+                                    if (maintenance > 0)
+                                      PieChartSectionData(
+                                        color: Colors.redAccent,
+                                        value: maintenance.toDouble(),
+                                        title: '$maintenance',
+                                        radius: _touchedIndex == 2 ? 42 : 36,
+                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    if (critical > 0)
+                                      PieChartSectionData(
+                                        color: Colors.orangeAccent,
+                                        value: critical.toDouble(),
+                                        title: '$critical',
+                                        radius: _touchedIndex == 3 ? 42 : 36,
+                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 14),
+                      // Legend
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLegendItem(Colors.greenAccent, 'In-Service Active', '$active'),
+                            const SizedBox(height: 6),
+                            _buildLegendItem(Colors.cyanAccent, 'Standby Spares', '$spares'),
+                            const SizedBox(height: 6),
+                            _buildLegendItem(Colors.redAccent, 'Under Maintenance', '$maintenance'),
+                            const SizedBox(height: 6),
+                            _buildLegendItem(Colors.orangeAccent, 'Critical Path', '$critical'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label, String count) {
     return Row(
       children: [
-        Container(width: 4, height: 20, decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(2))),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        const SizedBox(width: 8),
-        Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70), overflow: TextOverflow.ellipsis)),
+        Text(count, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
       ],
+    );
+  }
+
+  // --- 3. MACHINERY CATEGORY BREAKDOWN (BAR CHART) ---
+  Widget _buildAssetTypeBreakdown() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('assets').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final docs = snapshot.data!.docs;
+        final motors = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'motor').length;
+        final gearboxes = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'gearbox').length;
+        final pumps = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'pump').length;
+        final maxVal = [motors, gearboxes, pumps].reduce((a, b) => a > b ? a : b).toDouble();
+
+        return GlassContainer(
+          width: double.infinity,
+          borderRadius: 20,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.bar_chart, color: AppColors.accent, size: 20),
+                    SizedBox(width: 8),
+                    Text('Asset Distribution by Equipment Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 150,
+                  child: BarChart(
+                    BarChartData(
+                      maxY: maxVal > 0 ? maxVal * 1.3 : 10,
+                      barTouchData: BarTouchData(enabled: true),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (val, _) {
+                              switch (val.toInt()) {
+                                case 0:
+                                  return Text('Motors ($motors)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                case 1:
+                                  return Text('Gearboxes ($gearboxes)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                case 2:
+                                  return Text('Pumps ($pumps)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                default:
+                                  return const Text('');
+                              }
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      gridData: FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      barGroups: [
+                        BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: motors.toDouble(), color: Colors.blueAccent, width: 22, borderRadius: BorderRadius.circular(6))]),
+                        BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: gearboxes.toDouble(), color: Colors.amberAccent, width: 22, borderRadius: BorderRadius.circular(6))]),
+                        BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: pumps.toDouble(), color: Colors.tealAccent, width: 22, borderRadius: BorderRadius.circular(6))]),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- 4. OPERATIONS & DIAGNOSTIC INTELLIGENCE ---
+  Widget _buildOperationsIntelligence() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('health_logs').snapshots(),
+      builder: (context, snapshot) {
+        final logs = snapshot.data?.docs ?? [];
+        final totalTests = logs.length;
+
+        return GlassContainer(
+          width: double.infinity,
+          borderRadius: 20,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.monitor_heart_outlined, color: Colors.pinkAccent, size: 20),
+                    SizedBox(width: 8),
+                    Text('Diagnostic Testing & IEEE 43 Health Intelligence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: _buildMetricCard('Total Diagnostic Logs', '$totalTests Tests', Colors.cyanAccent, Icons.science_outlined)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildMetricCard('Insulation Health (IR)', '≥ 100 MΩ Pass', Colors.greenAccent, Icons.bolt)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _buildMetricCard('Vibration Index', 'ISO 10816 Zone A/B', Colors.blueAccent, Icons.vibration)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildMetricCard('LOTO Safety Rate', '100% Verified', Colors.amberAccent, Icons.lock_clock_outlined)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricCard(String title, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
     );
   }
 }

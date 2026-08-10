@@ -333,6 +333,39 @@ class FirestoreService {
         .map((s) => s.docs.map((d) => FeederModel.fromMap(d.data(), d.id)).toList());
   }
 
+  // Activity Logs Stream (Sorted by timestamp descending)
+  Stream<List<Map<String, dynamic>>> getActivityLogsStream({int limit = 20}) {
+    return _db.collection('activity_logs')
+        .snapshots()
+        .map((s) {
+          final list = s.docs.map((d) {
+            final data = d.data();
+            data['id'] = d.id;
+            return data;
+          }).toList();
+          list.sort((a, b) {
+            final aTime = (a['timestamp'] as Timestamp?)?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = (b['timestamp'] as Timestamp?)?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
+          return list.take(limit).toList();
+        });
+  }
+
+  // Open Faults Stream (status not resolved or closed)
+  Stream<List<FaultLogModel>> getOpenFaultLogsStream() {
+    return _db.collection('fault_logs')
+        .snapshots()
+        .map((s) {
+          final list = s.docs
+              .map((d) => FaultLogModel.fromMap(d.data(), d.id))
+              .where((f) => f.status != FaultStatus.resolved && f.status != FaultStatus.closed)
+              .toList();
+          list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+          return list;
+        });
+  }
+
   // --- FAULT LOG CRUDS ---
   Future<void> saveFaultLog(FaultLogModel log) async {
     await _db.collection('fault_logs').doc(log.id).set(log.toMap(), SetOptions(merge: true));

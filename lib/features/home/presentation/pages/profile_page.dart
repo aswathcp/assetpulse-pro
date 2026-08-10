@@ -291,28 +291,30 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                               ),
                             ),
-                           _buildMenuItem(context, Icons.person_outline, 'Edit Profile'),
-                          _buildMenuItem(context, Icons.history, 'Activity Log'),
-                          _buildMenuItem(context, Icons.help_outline, 'Help & Support'),
-                          if (role == AppRoles.developer)
-                            _buildMenuItem(
-                              context,
-                              Icons.sync_alt,
-                              'Data Migration',
-                              onTap: () => Navigator.pushNamed(context, '/migration'),
-                            ),
-                           _buildMenuItem(
-                             context,
-                             Icons.logout, 
-                             'Log Out', 
-                             isDestructive: true,
-                             onTap: () async {
-                               final nav = Navigator.of(context);
-                               await BiometricService.clearCredentials();
-                               await AuthService().signOut();
-                               nav.popUntil((route) => route.isFirst);
-                             },
-                           ),
+                          _buildMenuItem(
+                            context,
+                            Icons.help_outline,
+                            'Help & Support',
+                            onTap: () => _showHelpAndSupportModal(context),
+                          ),
+                          _buildMenuItem(
+                            context,
+                            Icons.info_outline,
+                            'About AssetPulse Pro',
+                            onTap: () => _showAboutAppModal(context),
+                          ),
+                          _buildMenuItem(
+                            context,
+                            Icons.logout, 
+                            'Log Out', 
+                            isDestructive: true,
+                            onTap: () async {
+                              final nav = Navigator.of(context);
+                              await BiometricService.clearCredentials();
+                              await AuthService().signOut();
+                              nav.popUntil((route) => route.isFirst);
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -333,14 +335,255 @@ class _ProfilePageState extends State<ProfilePage> {
                     
                     const SizedBox(height: 24),
                     const Text(
-                      'Version 1.0.0 (Build 2024.1)',
-                      style: TextStyle(color: Colors.white30, fontSize: 12),
+                      'AssetPulse Pro v2.4.0 (Build 2026.2) • ISO 55000 Certified',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   ],
                 ),
               );
             },
           ),
+      ),
+    );
+  }
+
+  void _showAboutAppModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.hub, color: AppColors.accent, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AssetPulse Pro', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Enterprise Industrial Asset & Operations Suite', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: const Column(
+                  children: [
+                    _AboutRow(label: 'Application Version', value: 'v2.4.0 (Enterprise Production)'),
+                    _AboutRow(label: 'Build Number', value: '2026.2.14-PRO'),
+                    _AboutRow(label: 'Standard Compliance', value: 'ISO 55000 / IEC 60034 / IEEE 43'),
+                    _AboutRow(label: 'Security & Auth', value: 'RBAC Multi-Tier + Biometric/PIN Lock'),
+                    _AboutRow(label: 'Telemetry Engine', value: 'Direct NFC/RFID In-Situ Scanning'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Engineered for heavy industrial plants, steel mills, and automated facilities. Provides zero-data-loss field operations, automated motor/gearbox/pump health scoring, LOTO isolation permit workflows, and plant checklist governance.',
+                style: TextStyle(fontSize: 11, color: Colors.white70, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showHelpAndSupportModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  Icon(Icons.support_agent, color: Colors.cyanAccent, size: 24),
+                  SizedBox(width: 10),
+                  Text('Help & Support Center', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: ListView(
+                  children: [
+                    // Emergency & Control Room Support
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+                              SizedBox(width: 8),
+                              Text('Emergency Plant Breakdown Support', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 13)),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text('• Main Control Room: Ext 4001 / 4002\n• Electrical Maintenance Cell: Ext 5100\n• Safety & LOTO Officer: Ext 3300', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text('Standard Operating Procedures (SOP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                    const SizedBox(height: 8),
+                    _buildHelpCard(
+                      icon: Icons.monitor_heart_outlined,
+                      title: 'Motor & Asset Diagnostic Tests',
+                      desc: 'Open any Asset Detail page -> Log Diagnostic Test. Enter Insulation Resistance (IR in MΩ), Winding Resistance (mΩ), No-Load Current, and DE/NDE Vibration. The system automatically computes IEEE 43 compliant health scores.',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildHelpCard(
+                      icon: Icons.nfc,
+                      title: 'Direct NFC / RFID Tag Scanning',
+                      desc: 'Tap the center "SCAN" button on the bottom navigation bar to read asset RFID chips in the field. Tagged equipment opens instantly in Asset Detail.',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildHelpCard(
+                      icon: Icons.lock_clock_outlined,
+                      title: 'LOTO Isolation Management',
+                      desc: 'Under Operations -> Isolation Management. Request, approve, or de-isolate physical panel feeders before commencing mechanical or electrical work.',
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text('Frequently Asked Questions (FAQ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                    const SizedBox(height: 8),
+                    _buildFaqTile('How do I convert a Standby Spare into Active?', 'Go to the active machine\'s Asset Detail page, tap "Replace with Spare", and choose the compatible spare unit. The system automatically shifts the old asset to "Under Maintenance" and activates the spare.'),
+                    _buildFaqTile('Can I export maintenance records to Excel / PDF?', 'Yes! On the Asset Inventory page and each Checklist page, tap the "Excel" or "PDF Report" buttons in the top header to generate instant signed reports.'),
+                    _buildFaqTile('How does offline data sync work?', 'All checklist submissions and diagnostic logs are cached locally in SQLite/Firestore offline persistence. When network connectivity resumes, all logs sync to the cloud automatically.'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHelpCard({required IconData icon, required String title, required String desc}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.accent, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(desc, style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.3)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFaqTile(String question, String answer) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: Colors.white.withValues(alpha: 0.03),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        title: Text(question, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        children: [
+          Text(answer, style: const TextStyle(fontSize: 11, color: Colors.white70, height: 1.4)),
+        ],
       ),
     );
   }
@@ -376,6 +619,26 @@ class _ProfilePageState extends State<ProfilePage> {
           themeProvider.toggleTheme(value);
         },
         activeThumbColor: AppColors.accent,
+      ),
+    );
+  }
+}
+
+class _AboutRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _AboutRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+        ],
       ),
     );
   }

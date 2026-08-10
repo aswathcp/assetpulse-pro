@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/services/auth_service.dart';
@@ -8,341 +9,574 @@ import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../log_data/presentation/pages/log_fault_page.dart';
 import '../../../log_data/presentation/pages/gen_work_log_page.dart';
+import '../../../operations/presentation/pages/isolation_management_page.dart';
+import '../../../operations/presentation/pages/checklist/checklist_management_dashboard.dart';
+import '../../../operations/presentation/pages/checklist/shift_checklists_page.dart';
+import '../../../assets/data/models/fault_log_model.dart';
 import '../widgets/custom_app_bar.dart';
 
-class DashboardTab extends StatelessWidget {
+class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
 
   @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  final FirestoreService _firestoreService = FirestoreService();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulate brief initial load for zero-CLS shimmer transition
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _isLoading = false);
+    });
+  }
+
+  // Exact Plant Shift Engine (Matches shift_checklists_page.dart)
+  String _getCurrentShiftCode() {
+    final hour = DateTime.now().hour;
+    if (hour >= 7 && hour < 15) return 'AS'; // 07:00 – 15:00
+    if (hour >= 15 && hour < 23) return 'BS'; // 15:00 – 23:00
+    return 'CS'; // 23:00 – 07:00
+  }
+
+  String _getShiftLabel(String code) {
+    switch (code) {
+      case 'AS':
+        return 'A-Shift (07:00–15:00)';
+      case 'BS':
+        return 'B-Shift (15:00–23:00)';
+      case 'CS':
+        return 'C-Shift (23:00–07:00)';
+      default:
+        return code;
+    }
+  }
+
+  String _getRelativeTime(DateTime? date) {
+    if (date == null) return 'Just now';
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: CustomAppBar(title: 'Operations Dashboard'),
+        body: Center(child: PulseLoading(size: 40)),
+      );
+    }
+
+    final currentShift = _getCurrentShiftCode();
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: const CustomAppBar(),
+      appBar: const CustomAppBar(title: 'Operations Dashboard'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Shift Status Header
-            _buildShiftHeader(context),
-            const SizedBox(height: 32),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Live Plant Shift & User Duty Header
+              _buildShiftHeader(context, currentShift).animate().fadeIn(duration: 300.ms).slideY(begin: -0.05, end: 0),
+              const SizedBox(height: 16),
 
-            // 2. Critical Alerts Carousel
-            Text(
-              'Critical Alerts',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600,
-                  ),
+              // 2. Live Asset Fleet Health & Operational Readiness Overview
+              _buildLiveFleetOverview(context).animate().fadeIn(duration: 350.ms),
+              const SizedBox(height: 16),
+
+              // 3. Quick Action Launchers
+              _buildSectionTitle('Operational Actions'),
+              const SizedBox(height: 10),
+              _buildQuickActionsRow(context).animate().fadeIn(duration: 400.ms),
+              const SizedBox(height: 18),
+
+              // 4. Live Critical Alerts & Open Faults
+              _buildSectionTitle('Active Critical Alerts & Faults'),
+              const SizedBox(height: 10),
+              _buildLiveFaultsStream(context),
+              const SizedBox(height: 18),
+
+              // 5. Live Recent Activity Stream (activity_logs)
+              _buildSectionTitle('Recent Plant Activity Log'),
+              const SizedBox(height: 10),
+              _buildLiveActivityLogStream(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 3.5,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- 1. SHIFT HEADER ---
+  Widget _buildShiftHeader(BuildContext context, String currentShift) {
+    final user = AuthService().currentUser;
+
+    return GlassContainer(
+      width: double.infinity,
+      borderRadius: 20,
+      border: 0.5,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+              ),
+              child: const Icon(Icons.access_time_filled, color: AppColors.accent, size: 24),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 160,
-              child: PageView(
-                padEnds: false,
-                controller: PageController(viewportFraction: 0.9),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // The provided snippet for MaterialPageRoute is not a valid Widget for PageView children.
-                  // Keeping the original card for syntactical correctness.
-                  // If the intent was to navigate, it should be wrapped in a GestureDetector or similar.
-                  _buildCriticalAlertCard(
-                    context,
-                    'Motor M-101 Critical Fault',
-                    'Overheating Detected (95°C)',
-                    'Unit A • Pending',
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppColors.success,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _getShiftLabel(currentShift),
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                  _buildCriticalAlertCard(
-                    context,
-                    'Hydraulic Pump P-4 Failure',
-                    'Pressure Drop < 100 PSI',
-                    'Unit B • Technicians Assigned',
+                  const SizedBox(height: 3),
+                  FutureBuilder<Map<String, dynamic>?>(
+                    future: user != null ? _firestoreService.getUserProfile(user.uid) : null,
+                    builder: (context, snapshot) {
+                      final name = snapshot.data?['displayName'] ?? user?.displayName ?? 'Duty Engineer';
+                      final dept = snapshot.data?['department'] ?? 'Operations';
+                      return Text(
+                        '$name • $dept',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                          fontSize: 12,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
-            ).animate().fadeIn().slideX(),
-            const SizedBox(height: 32),
-
-            // 3. Shift Progress
-            Text(
-              'Shift Progress',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600,
-                  ),
             ),
-            const SizedBox(height: 16),
-            GlassContainer(
-              width: double.infinity,
-              height: 100,
-              borderRadius: 16,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
+            IconButton(
+              icon: const Icon(Icons.playlist_add_check, color: AppColors.accent, size: 24),
+              tooltip: 'Open Shift Checklists',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShiftChecklistsPage()),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 2. LIVE FLEET OVERVIEW ---
+  Widget _buildLiveFleetOverview(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('assets').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+        final total = docs.length;
+        final active = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'active').length;
+        final spares = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'spare').length;
+        final maintenance = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'underMaintenance').length;
+        final critical = docs.where((d) => (d.data() as Map<String, dynamic>)['isCritical'] == true).length;
+        final readiness = total == 0 ? 0.0 : ((active + spares) / total) * 100;
+
+        return GlassContainer(
+          width: double.infinity,
+          borderRadius: 20,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Stack(
-                      alignment: Alignment.center,
+                    const Row(
                       children: [
-                        SizedBox(
-                          width: 60,
-                          height: 60,
-                          child: CircularProgressIndicator(
-                            value: 0.75,
-                            strokeWidth: 6,
-                            backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-                          ),
-                        ),
-                        Text(
-                          '75%',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
-                        ),
+                        Icon(Icons.hub_outlined, color: AppColors.accent, size: 18),
+                        SizedBox(width: 8),
+                        Text('Plant Asset Fleet Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       ],
                     ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Daily Checklist',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '15/20 tasks complete',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
-                          ),
-                        ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: readiness >= 85 ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: readiness >= 85 ? Colors.greenAccent.withValues(alpha: 0.4) : Colors.orangeAccent.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        '${readiness.toStringAsFixed(0)}% Fleet Ready',
+                        style: TextStyle(
+                          color: readiness >= 85 ? Colors.greenAccent : Colors.orangeAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 32),
-
-             // 4. Log Data Entry Points
-            Text(
-              'Log Data',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildQuickAction(context, Icons.build_circle_outlined, 'Fault Logs', onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const LogFaultPage()));
-                }),
-                _buildQuickAction(context, Icons.engineering_outlined, 'Work Logs', onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const GenWorkLogPage()));
-                }),
-                _buildQuickAction(context, Icons.history_edu_outlined, 'Reports'),
-                _buildQuickAction(context, Icons.analytics_outlined, 'Trends'),
-              ],
-            ).animate().fadeIn(delay: 100.ms),
-
-            const SizedBox(height: 32),
-
-            // 5. Recent Activity
-            Text(
-              'Recent Activity',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 16),
-             _buildActivityItem(context, 'System Backup Completed', '10 mins ago', Icons.cloud_done, AppColors.info),
-             _buildActivityItem(context, 'Shift Handover: Team A -> B', '30 mins ago', Icons.swap_horiz, AppColors.accent),
-             _buildActivityItem(context, 'Maintenance logged on P-200', '2 hours ago', Icons.build, AppColors.warning),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-  Widget _buildShiftHeader(BuildContext context) {
-    return GlassContainer(
-      width: double.infinity,
-      height: 90,
-      borderRadius: 20,
-      border: 0.5,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+                const SizedBox(height: 14),
                 Row(
                   children: [
-                     Container(
-                      width: 8, height: 8,
-                      decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('SHIFT A', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    Expanded(child: _buildMetricTile('Total Assets', '$total', Colors.white, Icons.storage_outlined)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildMetricTile('In-Service', '$active', Colors.greenAccent, Icons.bolt_outlined)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildMetricTile('Spares', '$spares', Colors.cyanAccent, Icons.inventory_2_outlined)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildMetricTile(
+                      maintenance > 0 ? 'Maintenance' : 'Critical',
+                      maintenance > 0 ? '$maintenance' : '$critical',
+                      maintenance > 0 ? Colors.redAccent : Colors.orangeAccent,
+                      maintenance > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
+                    )),
                   ],
                 ),
-                const SizedBox(height: 4),
-                FutureBuilder<Map<String, dynamic>?>(
-                  future: FirestoreService().getUserProfile(AuthService().currentUser?.uid ?? ''),
-                  builder: (context, snapshot) {
-                     // Loading State
-                     if (!snapshot.hasData) {
-                       return const PulseLoading(size: 20);
-                     }
-                     final name = snapshot.data?['displayName'] ?? 'Unknown User';
-                     return Text(
-                       'User: $name', 
-                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface)
-                     );
-                  },
-                ),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening Shift Log Entry...')),
-                );
-              },
-              icon: const Icon(Icons.edit_note, size: 18),
-              label: const Text('Add Entry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryLight,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                textStyle: const TextStyle(fontSize: 12),
-              ),
-            )
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCriticalAlertCard(BuildContext context, String title, String subtitle, String footer) {
+  Widget _buildMetricTile(String label, String value, Color color, IconData icon) {
     return Container(
-      margin: const EdgeInsets.only(right: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.error.withValues(alpha: 0.2),
-            AppColors.error.withValues(alpha: 0.05),
-          ],
-        ),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 14),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                footer,
-                style: const TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(BuildContext context, IconData icon, String label, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
       child: Column(
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24)),
-            ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.onSurface, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12)),
+          Icon(icon, color: color, size: 15),
+          const SizedBox(height: 3),
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 2),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: Colors.white70)),
         ],
       ),
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, String title, String time, IconData icon, Color iconColor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer(
-        width: double.infinity,
-        height: 70,
-        borderRadius: 16,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w500, fontSize: 14)),
-                    Text(time, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54), fontSize: 12)),
-                  ],
-                ),
-              ),
-            ],
+  // --- 3. QUICK ACTIONS ---
+  Widget _buildQuickActionsRow(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildActionBtn(
+            context,
+            title: 'Log Fault',
+            icon: Icons.warning_amber_rounded,
+            color: Colors.redAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogFaultPage())),
           ),
         ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionBtn(
+            context,
+            title: 'General Work',
+            icon: Icons.engineering_outlined,
+            color: Colors.blueAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GenWorkLogPage())),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionBtn(
+            context,
+            title: 'LOTO Permits',
+            icon: Icons.lock_clock_outlined,
+            color: Colors.amberAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IsolationManagementPage())),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionBtn(
+            context,
+            title: 'Checklists',
+            icon: Icons.checklist_outlined,
+            color: Colors.tealAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChecklistManagementDashboard())),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionBtn(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  // --- 4. LIVE CRITICAL FAULTS STREAM ---
+  Widget _buildLiveFaultsStream(BuildContext context) {
+    return StreamBuilder<List<FaultLogModel>>(
+      stream: _firestoreService.getOpenFaultLogsStream(),
+      builder: (context, snapshot) {
+        final faults = snapshot.data ?? [];
+
+        if (faults.isEmpty) {
+          return GlassContainer(
+            borderRadius: 16,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('All Systems Operating Normally', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('No active critical breakdown faults recorded', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: faults.take(3).map((fault) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              fault.masterEquipmentId.isNotEmpty ? fault.masterEquipmentId : 'Plant Equipment',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            Text(
+                              _getRelativeTime(fault.reportedAt),
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fault.odc.isNotEmpty ? fault.odc : fault.cause,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  // --- 5. LIVE RECENT ACTIVITY LOGS ---
+  Widget _buildLiveActivityLogStream(BuildContext context) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _firestoreService.getActivityLogsStream(limit: 6),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: PulseLoading(size: 24));
+        }
+
+        final logs = snapshot.data ?? [];
+
+        if (logs.isEmpty) {
+          return GlassContainer(
+            borderRadius: 16,
+            child: const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(
+                child: Text('No recent activity records found.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: logs.map((log) {
+            final action = log['action']?.toString() ?? 'Operation Performed';
+            final details = log['details']?.toString() ?? '';
+            final ts = (log['timestamp'] as Timestamp?)?.toDate();
+            final timeStr = _getRelativeTime(ts);
+
+            IconData icon = Icons.check_circle_outline;
+            Color iconColor = AppColors.accent;
+            if (action.toLowerCase().contains('fault') || action.toLowerCase().contains('breakdown')) {
+              icon = Icons.warning_amber_rounded;
+              iconColor = Colors.redAccent;
+            } else if (action.toLowerCase().contains('diagnostic') || action.toLowerCase().contains('test')) {
+              icon = Icons.monitor_heart_outlined;
+              iconColor = Colors.cyanAccent;
+            } else if (action.toLowerCase().contains('spare') || action.toLowerCase().contains('replace')) {
+              icon = Icons.swap_horiz;
+              iconColor = Colors.orangeAccent;
+            } else if (action.toLowerCase().contains('loto') || action.toLowerCase().contains('isolation')) {
+              icon = Icons.lock_clock_outlined;
+              iconColor = Colors.amberAccent;
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: iconColor, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(action, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        if (details.isNotEmpty)
+                          Text(details, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(timeStr, style: const TextStyle(fontSize: 9, color: Colors.white38)),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
