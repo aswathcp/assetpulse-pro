@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_roles.dart';
 import '../../../../features/home/presentation/widgets/custom_app_bar.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/responsive_layout.dart';
@@ -39,28 +40,53 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 
   Future<void> _initHierarchyAndScope() async {
     final user = AuthService().currentUser;
-    if (user != null) {
-      final profile = await _firestoreService.getUserProfile(user.uid);
-      if (profile != null) {
-        final assignedPlant = profile['plantId'] as String?;
-        final assignedUnit = profile['unitId'] as String?;
-        if (assignedPlant != null && assignedPlant.isNotEmpty) {
-          _selectedPlantId = assignedPlant;
-          _isPlantLocked = true;
-        }
-        if (assignedUnit != null && assignedUnit.isNotEmpty) {
-          _selectedUnitId = assignedUnit;
-          _isUnitLocked = true;
-        }
-      }
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
 
+    final profile = await _firestoreService.getUserProfile(user.uid);
+    final userRole = profile?['role'] ?? AppRoles.guest;
+    final userPlantId = profile?['plantId'] as String?;
+    final userUnitId = profile?['unitId'] as String?;
+    final uBusinessId = profile?['businessId'] as String? ?? 'VISL';
+
+    await _hierarchyService.init(businessId: uBusinessId);
     _plants = _hierarchyService.getPlants();
-    if (_plants.isNotEmpty && _selectedPlantId == null) {
-      _selectedPlantId = _plants.first;
-    }
 
-    _updateUnitList();
+    final String? userPlant = (userPlantId == null || userPlantId.isEmpty || userPlantId == 'Unknown') ? null : userPlantId;
+    final String? userUnit = (userUnitId == null || userUnitId.isEmpty || userUnitId == 'Unknown') ? null : userUnitId;
+
+    final bool hasGlobalAdmin = profile?['isAdmin'] == true && userPlant == null;
+    final bool hasPlantAdmin = profile?['isAdmin'] == true && userPlant != null;
+
+    final bool isPlantScope = (hasPlantAdmin || userRole == AppRoles.plantAdmin || userRole == AppRoles.plantHod) &&
+        userRole != AppRoles.manager &&
+        userRole != AppRoles.deputyManager &&
+        userRole != AppRoles.associateManager &&
+        userRole != AppRoles.assistantManager &&
+        userRole != AppRoles.unitAdmin &&
+        userRole != AppRoles.unitHod;
+
+    if (userRole == AppRoles.developer || userRole == AppRoles.auditor || hasGlobalAdmin) {
+      _isPlantLocked = false;
+      _isUnitLocked = false;
+      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
+      _updateUnitList();
+      _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : null);
+    } else if (isPlantScope) {
+      _isPlantLocked = true;
+      _isUnitLocked = false;
+      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
+      _updateUnitList();
+      _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : null);
+    } else {
+      _isPlantLocked = true;
+      _isUnitLocked = true;
+      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
+      _updateUnitList();
+      _selectedUnitId = userUnit;
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -202,7 +228,18 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
           return Container(height: 220, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(20)));
         }
 
-        final docs = snapshot.data!.docs;
+        final allDocs = snapshot.data!.docs;
+        final docs = allDocs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          if (_selectedPlantId != null && _selectedPlantId!.isNotEmpty) {
+            if (data['plantId'] != _selectedPlantId) return false;
+          }
+          if (_selectedUnitId != null && _selectedUnitId!.isNotEmpty) {
+            if (data['unitId'] != _selectedUnitId) return false;
+          }
+          return true;
+        }).toList();
+
         final total = docs.length;
         final active = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'active').length;
         final spares = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'spare').length;
@@ -365,11 +402,22 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
 
-        final docs = snapshot.data!.docs;
+        final allDocs = snapshot.data!.docs;
+        final docs = allDocs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          if (_selectedPlantId != null && _selectedPlantId!.isNotEmpty) {
+            if (data['plantId'] != _selectedPlantId) return false;
+          }
+          if (_selectedUnitId != null && _selectedUnitId!.isNotEmpty) {
+            if (data['unitId'] != _selectedUnitId) return false;
+          }
+          return true;
+        }).toList();
+
         final motors = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'motor').length;
         final gearboxes = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'gearbox').length;
         final pumps = docs.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'pump').length;
-        final maxVal = [motors, gearboxes, pumps].reduce((a, b) => a > b ? a : b).toDouble();
+        final maxVal = docs.isEmpty ? 10.0 : [motors, gearboxes, pumps].reduce((a, b) => a > b ? a : b).toDouble();
 
         return GlassContainer(
           width: double.infinity,
