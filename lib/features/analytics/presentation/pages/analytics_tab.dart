@@ -221,14 +221,38 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.pie_chart_outline, color: AppColors.accent, size: 20),
-                        SizedBox(width: 8),
-                        Text('Asset Fleet Health Distribution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      ],
+                    const Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.pie_chart_outline, color: AppColors.accent, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Fleet Health Distribution',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    Text('${readiness.toStringAsFixed(0)}% Fleet Health', style: TextStyle(color: readiness >= 85 ? Colors.greenAccent : Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: readiness >= 85 ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: readiness >= 85 ? Colors.greenAccent.withValues(alpha: 0.4) : Colors.orangeAccent.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        '${readiness.toStringAsFixed(0)}% Ready',
+                        style: TextStyle(
+                          color: readiness >= 85 ? Colors.greenAccent : Colors.orangeAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -238,7 +262,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                     children: [
                       // Donut Chart
                       Expanded(
-                        flex: 5,
+                        flex: 4,
                         child: total == 0
                             ? const Center(child: Text('No assets registered', style: TextStyle(fontSize: 11, color: Colors.grey)))
                             : PieChart(
@@ -256,48 +280,48 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                                   ),
                                   borderData: FlBorderData(show: false),
                                   sectionsSpace: 3,
-                                  centerSpaceRadius: 40,
+                                  centerSpaceRadius: 36,
                                   sections: [
                                     if (active > 0)
                                       PieChartSectionData(
                                         color: Colors.greenAccent,
                                         value: active.toDouble(),
                                         title: '$active',
-                                        radius: _touchedIndex == 0 ? 42 : 36,
-                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                        radius: _touchedIndex == 0 ? 38 : 32,
+                                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                                       ),
                                     if (spares > 0)
                                       PieChartSectionData(
                                         color: Colors.cyanAccent,
                                         value: spares.toDouble(),
                                         title: '$spares',
-                                        radius: _touchedIndex == 1 ? 42 : 36,
-                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                        radius: _touchedIndex == 1 ? 38 : 32,
+                                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                                       ),
                                     if (maintenance > 0)
                                       PieChartSectionData(
                                         color: Colors.redAccent,
                                         value: maintenance.toDouble(),
                                         title: '$maintenance',
-                                        radius: _touchedIndex == 2 ? 42 : 36,
-                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                        radius: _touchedIndex == 2 ? 38 : 32,
+                                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                                       ),
                                     if (critical > 0)
                                       PieChartSectionData(
                                         color: Colors.orangeAccent,
                                         value: critical.toDouble(),
                                         title: '$critical',
-                                        radius: _touchedIndex == 3 ? 42 : 36,
-                                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                                        radius: _touchedIndex == 3 ? 38 : 32,
+                                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                                       ),
                                   ],
                                 ),
                               ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       // Legend
                       Expanded(
-                        flex: 5,
+                        flex: 6,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,9 +381,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.bar_chart, color: AppColors.accent, size: 20),
+                    Icon(Icons.bar_chart, color: AppColors.accent, size: 18),
                     SizedBox(width: 8),
-                    Text('Asset Distribution by Equipment Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Expanded(
+                      child: Text(
+                        'Asset Distribution by Type',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -428,9 +458,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.monitor_heart_outlined, color: Colors.pinkAccent, size: 20),
+                    Icon(Icons.monitor_heart_outlined, color: Colors.pinkAccent, size: 18),
                     SizedBox(width: 8),
-                    Text('Diagnostic Testing & IEEE 43 Health Intelligence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Expanded(
+                      child: Text(
+                        'Diagnostic & Health Intelligence',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
