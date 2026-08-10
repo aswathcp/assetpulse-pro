@@ -33,6 +33,7 @@ class AssetsTab extends StatefulWidget {
 
 class _AssetsTabState extends State<AssetsTab> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _manageSearchController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -56,9 +57,39 @@ class _AssetsTabState extends State<AssetsTab> {
   String _filterType = 'All';
   String _filterCriticality = 'All';
 
+  String _manageFilterType = 'All';
+
   bool get _hasActiveFilters => _filterStatus != 'All' || _filterType != 'All' || _filterCriticality != 'All';
 
   List<AssetModel> _assets = [];
+
+  List<AssetModel> get _filteredManageAssets {
+    final query = _manageSearchController.text.trim().toLowerCase();
+    return _assets.where((a) {
+      if (_manageFilterType != 'All') {
+        if (a.type.name.toLowerCase() != _manageFilterType.toLowerCase()) {
+          return false;
+        }
+      }
+      if (query.isNotEmpty) {
+        final matchesTag = a.tagNo.toLowerCase().contains(query);
+        final matchesName = a.name.toLowerCase().contains(query);
+        final matchesMake = a.make.toLowerCase().contains(query);
+        final matchesModel = a.model.toLowerCase().contains(query);
+        final matchesSerial = a.serialNo.toLowerCase().contains(query);
+        final matchesParent = a.masterEquipmentId.toLowerCase().contains(query);
+        return matchesTag || matchesName || matchesMake || matchesModel || matchesSerial || matchesParent;
+      }
+      return true;
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _manageSearchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -169,12 +200,6 @@ class _AssetsTabState extends State<AssetsTab> {
     } catch (e) {
       debugPrint('Error fetching assets: $e');
     }
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   List<AssetModel> get _filteredAssets {
@@ -875,9 +900,11 @@ class _AssetsTabState extends State<AssetsTab> {
 
   // --- MANAGE ASSETS VIEW (MATCHING LUX LEVEL CHECKLIST SETTINGS) ---
   Widget _buildManageAssetsView() {
+    final filtered = _filteredManageAssets;
+
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -955,51 +982,173 @@ class _AssetsTabState extends State<AssetsTab> {
               ),
             ],
           ),
-          const Divider(height: 24),
+          const SizedBox(height: 14),
 
-          // Asset List with Edit & Delete Actions
-          _assets.isEmpty
-              ? const Center(child: Text('No assets registered in this scope. Add one above!'))
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _assets.length,
-                  itemBuilder: (context, idx) {
-                    final a = _assets[idx];
+          // Search Bar
+          TextField(
+            controller: _manageSearchController,
+            decoration: InputDecoration(
+              hintText: 'Search by Tag, Name, Make, Serial or Parent...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _manageSearchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _manageSearchController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 10),
+
+          // Asset Type Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildManageTypeChip('All', 'All (${_assets.length})'),
+                const SizedBox(width: 6),
+                _buildManageTypeChip('motor', 'Motors (${_assets.where((a) => a.type == AssetType.motor).length})'),
+                const SizedBox(width: 6),
+                _buildManageTypeChip('gearbox', 'Gearboxes (${_assets.where((a) => a.type == AssetType.gearbox).length})'),
+                const SizedBox(width: 6),
+                _buildManageTypeChip('pump', 'Pumps (${_assets.where((a) => a.type == AssetType.pump).length})'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Count Bar
+          Text(
+            'Registered Assets (${filtered.length} of ${_assets.length})',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+
+          // Asset List with Edit & Delete Actions (Direct Column without nested ScrollView)
+          filtered.isEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(32),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.search_off, color: Colors.grey, size: 40),
+                      SizedBox(height: 8),
+                      Text('No matching assets found.', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: filtered.map((a) {
+                    final typeColor = a.type == AssetType.motor
+                        ? Colors.blueAccent
+                        : a.type == AssetType.gearbox
+                            ? Colors.purpleAccent
+                            : Colors.tealAccent;
                     return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      child: ListTile(
-                        title: Text('${a.tagNo} - ${a.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          'Type: ${a.type.name.toUpperCase()} | Status: ${a.status.name.toUpperCase()}\nMake: ${a.make} | Model: ${a.model} | Serial: ${a.serialNo}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.amberAccent, size: 20),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AddEditAssetPage(asset: a),
-                                  ),
-                                ).then((_) => _fetchAssets());
-                              },
+                            // Type Tag
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: typeColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: typeColor.withValues(alpha: 0.4)),
+                              ),
+                              child: Text(
+                                a.type.name.toUpperCase(),
+                                style: TextStyle(color: typeColor, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-                              onPressed: () => _confirmDeleteSingleAsset(a),
+                            const SizedBox(width: 10),
+
+                            // Asset Specs & Identity
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    a.tagNo,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'monospace'),
+                                  ),
+                                  Text(
+                                    a.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${a.status.name.toUpperCase()}${a.make.isNotEmpty ? " • ${a.make}" : ""}${a.model.isNotEmpty ? " • ${a.model}" : ""}${a.masterEquipmentId.isNotEmpty ? " • Parent: ${a.masterEquipmentId}" : ""}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Action Buttons
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.amberAccent, size: 20),
+                                  tooltip: 'Edit Asset',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AddEditAssetPage(asset: a),
+                                      ),
+                                    ).then((_) => _fetchAssets());
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                  tooltip: 'Delete Asset',
+                                  onPressed: () => _confirmDeleteSingleAsset(a),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     );
-                  },
+                  }).toList(),
                 ),
         ],
       ),
+    );
+  }
+
+  Widget _buildManageTypeChip(String typeKey, String label) {
+    final isSelected = _manageFilterType.toLowerCase() == typeKey.toLowerCase();
+    return FilterChip(
+      selected: isSelected,
+      label: Text(label, style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      selectedColor: AppColors.primary.withValues(alpha: 0.25),
+      checkmarkColor: AppColors.accent,
+      onSelected: (_) {
+        setState(() {
+          _manageFilterType = typeKey;
+        });
+      },
     );
   }
 
