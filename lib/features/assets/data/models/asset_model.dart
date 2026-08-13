@@ -40,6 +40,12 @@ class AssetModel {
   final String? frameSize;
   final String? mountingType;
   final String? greaseType; // Direct top level
+  final String? dutyCycle; // e.g. S1, S2, Continuous
+  final String? insulationClass; // e.g. Class F, Class H
+  final String? couplingAvailable; // e.g. YES / NO
+  final String? couplingType; // e.g. Pin-Bush, Tyre, Fluid, Gear, Rigid
+  final String? efficiencyClass; // e.g. IE1, IE2, IE3, IE4
+  final String? ipRating; // e.g. IP55, IP56, IP65
 
   // Gearbox Dynamic Specs
   final String? gearRatio;
@@ -122,6 +128,12 @@ class AssetModel {
     this.frameSize,
     this.mountingType,
     this.greaseType,
+    this.dutyCycle,
+    this.insulationClass,
+    this.couplingAvailable,
+    this.couplingType,
+    this.efficiencyClass,
+    this.ipRating,
     
     this.gearRatio,
     this.oilType,
@@ -214,6 +226,12 @@ class AssetModel {
       frameSize: map['frameSize']?.toString(),
       mountingType: map['mountingType']?.toString(),
       greaseType: map['greaseType']?.toString() ?? legacySpecs?['greaseType']?.toString(),
+      dutyCycle: map['dutyCycle']?.toString() ?? legacySpecs?['dutyCycle']?.toString(),
+      insulationClass: map['insulationClass']?.toString() ?? legacySpecs?['insulationClass']?.toString(),
+      couplingAvailable: map['couplingAvailable']?.toString() ?? (map['isCouplingAvailable'] == true ? 'YES' : (map['isCouplingAvailable'] == false ? 'NO' : null)),
+      couplingType: map['couplingType']?.toString() ?? legacySpecs?['couplingType']?.toString(),
+      efficiencyClass: map['efficiencyClass']?.toString() ?? legacySpecs?['efficiencyClass']?.toString(),
+      ipRating: map['ipRating']?.toString() ?? legacySpecs?['ipRating']?.toString(),
       
       gearRatio: map['gearRatio']?.toString() ?? legacySpecs?['gearRatio']?.toString(),
       oilType: map['oilType']?.toString() ?? legacySpecs?['oilType']?.toString(),
@@ -309,6 +327,12 @@ class AssetModel {
     if (frameSize != null && frameSize!.isNotEmpty) map['frameSize'] = frameSize;
     if (mountingType != null && mountingType!.isNotEmpty) map['mountingType'] = mountingType;
     if (greaseType != null && greaseType!.isNotEmpty) map['greaseType'] = greaseType;
+    if (dutyCycle != null && dutyCycle!.isNotEmpty) map['dutyCycle'] = dutyCycle;
+    if (insulationClass != null && insulationClass!.isNotEmpty) map['insulationClass'] = insulationClass;
+    if (couplingAvailable != null && couplingAvailable!.isNotEmpty) map['couplingAvailable'] = couplingAvailable;
+    if (couplingType != null && couplingType!.isNotEmpty) map['couplingType'] = couplingType;
+    if (efficiencyClass != null && efficiencyClass!.isNotEmpty) map['efficiencyClass'] = efficiencyClass;
+    if (ipRating != null && ipRating!.isNotEmpty) map['ipRating'] = ipRating;
 
     // Direct Gearbox Specs
     if (gearRatio != null && gearRatio!.isNotEmpty) map['gearRatio'] = gearRatio;

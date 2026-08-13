@@ -541,6 +541,36 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 Expanded(child: _buildDetailBox(context, 'Grease Type / Grade', asset.greaseType ?? asset.specs?['greaseType'] ?? '-')),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Duty Cycle', asset.dutyCycle ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Insulation Class', asset.insulationClass ?? '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Efficiency Class', asset.efficiencyClass ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'IP Rating (Enclosure)', asset.ipRating ?? '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDetailBox(
+                    context,
+                    'Coupling / Coupler',
+                    (asset.couplingAvailable?.toUpperCase() == 'YES' || asset.couplingType != null && asset.couplingType!.isNotEmpty)
+                        ? 'YES (${asset.couplingType ?? 'Installed'})'
+                        : (asset.couplingAvailable?.toUpperCase() == 'NO' ? 'NO (Direct / None)' : '-'),
+                  ),
+                ),
+              ],
+            ),
           ]
 
           // 2. GEARBOX SPECIFICATIONS

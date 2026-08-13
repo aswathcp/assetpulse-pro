@@ -639,7 +639,9 @@ class _DataImportPageState extends State<DataImportPage> {
         final motorCols = [
           'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
           'powerKw', 'voltage', 'fullLoadCurrent', 'noLoadCurrent', 'speedRpm', 'frequency', 'poles',
-          'frameSize', 'mountingType', 'efficiency', 'powerFactor', 'greaseType', 'bearingDE', 'bearingNDE',
+          'frameSize', 'mountingType', 'efficiency', 'powerFactor', 'dutyCycle', 'insulationClass',
+          'couplingAvailable', 'couplingType', 'efficiencyClass', 'ipRating',
+          'greaseType', 'bearingDE', 'bearingNDE',
           'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
         ];
         motorSheet.appendRow(motorCols.map((e) => TextCellValue(e)).toList());
@@ -664,6 +666,12 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('B3 Foot Mounted'),
           TextCellValue('95.2'),
           TextCellValue('0.88'),
+          TextCellValue('S1 Continuous'),
+          TextCellValue('Class F'),
+          TextCellValue('YES'),
+          TextCellValue('Flexible Pin-Bush'),
+          TextCellValue('IE3'),
+          TextCellValue('IP55'),
           TextCellValue('Mobilith SHC 100'),
           TextCellValue('6316 C3'),
           TextCellValue('6316 C3'),
@@ -696,6 +704,12 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('B3 Foot Mounted'),
           TextCellValue('95.2'),
           TextCellValue('0.88'),
+          TextCellValue('S1 Continuous'),
+          TextCellValue('Class F'),
+          TextCellValue('YES'),
+          TextCellValue('Flexible Pin-Bush'),
+          TextCellValue('IE3'),
+          TextCellValue('IP55'),
           TextCellValue('Mobilith SHC 100'),
           TextCellValue('6316 C3'),
           TextCellValue('6316 C3'),
@@ -1607,6 +1621,12 @@ class _DataImportPageState extends State<DataImportPage> {
           data['mountingType'] = data['mountingType']?.toString().trim() ?? '';
           data['efficiency'] = double.tryParse(data['efficiency']?.toString() ?? '');
           data['powerFactor'] = double.tryParse(data['powerFactor']?.toString() ?? '');
+          data['dutyCycle'] = data['dutyCycle']?.toString().trim() ?? '';
+          data['insulationClass'] = data['insulationClass']?.toString().trim() ?? '';
+          data['couplingAvailable'] = data['couplingAvailable']?.toString().trim() ?? '';
+          data['couplingType'] = data['couplingType']?.toString().trim() ?? '';
+          data['efficiencyClass'] = data['efficiencyClass']?.toString().trim() ?? '';
+          data['ipRating'] = data['ipRating']?.toString().trim() ?? '';
 
           // Common Lubrication & Bearings
           data['greaseType'] = data['greaseType']?.toString().trim() ?? '';

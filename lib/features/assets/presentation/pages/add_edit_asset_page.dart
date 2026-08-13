@@ -77,6 +77,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _pfController = TextEditingController();
   final _efficiencyController = TextEditingController();
   final _motorGreaseTypeController = TextEditingController();
+  final _dutyCycleController = TextEditingController();
+  final _insulationClassController = TextEditingController();
+  String _couplingAvailable = 'NO';
+  final _couplingTypeController = TextEditingController();
+  final _efficiencyClassController = TextEditingController();
+  final _ipRatingController = TextEditingController();
 
   // Gearbox Dynamic Specs
   final _gearboxPowerController = TextEditingController();
@@ -259,6 +265,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _efficiencyController.text = a.efficiency?.toString() ?? '';
     _bearingDEController.text = a.bearingDE ?? '';
     _bearingNDEController.text = a.bearingNDE ?? '';
+    _dutyCycleController.text = a.dutyCycle ?? '';
+    _insulationClassController.text = a.insulationClass ?? '';
+    _couplingAvailable = (a.couplingAvailable?.toUpperCase() == 'YES' || a.couplingAvailable == 'true') ? 'YES' : 'NO';
+    _couplingTypeController.text = a.couplingType ?? '';
+    _efficiencyClassController.text = a.efficiencyClass ?? '';
+    _ipRatingController.text = a.ipRating ?? '';
 
     _installationDate = a.installationDate;
     _lastServiceDate = a.lastServiceDate;
@@ -608,6 +620,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         frameSize: _frameController.text.trim().isNotEmpty ? _frameController.text.trim() : null,
         mountingType: _mountingController.text.trim().isNotEmpty ? _mountingController.text.trim() : null,
         greaseType: directGreaseType,
+        dutyCycle: _selectedType == AssetType.motor && _dutyCycleController.text.trim().isNotEmpty ? _dutyCycleController.text.trim() : null,
+        insulationClass: _selectedType == AssetType.motor && _insulationClassController.text.trim().isNotEmpty ? _insulationClassController.text.trim() : null,
+        couplingAvailable: _selectedType == AssetType.motor ? _couplingAvailable : null,
+        couplingType: _selectedType == AssetType.motor && _couplingAvailable == 'YES' && _couplingTypeController.text.trim().isNotEmpty ? _couplingTypeController.text.trim() : null,
+        efficiencyClass: _selectedType == AssetType.motor && _efficiencyClassController.text.trim().isNotEmpty ? _efficiencyClassController.text.trim() : null,
+        ipRating: _selectedType == AssetType.motor && _ipRatingController.text.trim().isNotEmpty ? _ipRatingController.text.trim() : null,
 
         gearRatio: _gearRatioController.text.trim().isNotEmpty ? _gearRatioController.text.trim() : null,
         oilType: _oilTypeController.text.trim().isNotEmpty ? _oilTypeController.text.trim() : null,
@@ -1265,6 +1283,112 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _dutyCycleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Duty Cycle',
+                      hintText: 'e.g. S1 Continuous / S2 / S3',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _insulationClassController,
+                    decoration: const InputDecoration(
+                      labelText: 'Insulation Class',
+                      hintText: 'e.g. Class F / Class H / Class B',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _efficiencyClassController,
+                    decoration: const InputDecoration(
+                      labelText: 'Efficiency Class',
+                      hintText: 'e.g. IE3 Premium / IE2 / IE4',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _ipRatingController,
+                    decoration: const InputDecoration(
+                      labelText: 'IP Rating (Enclosure)',
+                      hintText: 'e.g. IP55 / IP56 / IP65',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Coupler / Coupling Available',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      Row(
+                        children: [
+                          ChoiceChip(
+                            label: const Text('YES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            selected: _couplingAvailable == 'YES',
+                            onSelected: (val) {
+                              if (val) setState(() => _couplingAvailable = 'YES');
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            selected: _couplingAvailable == 'NO',
+                            onSelected: (val) {
+                              if (val) setState(() => _couplingAvailable = 'NO');
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (_couplingAvailable == 'YES') ...[
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _couplingTypeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Coupling Type *',
+                        hintText: 'e.g. Flexible Pin-Bush / Tyre / Gear / Fluid / Rigid',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.link, color: AppColors.accent),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ]
 
