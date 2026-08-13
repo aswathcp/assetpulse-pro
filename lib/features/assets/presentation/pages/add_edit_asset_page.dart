@@ -77,6 +77,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _pfController = TextEditingController();
   final _efficiencyController = TextEditingController();
   final _motorGreaseTypeController = TextEditingController();
+  final _motorTypeController = TextEditingController();
   final _dutyCycleController = TextEditingController();
   final _insulationClassController = TextEditingController();
   String _couplingAvailable = 'NO';
@@ -265,6 +266,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _efficiencyController.text = a.efficiency?.toString() ?? '';
     _bearingDEController.text = a.bearingDE ?? '';
     _bearingNDEController.text = a.bearingNDE ?? '';
+    _motorTypeController.text = a.motorType ?? '';
     _dutyCycleController.text = a.dutyCycle ?? '';
     _insulationClassController.text = a.insulationClass ?? '';
     _couplingAvailable = (a.couplingAvailable?.toUpperCase() == 'YES' || a.couplingAvailable == 'true') ? 'YES' : 'NO';
@@ -620,6 +622,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         frameSize: _frameController.text.trim().isNotEmpty ? _frameController.text.trim() : null,
         mountingType: _mountingController.text.trim().isNotEmpty ? _mountingController.text.trim() : null,
         greaseType: directGreaseType,
+        motorType: _selectedType == AssetType.motor && _motorTypeController.text.trim().isNotEmpty ? _motorTypeController.text.trim() : null,
         dutyCycle: _selectedType == AssetType.motor && _dutyCycleController.text.trim().isNotEmpty ? _dutyCycleController.text.trim() : null,
         insulationClass: _selectedType == AssetType.motor && _insulationClassController.text.trim().isNotEmpty ? _insulationClassController.text.trim() : null,
         couplingAvailable: _selectedType == AssetType.motor ? _couplingAvailable : null,
@@ -1022,11 +1025,15 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
           ),
           const SizedBox(height: 14),
 
-          // Name
+          // Name (Optional / Auto-generated from specs)
           TextFormField(
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Equipment / Asset Name *', border: OutlineInputBorder()),
-            validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+            decoration: const InputDecoration(
+              labelText: 'Asset Name / Tag Description (Optional)',
+              hintText: 'Leave blank to auto-generate from rating (e.g. 75kW SCIM)',
+              helperText: 'Auto-derived from power, motor type & make if left blank',
+              border: OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -1156,6 +1163,108 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     );
   }
 
+  // Standard Industrial Motor Dropdown Lists
+  static const List<String> _motorTypeOptions = [
+    'Squirrel Cage Induction Motor (SCIM)',
+    'Slip Ring Induction Motor (SRIM)',
+    'Synchronous Motor',
+    'Permanent Magnet Motor (PMSM)',
+    'DC Shunt / Series Motor',
+    'Single Phase Motor',
+    'Flameproof / Ex-Proof Motor',
+    'Other / Custom',
+  ];
+
+  static const List<String> _dutyCycleOptions = [
+    'S1 Continuous',
+    'S2 Short-time',
+    'S3 Intermittent',
+    'S4 Intermittent with Starting',
+    'S6 Continuous Periodic',
+    'S8 Periodic with Speed/Load Changes',
+  ];
+
+  static const List<String> _insulationClassOptions = [
+    'Class F',
+    'Class H',
+    'Class B',
+    'Class A',
+    'Class C',
+  ];
+
+  static const List<String> _efficiencyClassOptions = [
+    'IE4 Super Premium',
+    'IE3 Premium',
+    'IE2 High',
+    'IE1 Standard',
+    'Non-Standard / Legacy',
+  ];
+
+  static const List<String> _ipRatingOptions = [
+    'IP55',
+    'IP56',
+    'IP65',
+    'IP66',
+    'IP23',
+    'IP67',
+  ];
+
+  static const List<String> _mountingTypeOptions = [
+    'B3 Foot Mounted',
+    'B5 Flange Mounted',
+    'B35 Foot & Flange Mounted',
+    'V1 Vertical Flange Mounted',
+    'V5 Vertical Foot Mounted',
+    'B14 Face Mounted',
+  ];
+
+  static const List<String> _couplingTypeOptions = [
+    'Flexible Pin-Bush',
+    'Tyre Coupling',
+    'Gear Coupling',
+    'Fluid / Hydraulic',
+    'Spider / Star (Jaw)',
+    'Grid Coupling',
+    'Rigid / Flanged Sleeve',
+    'Direct Driven / Solid',
+  ];
+
+  Widget _buildDropdownSelectionField({
+    required String label,
+    required String value,
+    required List<String> options,
+    required ValueChanged<String> onChanged,
+    String? hint,
+  }) {
+    final List<String> effectiveOptions = List<String>.from(options);
+    if (value.isNotEmpty && !effectiveOptions.contains(value)) {
+      effectiveOptions.insert(0, value);
+    }
+
+    return DropdownButtonFormField<String>(
+      value: (value.isNotEmpty && effectiveOptions.contains(value)) ? value : null,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      ),
+      isExpanded: true,
+      items: effectiveOptions.map((opt) {
+        return DropdownMenuItem(
+          value: opt,
+          child: Text(opt, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+        );
+      }).toList(),
+      onChanged: (val) {
+        if (val != null) {
+          onChanged(val);
+        }
+      },
+    );
+  }
+
   // --- TAB 2: TECHNICAL SPECIFICATIONS (CUSTOM PER ASSET TYPE) ---
   Widget _buildSpecsTab() {
     return SingleChildScrollView(
@@ -1168,6 +1277,17 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             const Text('Motor Electrical & Mechanical Specifications',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
             const SizedBox(height: 10),
+
+            // Motor Sub-Type Dropdown
+            _buildDropdownSelectionField(
+              label: 'Motor Type / Technology',
+              value: _motorTypeController.text,
+              options: _motorTypeOptions,
+              onChanged: (val) => setState(() => _motorTypeController.text = val),
+              hint: 'Select Motor Type',
+            ),
+            const SizedBox(height: 12),
+
             Row(
               children: [
                 Expanded(
@@ -1182,7 +1302,11 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _voltageController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Rated Voltage (V) *', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Rated Voltage (V) *',
+                      hintText: 'e.g. 415 / 690 / 3300',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
               ],
@@ -1222,7 +1346,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _polesController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Poles (e.g. 2, 4, 6)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Poles (e.g. 2, 4, 6, 8)', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1234,7 +1358,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _frequencyController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Frequency (Hz)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Frequency (Hz)', hintText: '50', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1242,7 +1366,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _pfController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Power Factor (cos φ)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Power Factor (cos φ)', hintText: '0.88', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1254,89 +1378,96 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   child: TextFormField(
                     controller: _efficiencyController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Efficiency (%)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Efficiency (%)', hintText: '95.2', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _frameController,
-                    decoration: const InputDecoration(labelText: 'Frame Size (e.g. 280M)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Frame Size', hintText: 'e.g. 280M / 160L', border: OutlineInputBorder()),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+
+            // Mounting & Grease
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: _mountingController,
-                    decoration: const InputDecoration(labelText: 'Mounting Type (B3 / B5 / V1)', border: OutlineInputBorder()),
+                  child: _buildDropdownSelectionField(
+                    label: 'Mounting Type',
+                    value: _mountingController.text,
+                    options: _mountingTypeOptions,
+                    onChanged: (val) => setState(() => _mountingController.text = val),
+                    hint: 'Select Mounting',
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _motorGreaseTypeController,
-                    decoration: const InputDecoration(labelText: 'Grease Type & Quantity (g)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Grease Type / Grade', hintText: 'e.g. Mobilith SHC 100', border: OutlineInputBorder()),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+
+            // Duty Cycle & Insulation Class Dropdowns
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: _dutyCycleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Duty Cycle',
-                      hintText: 'e.g. S1 Continuous / S2 / S3',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: _buildDropdownSelectionField(
+                    label: 'Duty Cycle',
+                    value: _dutyCycleController.text,
+                    options: _dutyCycleOptions,
+                    onChanged: (val) => setState(() => _dutyCycleController.text = val),
+                    hint: 'Select Duty',
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextFormField(
-                    controller: _insulationClassController,
-                    decoration: const InputDecoration(
-                      labelText: 'Insulation Class',
-                      hintText: 'e.g. Class F / Class H / Class B',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: _buildDropdownSelectionField(
+                    label: 'Insulation Class',
+                    value: _insulationClassController.text,
+                    options: _insulationClassOptions,
+                    onChanged: (val) => setState(() => _insulationClassController.text = val),
+                    hint: 'Select Insulation',
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+
+            // Efficiency Class & IP Rating Dropdowns
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: _efficiencyClassController,
-                    decoration: const InputDecoration(
-                      labelText: 'Efficiency Class',
-                      hintText: 'e.g. IE3 Premium / IE2 / IE4',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: _buildDropdownSelectionField(
+                    label: 'Efficiency Class',
+                    value: _efficiencyClassController.text,
+                    options: _efficiencyClassOptions,
+                    onChanged: (val) => setState(() => _efficiencyClassController.text = val),
+                    hint: 'Select Class',
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextFormField(
-                    controller: _ipRatingController,
-                    decoration: const InputDecoration(
-                      labelText: 'IP Rating (Enclosure)',
-                      hintText: 'e.g. IP55 / IP56 / IP65',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: _buildDropdownSelectionField(
+                    label: 'IP Rating (Enclosure)',
+                    value: _ipRatingController.text,
+                    options: _ipRatingOptions,
+                    onChanged: (val) => setState(() => _ipRatingController.text = val),
+                    hint: 'Select IP',
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+
+            // Coupling Box
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1377,14 +1508,12 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                   ),
                   if (_couplingAvailable == 'YES') ...[
                     const SizedBox(height: 10),
-                    TextFormField(
-                      controller: _couplingTypeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Coupling Type *',
-                        hintText: 'e.g. Flexible Pin-Bush / Tyre / Gear / Fluid / Rigid',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.link, color: AppColors.accent),
-                      ),
+                    _buildDropdownSelectionField(
+                      label: 'Coupling Type',
+                      value: _couplingTypeController.text,
+                      options: _couplingTypeOptions,
+                      onChanged: (val) => setState(() => _couplingTypeController.text = val),
+                      hint: 'Select Coupling Type',
                     ),
                   ],
                 ],

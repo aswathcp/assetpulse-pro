@@ -77,13 +77,13 @@ class AssetCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                asset.name,
+                                asset.displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                                  fontSize: 14.5,
                                 ),
                               ),
                             ),
@@ -106,7 +106,7 @@ class AssetCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 5),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Container(
@@ -116,24 +116,24 @@ class AssetCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                asset.type.name.toUpperCase(),
+                                asset.tagNo,
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
-                                  fontSize: 10, 
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11, 
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                asset.tagNo,
+                                asset.technicalSummary,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ),

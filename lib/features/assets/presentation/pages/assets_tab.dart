@@ -346,6 +346,7 @@ class _AssetsTabState extends State<AssetsTab> {
         'Tag No',
         'Equipment Name',
         'Type',
+        'Motor Type',
         'Status',
         'Make',
         'Model',
@@ -368,8 +369,9 @@ class _AssetsTabState extends State<AssetsTab> {
       for (var a in _filteredAssets) {
         sheet.appendRow([
           TextCellValue(a.tagNo),
-          TextCellValue(a.name),
+          TextCellValue(a.displayName),
           TextCellValue(a.type.name.toUpperCase()),
+          TextCellValue(a.motorType ?? ''),
           TextCellValue(a.status.name.toUpperCase()),
           TextCellValue(a.make),
           TextCellValue(a.model),

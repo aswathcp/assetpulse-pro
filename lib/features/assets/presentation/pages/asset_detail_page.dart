@@ -209,7 +209,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
       child: Column(
         children: [
           Text(
-            asset.name,
+            asset.displayName,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
@@ -496,17 +496,17 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             _sectionHeader('Motor Electrical Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Rated Power', asset.powerKw != null ? '${asset.powerKw} kW' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Motor Type / Technology', asset.motorType ?? 'Induction Motor')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Rated Voltage', asset.voltage != null ? '${asset.voltage} V' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Rated Power', asset.powerKw != null ? '${asset.powerKw} kW' : '-')),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Full Load Current (FLC)', asset.fullLoadCurrent != null ? '${asset.fullLoadCurrent} A' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Rated Voltage', asset.voltage != null ? '${asset.voltage} V' : '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'No Load Current', asset.noLoadCurrent != null ? '${asset.noLoadCurrent} A' : '-')),
+                Expanded(child: _buildDetailBox(context, 'Full Load Current (FLC)', asset.fullLoadCurrent != null ? '${asset.fullLoadCurrent} A' : '-')),
               ],
             ),
             const SizedBox(height: 12),

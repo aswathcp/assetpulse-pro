@@ -638,7 +638,7 @@ class _DataImportPageState extends State<DataImportPage> {
 
         final motorCols = [
           'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
-          'powerKw', 'voltage', 'fullLoadCurrent', 'noLoadCurrent', 'speedRpm', 'frequency', 'poles',
+          'motorType', 'powerKw', 'voltage', 'fullLoadCurrent', 'noLoadCurrent', 'speedRpm', 'frequency', 'poles',
           'frameSize', 'mountingType', 'efficiency', 'powerFactor', 'dutyCycle', 'insulationClass',
           'couplingAvailable', 'couplingType', 'efficiencyClass', 'ipRating',
           'greaseType', 'bearingDE', 'bearingNDE',
@@ -655,6 +655,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
           TextCellValue(''),
           TextCellValue('YES'),
+          TextCellValue('Squirrel Cage Induction Motor (SCIM)'),
           TextCellValue('75'),
           TextCellValue('415'),
           TextCellValue('130.5'),
@@ -693,6 +694,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
           TextCellValue('Central Warehouse - Bay 3, Rack A2'),
           TextCellValue('YES'),
+          TextCellValue('Squirrel Cage Induction Motor (SCIM)'),
           TextCellValue('75'),
           TextCellValue('415'),
           TextCellValue('130.5'),
@@ -1613,6 +1615,7 @@ class _DataImportPageState extends State<DataImportPage> {
           data['speedRpm'] = double.tryParse(data['speedRpm']?.toString() ?? '');
 
           // Motor Specific Fields
+          data['motorType'] = data['motorType']?.toString().trim() ?? '';
           data['fullLoadCurrent'] = double.tryParse(data['fullLoadCurrent']?.toString() ?? data['flc']?.toString() ?? '');
           data['noLoadCurrent'] = double.tryParse(data['noLoadCurrent']?.toString() ?? '');
           data['frequency'] = double.tryParse(data['frequency']?.toString() ?? '');

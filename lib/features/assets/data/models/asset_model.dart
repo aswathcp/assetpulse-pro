@@ -28,6 +28,7 @@ class AssetModel {
   final Map<String, dynamic>? specs;
 
   // Motor Technical Specs
+  final String? motorType; // e.g. SCIM, SRIM, Synchronous, DC, PMSM
   final double? powerKw;
   final double? voltage;
   final double? fullLoadCurrent; // FLC (Amps)
@@ -116,6 +117,7 @@ class AssetModel {
     
     this.specs,
     
+    this.motorType,
     this.powerKw,
     this.voltage,
     this.fullLoadCurrent,
@@ -214,6 +216,7 @@ class AssetModel {
       
       specs: legacySpecs,
       
+      motorType: map['motorType']?.toString() ?? legacySpecs?['motorType']?.toString(),
       powerKw: (map['powerKw'] as num?)?.toDouble() ?? (legacySpecs?['pumpPower'] as num?)?.toDouble() ?? (legacySpecs?['inputPowerKw'] as num?)?.toDouble(),
       voltage: (map['voltage'] as num?)?.toDouble(),
       fullLoadCurrent: (map['fullLoadCurrent'] as num?)?.toDouble(),
@@ -289,11 +292,59 @@ class AssetModel {
     return null;
   }
 
+  /// Dynamic display name derived from nameplate specs or tag if name is omitted
+  String get displayName {
+    if (name.trim().isNotEmpty && name.trim() != tagNo.trim()) {
+      return name.trim();
+    }
+    if (type == AssetType.motor) {
+      final pwr = powerKw != null ? '${powerKw}kW ' : '';
+      final mType = (motorType != null && motorType!.isNotEmpty) ? motorType! : 'Induction Motor';
+      final mk = make.isNotEmpty ? ' ($make)' : '';
+      return '$pwr$mType$mk'.trim();
+    } else if (type == AssetType.gearbox) {
+      final ratio = (gearRatio != null && gearRatio!.isNotEmpty) ? ' (i=$gearRatio)' : '';
+      final mk = make.isNotEmpty ? ' $make' : '';
+      return 'Gearbox$mk$ratio'.trim();
+    } else if (type == AssetType.pump) {
+      final flw = flowRate != null ? ' (${flowRate}m³/h)' : '';
+      final mk = make.isNotEmpty ? ' $make' : '';
+      return 'Pump$mk$flw'.trim();
+    }
+    return tagNo;
+  }
+
+  /// Compact technical summary line for cards and listings
+  String get technicalSummary {
+    if (type == AssetType.motor) {
+      final parts = <String>[];
+      if (powerKw != null) parts.add('${powerKw}kW');
+      if (speedRpm != null) parts.add('${speedRpm!.toStringAsFixed(0)} RPM');
+      if (voltage != null) parts.add('${voltage!.toStringAsFixed(0)}V');
+      if (frameSize != null && frameSize!.isNotEmpty) parts.add(frameSize!);
+      if (dutyCycle != null && dutyCycle!.isNotEmpty) parts.add(dutyCycle!.split(' ').first);
+      return parts.isNotEmpty ? parts.join(' • ') : 'Motor Specs Pending';
+    } else if (type == AssetType.gearbox) {
+      final parts = <String>[];
+      if (gearRatio != null && gearRatio!.isNotEmpty) parts.add('Ratio $gearRatio');
+      if (oilType != null && oilType!.isNotEmpty) parts.add(oilType!);
+      if (inputSpeedRpm != null) parts.add('In: ${inputSpeedRpm!.toStringAsFixed(0)} RPM');
+      return parts.isNotEmpty ? parts.join(' • ') : 'Gearbox Specs Pending';
+    } else if (type == AssetType.pump) {
+      final parts = <String>[];
+      if (flowRate != null) parts.add('${flowRate}m³/h');
+      if (head != null) parts.add('${head}m Head');
+      if (casingMaterial != null && casingMaterial!.isNotEmpty) parts.add(casingMaterial!);
+      return parts.isNotEmpty ? parts.join(' • ') : 'Pump Specs Pending';
+    }
+    return tagNo;
+  }
+
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
       'masterEquipmentId': masterEquipmentId,
       'tagNo': tagNo,
-      'name': name,
+      'name': name.trim().isNotEmpty ? name.trim() : displayName,
       'type': type.name,
       'status': status.name,
       'isCritical': isCritical,
@@ -315,6 +366,7 @@ class AssetModel {
     }
 
     // Direct Motor Specs
+    if (motorType != null && motorType!.isNotEmpty) map['motorType'] = motorType;
     if (powerKw != null) map['powerKw'] = powerKw;
     if (voltage != null) map['voltage'] = voltage;
     if (fullLoadCurrent != null) map['fullLoadCurrent'] = fullLoadCurrent;
