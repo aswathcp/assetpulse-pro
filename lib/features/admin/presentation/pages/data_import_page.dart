@@ -884,7 +884,131 @@ class _DataImportPageState extends State<DataImportPage> {
         ]);
       }
 
-      // 4. Reference Options Sheet
+      // 4. Brakes Sheet (DC Electromagnetic & AC Thruster EHT)
+      if (type == 'all' || type == 'brake') {
+        final sheetName = type == 'all' ? 'Brakes' : (type == 'brake' && !excel.sheets.containsKey('Brake_Template') ? 'Brake_Template' : 'Brakes');
+        if (type == 'brake' && excel.sheets.containsKey(defaultSheet)) {
+          excel.rename(defaultSheet, 'Brake_Template');
+        }
+        Sheet brakeSheet = excel[type == 'brake' ? 'Brake_Template' : sheetName];
+
+        final brakeCols = [
+          'type', 'name', 'status', 'installationDate', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'brakeType', 'voltageType', 'voltageRating', 'thrusterCapacityKg', 'brakingTorqueNm',
+          'drumDiaMm', 'drumWidthMm', 'drumInstallation', 'mountingBoltSize', 'noOfMountingBolts', 'mountingLengthMm', 'mountingWidthMm',
+          'brakeShoeLining', 'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
+        ];
+        brakeSheet.appendRow(brakeCols.map((e) => TextCellValue(e)).toList());
+
+        // Sample Brake 1: AC Thruster (Active)
+        brakeSheet.appendRow([
+          TextCellValue('brake'),
+          TextCellValue('BF-1 HMC 60T Main Hoist EHT Brake'),
+          TextCellValue('active'),
+          TextCellValue('2023-04-15'),
+          TextCellValue('BF-1-HMC'),
+          TextCellValue('BF-1-HMC; BF-2-HMC'),
+          TextCellValue(''),
+          TextCellValue('YES'),
+          TextCellValue('Thruster'),
+          TextCellValue('AC'),
+          TextCellValue('415'),
+          TextCellValue('34'),
+          TextCellValue('680'),
+          TextCellValue('250'),
+          TextCellValue('120'),
+          TextCellValue('1-M 1-GB'),
+          TextCellValue('M12'),
+          TextCellValue('4'),
+          TextCellValue('490'),
+          TextCellValue('120'),
+          TextCellValue('Non-Asbestos Friction Liner'),
+          TextCellValue('Sterling'),
+          TextCellValue('MDT-250/34'),
+          TextCellValue('SN-99201'),
+          TextCellValue('2022'),
+          TextCellValue('PO-450120'),
+          TextCellValue(''),
+          TextCellValue('001'),
+        ]);
+
+        // Sample Brake 2: DC Electromagnetic (Spare)
+        brakeSheet.appendRow([
+          TextCellValue('brake'),
+          TextCellValue('BF-1 HMC 10T Aux Hoist DC Brake Spare'),
+          TextCellValue('spare'),
+          TextCellValue(''),
+          TextCellValue(''),
+          TextCellValue('BF-1-HMC; BF-2-HMC'),
+          TextCellValue('Crane Electrical Store - Bay 4'),
+          TextCellValue('YES'),
+          TextCellValue('Electromagnetic'),
+          TextCellValue('DC'),
+          TextCellValue('110'),
+          TextCellValue(''),
+          TextCellValue('320'),
+          TextCellValue('200'),
+          TextCellValue('100'),
+          TextCellValue('M'),
+          TextCellValue('M12'),
+          TextCellValue('4'),
+          TextCellValue('350'),
+          TextCellValue('65'),
+          TextCellValue('Semi-Metallic Lining'),
+          TextCellValue('BCH'),
+          TextCellValue('EM-200'),
+          TextCellValue('SN-44390'),
+          TextCellValue('2023'),
+          TextCellValue('PO-450144'),
+          TextCellValue(''),
+          TextCellValue('002'),
+        ]);
+      }
+
+      // 5. Actuators Sheet (Electric / Pneumatic / Hydraulic)
+      if (type == 'all' || type == 'actuator') {
+        final sheetName = type == 'all' ? 'Actuators' : (type == 'actuator' && !excel.sheets.containsKey('Actuator_Template') ? 'Actuator_Template' : 'Actuators');
+        if (type == 'actuator' && excel.sheets.containsKey(defaultSheet)) {
+          excel.rename(defaultSheet, 'Actuator_Template');
+        }
+        Sheet actuatorSheet = excel[type == 'actuator' ? 'Actuator_Template' : sheetName];
+
+        final actCols = [
+          'type', 'name', 'status', 'installationDate', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'actuatorType', 'torqueOrThrust', 'operatingTimeSeconds', 'controlSignal',
+          'valveType', 'valveSize', 'valveFlangeStandard',
+          'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
+        ];
+        actuatorSheet.appendRow(actCols.map((e) => TextCellValue(e)).toList());
+
+        // Sample Actuator 1: Electric Multi-Turn
+        actuatorSheet.appendRow([
+          TextCellValue('actuator'),
+          TextCellValue('BF-1 Gas Cleaning Plant Main Butterfly Valve Actuator'),
+          TextCellValue('active'),
+          TextCellValue('2023-01-10'),
+          TextCellValue('BF1-GCP-01'),
+          TextCellValue('BF1-GCP-01; BF2-GCP-01'),
+          TextCellValue(''),
+          TextCellValue('YES'),
+          TextCellValue('Electric Multi-Turn Actuator (Rotork IQ / Auma SA)'),
+          TextCellValue('450'),
+          TextCellValue('30'),
+          TextCellValue('4-20 mA Analog (Modulating / Inching)'),
+          TextCellValue('Butterfly Valve'),
+          TextCellValue('DN 300 / 12"'),
+          TextCellValue('ISO 5211 - F14 / F16'),
+          TextCellValue('Rotork'),
+          TextCellValue('IQ35 4-20mA'),
+          TextCellValue('SN-ACT-8831'),
+          TextCellValue('2022'),
+          TextCellValue('PO-450882'),
+          TextCellValue(''),
+          TextCellValue('001'),
+        ]);
+      }
+
+      // 6. Reference Options Sheet
       Sheet refSheet = excel['Reference Guide'];
       refSheet.appendRow([TextCellValue('AVAILABLE MASTER EQUIPMENTS IN UNIT (Use in parentEquipment / compatibleSpares)')]);
       refSheet.appendRow([TextCellValue('Equipment Tag (Raw)'), TextCellValue('Full Tag ID'), TextCellValue('Equipment Name')]);
@@ -904,7 +1028,11 @@ class _DataImportPageState extends State<DataImportPage> {
               ? 'Gearbox_Import_Template.xlsx'
               : type == 'pump'
                   ? 'Pump_Import_Template.xlsx'
-                  : 'Asset_Master_Templates.xlsx';
+                  : type == 'brake'
+                      ? 'Brake_Import_Template.xlsx'
+                      : type == 'actuator'
+                          ? 'Actuator_Import_Template.xlsx'
+                          : 'Asset_Master_Templates.xlsx';
 
       final fileBytes = excel.save();
       if (fileBytes != null) {
@@ -936,82 +1064,114 @@ class _DataImportPageState extends State<DataImportPage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Choose Asset Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text('Download tailored Excel templates with exact technical specification columns per asset classification:',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), shape: BoxShape.circle),
-                child: const Icon(Icons.bolt, color: Colors.amberAccent),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Choose Asset Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+                ],
               ),
-              title: const Text('Electric Motors Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Power (kW), Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease Grade', style: TextStyle(fontSize: 11)),
-              trailing: const Icon(Icons.download, size: 18, color: Colors.amberAccent),
-              onTap: () {
-                Navigator.pop(ctx);
-                _downloadAssetTemplate('motor');
-              },
-            ),
-            const Divider(height: 12),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.15), shape: BoxShape.circle),
-                child: const Icon(Icons.settings, color: Colors.orangeAccent),
+              const SizedBox(height: 8),
+              const Text('Download tailored Excel templates with exact technical specification columns per asset classification:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.bolt, color: Colors.amberAccent),
+                ),
+                title: const Text('Electric Motors Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Power (kW), Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease Grade', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.amberAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('motor');
+                },
               ),
-              title: const Text('Industrial Gearboxes Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Gear Ratio, Sump Capacity, Oil Grade, Input/Output Shafts, Speeds, Bearings', style: TextStyle(fontSize: 11)),
-              trailing: const Icon(Icons.download, size: 18, color: Colors.orangeAccent),
-              onTap: () {
-                Navigator.pop(ctx);
-                _downloadAssetTemplate('gearbox');
-              },
-            ),
-            const Divider(height: 12),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), shape: BoxShape.circle),
-                child: const Icon(Icons.water_drop, color: Colors.blueAccent),
+              const Divider(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.disc_full_outlined, color: Colors.purpleAccent),
+                ),
+                title: const Text('Industrial Brakes Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('DC Electromagnetic / AC EHT Thrusters, Drum Dia/Width, Mounting Pitch, Torque, Lining', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.purpleAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('brake');
+                },
               ),
-              title: const Text('Process & Water Pumps Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Flow Rate (m³/h), Head, Speed, Impeller, Suction/Discharge Flanges, Seal Type', style: TextStyle(fontSize: 11)),
-              trailing: const Icon(Icons.download, size: 18, color: Colors.blueAccent),
-              onTap: () {
-                Navigator.pop(ctx);
-                _downloadAssetTemplate('pump');
-              },
-            ),
-            const Divider(height: 12),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle),
-                child: const Icon(Icons.table_chart, color: Colors.greenAccent),
+              const Divider(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.tune, color: Colors.tealAccent),
+                ),
+                title: const Text('Valve Actuators Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Electric / Pneumatic / Hydraulic, Torque/Thrust, Signal (4-20mA), Valve Size, ISO Flange', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.tealAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('actuator');
+                },
               ),
-              title: const Text('All-in-One Master Workbook (3 Sheets)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Contains Motors, Gearboxes, Pumps tabs and Parent Equipment Reference Guide', style: TextStyle(fontSize: 11)),
-              trailing: const Icon(Icons.download, size: 18, color: Colors.greenAccent),
-              onTap: () {
-                Navigator.pop(ctx);
-                _downloadAssetTemplate('all');
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
+              const Divider(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.settings, color: Colors.orangeAccent),
+                ),
+                title: const Text('Industrial Gearboxes Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Gear Ratio, Sump Capacity, Oil Grade, Input/Output Shafts, Speeds, Bearings', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.orangeAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('gearbox');
+                },
+              ),
+              const Divider(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.water_drop, color: Colors.blueAccent),
+                ),
+                title: const Text('Process & Water Pumps Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Flow Rate (m³/h), Head, Speed, Impeller, Suction/Discharge Flanges, Seal Type', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.blueAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('pump');
+                },
+              ),
+              const Divider(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.table_chart, color: Colors.greenAccent),
+                ),
+                title: const Text('All-in-One Master Workbook (5 Sheets)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Contains Motors, Brakes, Actuators, Gearboxes, Pumps tabs and Parent Reference Guide', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.download, size: 18, color: Colors.greenAccent),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _downloadAssetTemplate('all');
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );
@@ -1559,7 +1719,15 @@ class _DataImportPageState extends State<DataImportPage> {
           data['updatedAt'] = DateTime.now().toIso8601String();
         } else if (widget.collectionId == 'assets') {
           final rawType = data['type']?.toString().trim().toLowerCase() ?? 'motor';
-          final typeStr = rawType.contains('gear') ? 'gearbox' : rawType.contains('pump') ? 'pump' : 'motor';
+          final typeStr = rawType.contains('gear')
+              ? 'gearbox'
+              : rawType.contains('pump')
+                  ? 'pump'
+                  : rawType.contains('brake')
+                      ? 'brake'
+                      : rawType.contains('actuat')
+                          ? 'actuator'
+                          : 'motor';
           final nameStr = data['name']?.toString().trim() ?? 'Equipment Asset';
           final makeStr = data['make']?.toString().trim() ?? '';
           final modelStr = data['model']?.toString().trim() ?? '';
@@ -1579,7 +1747,15 @@ class _DataImportPageState extends State<DataImportPage> {
               ? parsedSeqNum.toString().padLeft(3, '0')
               : (rawSeq.isNotEmpty ? rawSeq.padLeft(3, '0') : '001');
 
-          final typeCode = typeStr == 'gearbox' ? 'GBX' : typeStr == 'pump' ? 'PMP' : 'MTR';
+          final typeCode = typeStr == 'gearbox'
+              ? 'GBX'
+              : typeStr == 'pump'
+                  ? 'PMP'
+                  : typeStr == 'brake'
+                      ? 'BRK'
+                      : typeStr == 'actuator'
+                          ? 'ACT'
+                          : 'MTR';
           final rawTagId = data['tagNo']?.toString().trim() ?? data['tagId']?.toString().trim() ?? data['id']?.toString().trim() ?? '';
           String finalTagId = rawTagId.isNotEmpty
               ? rawTagId
@@ -1691,6 +1867,30 @@ class _DataImportPageState extends State<DataImportPage> {
           data['dischargeFlangeMm'] = double.tryParse(data['dischargeFlangeMm']?.toString() ?? '');
           data['sealType'] = data['sealType']?.toString().trim() ?? '';
           data['casingMaterial'] = data['casingMaterial']?.toString().trim() ?? '';
+
+          // Brake Specific Fields
+          data['brakeType'] = data['brakeType']?.toString().trim() ?? (typeStr == 'brake' ? data['type']?.toString().trim() : '') ?? '';
+          data['thrusterCapacityKg'] = double.tryParse(data['thrusterCapacityKg']?.toString() ?? data['thrusterCapacity']?.toString() ?? data['thrusterCapacity(Kg)']?.toString() ?? '');
+          data['voltageType'] = data['voltageType']?.toString().trim() ?? data['voltage']?.toString().trim() ?? '';
+          data['voltageRating'] = double.tryParse(data['voltageRating']?.toString() ?? data['voltage']?.toString() ?? '');
+          data['drumDiaMm'] = double.tryParse(data['drumDiaMm']?.toString() ?? data['drumDia']?.toString() ?? data['drumDia(Mm)']?.toString() ?? '');
+          data['drumWidthMm'] = double.tryParse(data['drumWidthMm']?.toString() ?? data['drumWidth']?.toString() ?? data['drumWidth(Mm)']?.toString() ?? '');
+          data['drumInstallation'] = data['drumInstallation']?.toString().trim() ?? '';
+          data['mountingBoltSize'] = data['mountingBoltSize']?.toString().trim() ?? '';
+          data['mountingBoltCount'] = int.tryParse(data['mountingBoltCount']?.toString() ?? data['noOfMountingBolts']?.toString() ?? '');
+          data['mountingLengthMm'] = double.tryParse(data['mountingLengthMm']?.toString() ?? data['mountingL']?.toString() ?? data['mountingLength']?.toString() ?? '');
+          data['mountingWidthMm'] = double.tryParse(data['mountingWidthMm']?.toString() ?? data['mountingW']?.toString() ?? data['mountingWidth']?.toString() ?? '');
+          data['brakingTorqueNm'] = double.tryParse(data['brakingTorqueNm']?.toString() ?? data['torque']?.toString() ?? '');
+          data['brakeShoeLining'] = data['brakeShoeLining']?.toString().trim() ?? data['liningMaterial']?.toString().trim() ?? '';
+
+          // Actuator Specific Fields
+          data['actuatorType'] = data['actuatorType']?.toString().trim() ?? (typeStr == 'actuator' ? data['type']?.toString().trim() : '') ?? '';
+          data['torqueOrThrust'] = double.tryParse(data['torqueOrThrust']?.toString() ?? data['torque']?.toString() ?? '');
+          data['operatingTimeSeconds'] = double.tryParse(data['operatingTimeSeconds']?.toString() ?? data['operatingTime']?.toString() ?? '');
+          data['controlSignal'] = data['controlSignal']?.toString().trim() ?? '';
+          data['valveFlangeStandard'] = data['valveFlangeStandard']?.toString().trim() ?? '';
+          data['valveType'] = data['valveType']?.toString().trim() ?? '';
+          data['valveSize'] = data['valveSize']?.toString().trim() ?? '';
 
           data['createdAt'] = FieldValue.serverTimestamp();
           data['modifiedAt'] = FieldValue.serverTimestamp();

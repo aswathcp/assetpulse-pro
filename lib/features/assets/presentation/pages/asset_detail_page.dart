@@ -314,6 +314,12 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
       case AssetType.pump:
         icon = Icons.water_drop;
         break;
+      case AssetType.brake:
+        icon = Icons.disc_full_outlined;
+        break;
+      case AssetType.actuator:
+        icon = Icons.tune;
+        break;
     }
 
     return Container(
@@ -449,14 +455,16 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
               ],
             ),
           ] else ...[
-            _buildDetailBox(
-              context,
-              asset.status == AssetStatus.spare ? 'Spare Storage Location / Rack' : 'Maintenance / Workshop Location',
-              asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Not Specified',
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Spare Warehouse Location', asset.spareLocation != null && asset.spareLocation!.isNotEmpty ? asset.spareLocation! : 'Not Specified')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Spare Status', 'Available in Reserve')),
+              ],
             ),
           ],
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           const Text('Applicable / Compatible Parent Machines:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           asset.applicableParentEquipmentIds != null && asset.applicableParentEquipmentIds!.isNotEmpty
@@ -485,6 +493,8 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     final isMotor = asset.type == AssetType.motor;
     final isGearbox = asset.type == AssetType.gearbox;
     final isPump = asset.type == AssetType.pump;
+    final isBrake = asset.type == AssetType.brake;
+    final isActuator = asset.type == AssetType.actuator;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -578,15 +588,15 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             _sectionHeader('Gearbox Transmission Specifications'),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Power Rating', asset.powerKw != null ? '${asset.powerKw} kW' : (asset.specs?['inputPowerKw'] != null ? '${asset.specs!['inputPowerKw']} kW' : '-'))),
+                Expanded(child: _buildDetailBox(context, 'Gear Ratio', asset.gearRatio ?? asset.specs?['gearRatio'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Gear Ratio (i)', asset.gearRatio ?? asset.specs?['gearRatio']?.toString() ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Input Power Rating', asset.powerKw != null ? '${asset.powerKw} kW' : (asset.specs?['inputPowerKw'] != null ? '${asset.specs!['inputPowerKw']} kW' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Input Speed', asset.inputSpeedRpm != null ? '${asset.inputSpeedRpm} RPM' : (asset.speedRpm != null ? '${asset.speedRpm} RPM' : '-'))),
+                Expanded(child: _buildDetailBox(context, 'Input Speed', asset.inputSpeedRpm != null ? '${asset.inputSpeedRpm} RPM' : (asset.specs?['inputSpeedRpm'] != null ? '${asset.specs!['inputSpeedRpm']} RPM' : '-'))),
                 const SizedBox(width: 12),
                 Expanded(child: _buildDetailBox(context, 'Output Speed', asset.outputSpeedRpm != null ? '${asset.outputSpeedRpm} RPM' : (asset.specs?['outputSpeedRpm'] != null ? '${asset.specs!['outputSpeedRpm']} RPM' : '-'))),
               ],
@@ -594,7 +604,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildDetailBox(context, 'Recommended Oil Grade', asset.oilType ?? asset.specs?['oilType'] ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Oil Grade', asset.oilType ?? asset.specs?['oilType'] ?? '-')),
                 const SizedBox(width: 12),
                 Expanded(child: _buildDetailBox(context, 'Oil Sump Capacity', asset.oilCapacity != null ? '${asset.oilCapacity} L' : (asset.specs?['oilCapacity'] != null ? '${asset.specs!['oilCapacity']} L' : '-'))),
               ],
@@ -612,7 +622,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
               children: [
                 Expanded(child: _buildDetailBox(context, 'Lubrication Method', asset.lubricationMethod ?? asset.specs?['lubricationMethod'] ?? '-')),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Mounting Orientation', asset.mountingOrientation ?? asset.mountingType ?? '-')),
+                Expanded(child: _buildDetailBox(context, 'Mounting Orientation', asset.mountingOrientation ?? asset.specs?['mountingOrientation'] ?? '-')),
               ],
             ),
           ]
@@ -624,7 +634,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
               children: [
                 Expanded(child: _buildDetailBox(context, 'Flow Rate / Capacity', asset.flowRate != null ? '${asset.flowRate} m³/hr' : (asset.specs?['flowRate'] != null ? '${asset.specs!['flowRate']} m³/hr' : '-'))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDetailBox(context, 'Total Dynamic Head', asset.head != null ? '${asset.head} m' : (asset.specs?['head'] != null ? '${asset.specs!['head']} m' : '-'))),
+                Expanded(child: _buildDetailBox(context, 'Total Head', asset.head != null ? '${asset.head} m' : (asset.specs?['head'] != null ? '${asset.specs!['head']} m' : '-'))),
               ],
             ),
             const SizedBox(height: 12),
@@ -659,18 +669,92 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                 Expanded(child: _buildDetailBox(context, 'Grease / Lubricant', asset.greaseType ?? asset.specs?['greaseType'] ?? '-')),
               ],
             ),
+          ]
+
+          // 4. BRAKE SPECIFICATIONS
+          else if (isBrake) ...[
+            _sectionHeader('Brake Technical & Dimensional Specifications'),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Brake Technology / Type', asset.brakeType ?? 'Industrial Brake')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Voltage Supply', '${asset.voltageType ?? ''} ${asset.voltageRating != null ? '${asset.voltageRating!.toStringAsFixed(0)}V' : ''}'.trim())),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Thruster Capacity', asset.thrusterCapacityKg != null ? '${asset.thrusterCapacityKg!.toStringAsFixed(0)} kg' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Braking Torque', asset.brakingTorqueNm != null ? '${asset.brakingTorqueNm} Nm' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Drum / Disc Diameter', asset.drumDiaMm != null ? 'Ø ${asset.drumDiaMm!.toStringAsFixed(0)} mm' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Drum Width', asset.drumWidthMm != null ? '${asset.drumWidthMm!.toStringAsFixed(0)} mm' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Drum Installation', asset.drumInstallation ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Mounting Bolts', '${asset.mountingBoltSize ?? '-'} (${asset.mountingBoltCount ?? '-'} Nos)')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Mounting Pitch (L x W)', '${asset.mountingLengthMm != null ? '${asset.mountingLengthMm!.toStringAsFixed(0)} mm' : '-'} x ${asset.mountingWidthMm != null ? '${asset.mountingWidthMm!.toStringAsFixed(0)} mm' : '-'}')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Shoe Lining Material', asset.brakeShoeLining ?? '-')),
+              ],
+            ),
+          ]
+
+          // 5. ACTUATOR SPECIFICATIONS
+          else if (isActuator) ...[
+            _sectionHeader('Actuator & Valve Automation Specifications'),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Actuator Type', asset.actuatorType ?? 'Actuator')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Torque / Thrust', asset.torqueOrThrust != null ? '${asset.torqueOrThrust} Nm/kN' : '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Operating Time', asset.operatingTimeSeconds != null ? '${asset.operatingTimeSeconds} s' : '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Control Signal', asset.controlSignal ?? '-')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Valve Type & Size', '${asset.valveType ?? '-'} (${asset.valveSize ?? '-'})')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Mounting Flange (ISO)', asset.valveFlangeStandard ?? '-')),
+              ],
+            ),
           ],
 
           // Common Bearing Specifications
-          Divider(color: Theme.of(context).dividerColor, height: 32),
-          _sectionHeader('Bearing Details'),
-          Row(
-            children: [
-              Expanded(child: _buildDetailBox(context, 'Drive End (DE) Bearing', asset.bearingDE ?? '-')),
-              const SizedBox(width: 12),
-              Expanded(child: _buildDetailBox(context, 'Non-Drive End (NDE) Bearing', asset.bearingNDE ?? '-')),
-            ],
-          ),
+          if (isMotor || isGearbox || isPump) ...[
+            Divider(color: Theme.of(context).dividerColor, height: 32),
+            _sectionHeader('Bearing Details'),
+            Row(
+              children: [
+                Expanded(child: _buildDetailBox(context, 'Drive End (DE) Bearing', asset.bearingDE ?? '-')),
+                const SizedBox(width: 12),
+                Expanded(child: _buildDetailBox(context, 'Non-Drive End (NDE) Bearing', asset.bearingNDE ?? '-')),
+              ],
+            ),
+          ],
         ],
       ),
     );

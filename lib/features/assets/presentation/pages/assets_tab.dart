@@ -235,7 +235,7 @@ class _AssetsTabState extends State<AssetsTab> {
       ),
       builder: (modalCtx) {
         const statusOptions = ['All', 'Active', 'Spare', 'Under Maintenance', 'Scrapped'];
-        const typeOptions = ['All', 'Motor', 'Gearbox', 'Pump'];
+        const typeOptions = ['All', 'Motor', 'Gearbox', 'Pump', 'Brake', 'Actuator'];
         const critOptions = ['All', 'Critical Only', 'Standard Only'];
 
         String tempStatus = statusOptions.firstWhere(
@@ -878,6 +878,10 @@ class _AssetsTabState extends State<AssetsTab> {
                     _buildMainTypeChip('gearbox', 'Gearboxes (${_assets.where((a) => a.type == AssetType.gearbox).length})'),
                     const SizedBox(width: 6),
                     _buildMainTypeChip('pump', 'Pumps (${_assets.where((a) => a.type == AssetType.pump).length})'),
+                    const SizedBox(width: 6),
+                    _buildMainTypeChip('brake', 'Brakes (${_assets.where((a) => a.type == AssetType.brake).length})'),
+                    const SizedBox(width: 6),
+                    _buildMainTypeChip('actuator', 'Actuators (${_assets.where((a) => a.type == AssetType.actuator).length})'),
                   ],
                 ),
               ),
@@ -1071,6 +1075,10 @@ class _AssetsTabState extends State<AssetsTab> {
                 _buildManageTypeChip('gearbox', 'Gearboxes (${_assets.where((a) => a.type == AssetType.gearbox).length})'),
                 const SizedBox(width: 6),
                 _buildManageTypeChip('pump', 'Pumps (${_assets.where((a) => a.type == AssetType.pump).length})'),
+                const SizedBox(width: 6),
+                _buildManageTypeChip('brake', 'Brakes (${_assets.where((a) => a.type == AssetType.brake).length})'),
+                const SizedBox(width: 6),
+                _buildManageTypeChip('actuator', 'Actuators (${_assets.where((a) => a.type == AssetType.actuator).length})'),
               ],
             ),
           ),

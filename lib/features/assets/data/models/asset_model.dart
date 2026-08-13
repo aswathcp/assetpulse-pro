@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum AssetStatus { active, spare, underMaintenance, scrapped }
-enum AssetType { motor, gearbox, pump }
+enum AssetType { motor, gearbox, pump, brake, actuator }
 enum AssetHealthStatus { healthy, warning, critical, unknown }
 
 class AssetModel {
@@ -68,6 +68,30 @@ class AssetModel {
   final double? dischargeFlangeMm;
   final String? sealType;
   final String? casingMaterial;
+
+  // Brake Technical Specs (Electromagnetic DC / Electro-Hydraulic AC Thruster EHT)
+  final String? brakeType; // e.g. Electromagnetic (DC), Thruster (AC) / EHT
+  final double? thrusterCapacityKg; // e.g. 18kg, 34kg, 50kg
+  final String? voltageType; // AC / DC
+  final double? voltageRating; // e.g. 110, 415, 190
+  final double? drumDiaMm; // e.g. 100, 160, 200, 250, 300, 400
+  final double? drumWidthMm; // e.g. 80, 100, 120, 130, 150, 190
+  final String? drumInstallation; // e.g. 1-M 1-GB, GB, M, Motor Shaft
+  final String? mountingBoltSize; // e.g. M10, M12, M16
+  final int? mountingBoltCount; // e.g. 4, 6, 8
+  final double? mountingLengthMm; // e.g. 210, 350, 490, 680, 855
+  final double? mountingWidthMm; // e.g. 60, 65, 68, 100, 120, 165
+  final double? brakingTorqueNm;
+  final String? brakeShoeLining;
+
+  // Actuator Technical Specs (Electric / Pneumatic / Hydraulic)
+  final String? actuatorType; // e.g. Electric Multi-Turn, Electric Quarter-Turn, Pneumatic Cylinder, Hydraulic Actuator
+  final double? torqueOrThrust; // Output Torque (Nm) or Thrust (kN)
+  final double? operatingTimeSeconds;
+  final String? controlSignal; // e.g. 4-20mA Modulating, ON-OFF (24VDC), Profibus DP
+  final String? valveFlangeStandard; // e.g. ISO 5211 (F10/F12), ISO 5210
+  final String? valveType; // e.g. Butterfly, Gate, Ball, Damper
+  final String? valveSize; // e.g. DN 200 / 8"
 
   // Diagnostics / Health (Derived from health_logs)
   final AssetHealthStatus healthStatus;
@@ -155,6 +179,28 @@ class AssetModel {
     this.dischargeFlangeMm,
     this.sealType,
     this.casingMaterial,
+
+    this.brakeType,
+    this.thrusterCapacityKg,
+    this.voltageType,
+    this.voltageRating,
+    this.drumDiaMm,
+    this.drumWidthMm,
+    this.drumInstallation,
+    this.mountingBoltSize,
+    this.mountingBoltCount,
+    this.mountingLengthMm,
+    this.mountingWidthMm,
+    this.brakingTorqueNm,
+    this.brakeShoeLining,
+
+    this.actuatorType,
+    this.torqueOrThrust,
+    this.operatingTimeSeconds,
+    this.controlSignal,
+    this.valveFlangeStandard,
+    this.valveType,
+    this.valveSize,
     
     this.healthStatus = AssetHealthStatus.unknown,
     this.lastPulseTime,
@@ -255,6 +301,30 @@ class AssetModel {
       sealType: map['sealType']?.toString() ?? legacySpecs?['sealType']?.toString(),
       casingMaterial: map['casingMaterial']?.toString() ?? legacySpecs?['casingMaterial']?.toString(),
       
+      // Brake Direct Specs
+      brakeType: map['brakeType']?.toString() ?? legacySpecs?['brakeType']?.toString(),
+      thrusterCapacityKg: (map['thrusterCapacityKg'] as num?)?.toDouble() ?? (legacySpecs?['thrusterCapacityKg'] as num?)?.toDouble(),
+      voltageType: map['voltageType']?.toString() ?? legacySpecs?['voltageType']?.toString(),
+      voltageRating: (map['voltageRating'] as num?)?.toDouble() ?? (legacySpecs?['voltageRating'] as num?)?.toDouble(),
+      drumDiaMm: (map['drumDiaMm'] as num?)?.toDouble() ?? (legacySpecs?['drumDiaMm'] as num?)?.toDouble(),
+      drumWidthMm: (map['drumWidthMm'] as num?)?.toDouble() ?? (legacySpecs?['drumWidthMm'] as num?)?.toDouble(),
+      drumInstallation: map['drumInstallation']?.toString() ?? legacySpecs?['drumInstallation']?.toString(),
+      mountingBoltSize: map['mountingBoltSize']?.toString() ?? legacySpecs?['mountingBoltSize']?.toString(),
+      mountingBoltCount: (map['mountingBoltCount'] as num?)?.toInt() ?? (legacySpecs?['mountingBoltCount'] as num?)?.toInt(),
+      mountingLengthMm: (map['mountingLengthMm'] as num?)?.toDouble() ?? (legacySpecs?['mountingLengthMm'] as num?)?.toDouble(),
+      mountingWidthMm: (map['mountingWidthMm'] as num?)?.toDouble() ?? (legacySpecs?['mountingWidthMm'] as num?)?.toDouble(),
+      brakingTorqueNm: (map['brakingTorqueNm'] as num?)?.toDouble() ?? (legacySpecs?['brakingTorqueNm'] as num?)?.toDouble(),
+      brakeShoeLining: map['brakeShoeLining']?.toString() ?? legacySpecs?['brakeShoeLining']?.toString(),
+
+      // Actuator Direct Specs
+      actuatorType: map['actuatorType']?.toString() ?? legacySpecs?['actuatorType']?.toString(),
+      torqueOrThrust: (map['torqueOrThrust'] as num?)?.toDouble() ?? (legacySpecs?['torqueOrThrust'] as num?)?.toDouble(),
+      operatingTimeSeconds: (map['operatingTimeSeconds'] as num?)?.toDouble() ?? (legacySpecs?['operatingTimeSeconds'] as num?)?.toDouble(),
+      controlSignal: map['controlSignal']?.toString() ?? legacySpecs?['controlSignal']?.toString(),
+      valveFlangeStandard: map['valveFlangeStandard']?.toString() ?? legacySpecs?['valveFlangeStandard']?.toString(),
+      valveType: map['valveType']?.toString() ?? legacySpecs?['valveType']?.toString(),
+      valveSize: map['valveSize']?.toString() ?? legacySpecs?['valveSize']?.toString(),
+      
       healthStatus: AssetHealthStatus.values.firstWhere(
         (e) => e.name == (map['healthStatus'] ?? 'unknown'),
         orElse: () => AssetHealthStatus.unknown,
@@ -310,6 +380,16 @@ class AssetModel {
       final flw = flowRate != null ? ' (${flowRate}m³/h)' : '';
       final mk = make.isNotEmpty ? ' $make' : '';
       return 'Pump$mk$flw'.trim();
+    } else if (type == AssetType.brake) {
+      final dia = drumDiaMm != null ? 'Ø${drumDiaMm!.toStringAsFixed(0)}mm ' : '';
+      final bType = (brakeType != null && brakeType!.isNotEmpty) ? brakeType! : 'Brake';
+      final mk = make.isNotEmpty ? ' ($make)' : '';
+      return '$dia$bType$mk'.trim();
+    } else if (type == AssetType.actuator) {
+      final aType = (actuatorType != null && actuatorType!.isNotEmpty) ? actuatorType! : 'Actuator';
+      final vT = (valveType != null && valveType!.isNotEmpty) ? ' for $valveType' : '';
+      final mk = make.isNotEmpty ? ' ($make)' : '';
+      return '$aType$vT$mk'.trim();
     }
     return tagNo;
   }
@@ -336,6 +416,19 @@ class AssetModel {
       if (head != null) parts.add('${head}m Head');
       if (casingMaterial != null && casingMaterial!.isNotEmpty) parts.add(casingMaterial!);
       return parts.isNotEmpty ? parts.join(' • ') : 'Pump Specs Pending';
+    } else if (type == AssetType.brake) {
+      final parts = <String>[];
+      if (drumDiaMm != null) parts.add('Drum Ø${drumDiaMm!.toStringAsFixed(0)}mm');
+      if (voltageRating != null) parts.add('${voltageType ?? ''} ${voltageRating!.toStringAsFixed(0)}V'.trim());
+      if (thrusterCapacityKg != null) parts.add('${thrusterCapacityKg!.toStringAsFixed(0)}kg Thruster');
+      if (mountingBoltSize != null && mountingBoltSize!.isNotEmpty) parts.add(mountingBoltSize!);
+      return parts.isNotEmpty ? parts.join(' • ') : 'Brake Specs Pending';
+    } else if (type == AssetType.actuator) {
+      final parts = <String>[];
+      if (torqueOrThrust != null) parts.add('${torqueOrThrust}Nm');
+      if (controlSignal != null && controlSignal!.isNotEmpty) parts.add(controlSignal!);
+      if (valveSize != null && valveSize!.isNotEmpty) parts.add(valveSize!);
+      return parts.isNotEmpty ? parts.join(' • ') : 'Actuator Specs Pending';
     }
     return tagNo;
   }
@@ -406,6 +499,30 @@ class AssetModel {
     if (dischargeFlangeMm != null) map['dischargeFlangeMm'] = dischargeFlangeMm;
     if (sealType != null && sealType!.isNotEmpty) map['sealType'] = sealType;
     if (casingMaterial != null && casingMaterial!.isNotEmpty) map['casingMaterial'] = casingMaterial;
+
+    // Direct Brake Specs
+    if (brakeType != null && brakeType!.isNotEmpty) map['brakeType'] = brakeType;
+    if (thrusterCapacityKg != null) map['thrusterCapacityKg'] = thrusterCapacityKg;
+    if (voltageType != null && voltageType!.isNotEmpty) map['voltageType'] = voltageType;
+    if (voltageRating != null) map['voltageRating'] = voltageRating;
+    if (drumDiaMm != null) map['drumDiaMm'] = drumDiaMm;
+    if (drumWidthMm != null) map['drumWidthMm'] = drumWidthMm;
+    if (drumInstallation != null && drumInstallation!.isNotEmpty) map['drumInstallation'] = drumInstallation;
+    if (mountingBoltSize != null && mountingBoltSize!.isNotEmpty) map['mountingBoltSize'] = mountingBoltSize;
+    if (mountingBoltCount != null) map['mountingBoltCount'] = mountingBoltCount;
+    if (mountingLengthMm != null) map['mountingLengthMm'] = mountingLengthMm;
+    if (mountingWidthMm != null) map['mountingWidthMm'] = mountingWidthMm;
+    if (brakingTorqueNm != null) map['brakingTorqueNm'] = brakingTorqueNm;
+    if (brakeShoeLining != null && brakeShoeLining!.isNotEmpty) map['brakeShoeLining'] = brakeShoeLining;
+
+    // Direct Actuator Specs
+    if (actuatorType != null && actuatorType!.isNotEmpty) map['actuatorType'] = actuatorType;
+    if (torqueOrThrust != null) map['torqueOrThrust'] = torqueOrThrust;
+    if (operatingTimeSeconds != null) map['operatingTimeSeconds'] = operatingTimeSeconds;
+    if (controlSignal != null && controlSignal!.isNotEmpty) map['controlSignal'] = controlSignal;
+    if (valveFlangeStandard != null && valveFlangeStandard!.isNotEmpty) map['valveFlangeStandard'] = valveFlangeStandard;
+    if (valveType != null && valveType!.isNotEmpty) map['valveType'] = valveType;
+    if (valveSize != null && valveSize!.isNotEmpty) map['valveSize'] = valveSize;
 
     // Mechanical
     if (bearingDE != null && bearingDE!.isNotEmpty) map['bearingDE'] = bearingDE;

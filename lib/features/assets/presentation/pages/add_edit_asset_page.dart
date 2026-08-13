@@ -109,6 +109,30 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
   final _casingMaterialController = TextEditingController();
   final _pumpGreaseTypeController = TextEditingController();
 
+  // Brake Dynamic Specs
+  final _brakeTypeController = TextEditingController();
+  final _thrusterCapacityController = TextEditingController();
+  final _brakeVoltageTypeController = TextEditingController();
+  final _brakeVoltageRatingController = TextEditingController();
+  final _drumDiaController = TextEditingController();
+  final _drumWidthController = TextEditingController();
+  final _drumInstallationController = TextEditingController();
+  final _mountingBoltSizeController = TextEditingController();
+  final _mountingBoltCountController = TextEditingController();
+  final _mountingLengthController = TextEditingController();
+  final _mountingWidthController = TextEditingController();
+  final _brakingTorqueController = TextEditingController();
+  final _brakeShoeLiningController = TextEditingController();
+
+  // Actuator Dynamic Specs
+  final _actuatorTypeController = TextEditingController();
+  final _torqueOrThrustController = TextEditingController();
+  final _operatingTimeController = TextEditingController();
+  final _controlSignalController = TextEditingController();
+  final _valveFlangeStandardController = TextEditingController();
+  final _valveTypeController = TextEditingController();
+  final _valveSizeController = TextEditingController();
+
   // Construction Bearings (Common)
   final _bearingDEController = TextEditingController();
   final _bearingNDEController = TextEditingController();
@@ -136,7 +160,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _updateComputedTagId();
   }
 
-  String get _currentPlantId => widget.plantId ?? widget.asset?.id.split('-').first ?? _userPlantId ?? 'PLANT';
+  String get _currentPlantId => widget.plantId ?? (_currentUnitId.isNotEmpty ? widget.asset?.id.split('-').firstOrNull : null) ?? _userPlantId ?? 'PLANT';
   String get _currentUnitId =>
       widget.unitId ?? (_currentPlantId.isNotEmpty ? widget.asset?.id.split('-').skip(1).firstOrNull : null) ?? _userUnitId ?? 'UNIT';
 
@@ -148,6 +172,10 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         return 'GBX';
       case AssetType.pump:
         return 'PMP';
+      case AssetType.brake:
+        return 'BRK';
+      case AssetType.actuator:
+        return 'ACT';
     }
   }
 
@@ -304,6 +332,30 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _sealTypeController.text = a.sealType ?? a.specs?['sealType']?.toString() ?? '';
     _casingMaterialController.text = a.casingMaterial ?? a.specs?['casingMaterial']?.toString() ?? '';
     _pumpGreaseTypeController.text = a.greaseType ?? a.specs?['greaseType']?.toString() ?? '';
+
+    // Brake
+    _brakeTypeController.text = a.brakeType ?? a.specs?['brakeType']?.toString() ?? '';
+    _thrusterCapacityController.text = a.thrusterCapacityKg?.toString() ?? a.specs?['thrusterCapacityKg']?.toString() ?? '';
+    _brakeVoltageTypeController.text = a.voltageType ?? a.specs?['voltageType']?.toString() ?? '';
+    _brakeVoltageRatingController.text = a.voltageRating?.toString() ?? a.voltage?.toString() ?? a.specs?['voltageRating']?.toString() ?? '';
+    _drumDiaController.text = a.drumDiaMm?.toString() ?? a.specs?['drumDiaMm']?.toString() ?? '';
+    _drumWidthController.text = a.drumWidthMm?.toString() ?? a.specs?['drumWidthMm']?.toString() ?? '';
+    _drumInstallationController.text = a.drumInstallation ?? a.specs?['drumInstallation']?.toString() ?? '';
+    _mountingBoltSizeController.text = a.mountingBoltSize ?? a.specs?['mountingBoltSize']?.toString() ?? '';
+    _mountingBoltCountController.text = a.mountingBoltCount?.toString() ?? a.specs?['mountingBoltCount']?.toString() ?? '';
+    _mountingLengthController.text = a.mountingLengthMm?.toString() ?? a.specs?['mountingLengthMm']?.toString() ?? '';
+    _mountingWidthController.text = a.mountingWidthMm?.toString() ?? a.specs?['mountingWidthMm']?.toString() ?? '';
+    _brakingTorqueController.text = a.brakingTorqueNm?.toString() ?? a.specs?['brakingTorqueNm']?.toString() ?? '';
+    _brakeShoeLiningController.text = a.brakeShoeLining ?? a.specs?['brakeShoeLining']?.toString() ?? '';
+
+    // Actuator
+    _actuatorTypeController.text = a.actuatorType ?? a.specs?['actuatorType']?.toString() ?? '';
+    _torqueOrThrustController.text = a.torqueOrThrust?.toString() ?? a.specs?['torqueOrThrust']?.toString() ?? '';
+    _operatingTimeController.text = a.operatingTimeSeconds?.toString() ?? a.specs?['operatingTimeSeconds']?.toString() ?? '';
+    _controlSignalController.text = a.controlSignal ?? a.specs?['controlSignal']?.toString() ?? '';
+    _valveFlangeStandardController.text = a.valveFlangeStandard ?? a.specs?['valveFlangeStandard']?.toString() ?? '';
+    _valveTypeController.text = a.valveType ?? a.specs?['valveType']?.toString() ?? '';
+    _valveSizeController.text = a.valveSize ?? a.specs?['valveSize']?.toString() ?? '';
   }
 
   @override
@@ -347,6 +399,26 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _sealTypeController.dispose();
     _casingMaterialController.dispose();
     _pumpGreaseTypeController.dispose();
+    _brakeTypeController.dispose();
+    _thrusterCapacityController.dispose();
+    _brakeVoltageTypeController.dispose();
+    _brakeVoltageRatingController.dispose();
+    _drumDiaController.dispose();
+    _drumWidthController.dispose();
+    _drumInstallationController.dispose();
+    _mountingBoltSizeController.dispose();
+    _mountingBoltCountController.dispose();
+    _mountingLengthController.dispose();
+    _mountingWidthController.dispose();
+    _brakingTorqueController.dispose();
+    _brakeShoeLiningController.dispose();
+    _actuatorTypeController.dispose();
+    _torqueOrThrustController.dispose();
+    _operatingTimeController.dispose();
+    _controlSignalController.dispose();
+    _valveFlangeStandardController.dispose();
+    _valveTypeController.dispose();
+    _valveSizeController.dispose();
     _mountingController.dispose();
     _polesController.dispose();
     _pfController.dispose();
@@ -648,6 +720,30 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
         dischargeFlangeMm: double.tryParse(_dischargeFlangeController.text),
         sealType: _sealTypeController.text.trim().isNotEmpty ? _sealTypeController.text.trim() : null,
         casingMaterial: _casingMaterialController.text.trim().isNotEmpty ? _casingMaterialController.text.trim() : null,
+
+        // Brake Specs
+        brakeType: _selectedType == AssetType.brake && _brakeTypeController.text.trim().isNotEmpty ? _brakeTypeController.text.trim() : null,
+        thrusterCapacityKg: _selectedType == AssetType.brake ? double.tryParse(_thrusterCapacityController.text) : null,
+        voltageType: _selectedType == AssetType.brake && _brakeVoltageTypeController.text.trim().isNotEmpty ? _brakeVoltageTypeController.text.trim() : null,
+        voltageRating: _selectedType == AssetType.brake ? double.tryParse(_brakeVoltageRatingController.text) : null,
+        drumDiaMm: _selectedType == AssetType.brake ? double.tryParse(_drumDiaController.text) : null,
+        drumWidthMm: _selectedType == AssetType.brake ? double.tryParse(_drumWidthController.text) : null,
+        drumInstallation: _selectedType == AssetType.brake && _drumInstallationController.text.trim().isNotEmpty ? _drumInstallationController.text.trim() : null,
+        mountingBoltSize: _selectedType == AssetType.brake && _mountingBoltSizeController.text.trim().isNotEmpty ? _mountingBoltSizeController.text.trim() : null,
+        mountingBoltCount: _selectedType == AssetType.brake ? int.tryParse(_mountingBoltCountController.text) : null,
+        mountingLengthMm: _selectedType == AssetType.brake ? double.tryParse(_mountingLengthController.text) : null,
+        mountingWidthMm: _selectedType == AssetType.brake ? double.tryParse(_mountingWidthController.text) : null,
+        brakingTorqueNm: _selectedType == AssetType.brake ? double.tryParse(_brakingTorqueController.text) : null,
+        brakeShoeLining: _selectedType == AssetType.brake && _brakeShoeLiningController.text.trim().isNotEmpty ? _brakeShoeLiningController.text.trim() : null,
+
+        // Actuator Specs
+        actuatorType: _selectedType == AssetType.actuator && _actuatorTypeController.text.trim().isNotEmpty ? _actuatorTypeController.text.trim() : null,
+        torqueOrThrust: _selectedType == AssetType.actuator ? double.tryParse(_torqueOrThrustController.text) : null,
+        operatingTimeSeconds: _selectedType == AssetType.actuator ? double.tryParse(_operatingTimeController.text) : null,
+        controlSignal: _selectedType == AssetType.actuator && _controlSignalController.text.trim().isNotEmpty ? _controlSignalController.text.trim() : null,
+        valveFlangeStandard: _selectedType == AssetType.actuator && _valveFlangeStandardController.text.trim().isNotEmpty ? _valveFlangeStandardController.text.trim() : null,
+        valveType: _selectedType == AssetType.actuator && _valveTypeController.text.trim().isNotEmpty ? _valveTypeController.text.trim() : null,
+        valveSize: _selectedType == AssetType.actuator && _valveSizeController.text.trim().isNotEmpty ? _valveSizeController.text.trim() : null,
 
         bearingDE: _bearingDEController.text.trim().isNotEmpty ? _bearingDEController.text.trim() : null,
         bearingNDE: _bearingNDEController.text.trim().isNotEmpty ? _bearingNDEController.text.trim() : null,
@@ -1216,9 +1312,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     'V1 Vertical Flange Mounted',
     'V5 Vertical Foot Mounted',
     'B14 Face Mounted',
-  ];
-
-  static const List<String> _couplingTypeOptions = [
+  ];  static const List<String> _couplingTypeOptions = [
     'Flexible Pin-Bush',
     'Tyre Coupling',
     'Gear Coupling',
@@ -1227,6 +1321,92 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     'Grid Coupling',
     'Rigid / Flanged Sleeve',
     'Direct Driven / Solid',
+  ];
+
+  // Standard Industrial Brake Dropdown Lists
+  static const List<String> _brakeTypeOptions = [
+    'AC Electro-Hydraulic Thruster (EHT) Brake',
+    'DC Electromagnetic Disc Brake',
+    'DC Solenoid Drum Brake',
+    'Fail-Safe Spring Applied DC Brake',
+    'Pneumatic Disc Brake',
+    'Hydraulic Caliper Disc Brake',
+    'Other / Custom',
+  ];
+
+  static const List<String> _voltageTypeOptions = [
+    'AC',
+    'DC',
+  ];
+
+  static const List<String> _drumInstallationOptions = [
+    '1-M 1-GB (Dual Drive)',
+    'Motor Shaft (M)',
+    'Gearbox Input Shaft (GB)',
+    'Direct Coupling Mounted',
+    'NA / Standalone',
+  ];
+
+  static const List<String> _mountingBoltSizeOptions = [
+    'M10',
+    'M12',
+    'M16',
+    'M20',
+    'M24',
+    'M30',
+  ];
+
+  static const List<String> _thrusterCapacityOptions = [
+    '18 kg (180 N)',
+    '23 kg (230 N - Ed 23/5)',
+    '30 kg (300 N - Ed 30/5)',
+    '34 kg (340 N)',
+    '50 kg (500 N - Ed 50/6)',
+    '80 kg (800 N - Ed 80/6)',
+    '125 kg (1250 N - Ed 121/6)',
+    '200 kg (2000 N - Ed 201/6)',
+    '300 kg (3000 N - Ed 301/6)',
+    'NA (Electromagnetic)',
+  ];
+
+  // Standard Industrial Actuator Dropdown Lists
+  static const List<String> _actuatorTypeOptions = [
+    'Electric Multi-Turn Actuator (Rotork IQ / Auma SA)',
+    'Electric Part-Turn / Quarter-Turn (Rotork IQT / Auma SG)',
+    'Pneumatic Single-Acting (Spring Return)',
+    'Pneumatic Double-Acting',
+    'Electro-Hydraulic Actuator',
+    'Hydraulic Cylinder Actuator',
+    'Linear Electric Actuator',
+  ];
+
+  static const List<String> _controlSignalOptions = [
+    '4-20 mA Analog (Modulating / Inching)',
+    'ON-OFF (24V DC / 110V AC Command)',
+    'Profibus DP',
+    'Modbus RTU',
+    'HART Protocol',
+    'Foundation Fieldbus',
+  ];
+
+  static const List<String> _valveTypeOptions = [
+    'Butterfly Valve',
+    'Gate Valve',
+    'Knife Gate Valve',
+    'Ball Valve',
+    'Globe Valve',
+    'Louver / Guillotine Damper',
+    'Hopper Sector Gate',
+    'Control Valve',
+  ];
+
+  static const List<String> _valveFlangeOptions = [
+    'ISO 5211 - F05 / F07',
+    'ISO 5211 - F10 / F12',
+    'ISO 5211 - F14 / F16',
+    'ISO 5211 - F25 / F30',
+    'ISO 5210 (Multi-Turn)',
+    'Custom Flange',
   ];
 
   Widget _buildDropdownSelectionField({
@@ -1539,7 +1719,7 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 Expanded(
                   child: TextFormField(
                     controller: _gearRatioController,
-                    decoration: const InputDecoration(labelText: 'Gear Ratio (e.g. 1:25.4) *', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Gear Ratio (e.g. 25:1) *', border: OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -1723,30 +1903,260 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
                 ),
               ],
             ),
+          ]
+
+          // 4. BRAKE SPECIFICATIONS (DC Electromagnetic / AC Thruster EHT)
+          else if (_selectedType == AssetType.brake) ...[
+            const Text('Brake Operating & Mounting Specifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const SizedBox(height: 10),
+
+            // Brake Type Dropdown
+            _buildDropdownSelectionField(
+              label: 'Brake Technology / Type *',
+              value: _brakeTypeController.text,
+              options: _brakeTypeOptions,
+              onChanged: (val) => setState(() => _brakeTypeController.text = val),
+              hint: 'Select Brake Type',
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdownSelectionField(
+                    label: 'Voltage Type',
+                    value: _brakeVoltageTypeController.text,
+                    options: _voltageTypeOptions,
+                    onChanged: (val) => setState(() => _brakeVoltageTypeController.text = val),
+                    hint: 'AC / DC',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _brakeVoltageRatingController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Voltage Rating (V) *',
+                      hintText: 'e.g. 110 / 415 / 190 / 220',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdownSelectionField(
+                    label: 'Thruster Capacity',
+                    value: _thrusterCapacityController.text.isNotEmpty ? '${_thrusterCapacityController.text} kg' : '',
+                    options: _thrusterCapacityOptions,
+                    onChanged: (val) {
+                      final numStr = RegExp(r'(\d+)').firstMatch(val)?.group(1) ?? '';
+                      setState(() => _thrusterCapacityController.text = numStr);
+                    },
+                    hint: 'Thruster (kg / N)',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _brakingTorqueController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Braking Torque (Nm)', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Drum Specifications
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _drumDiaController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Drum / Disc Diameter (mm) *', hintText: 'e.g. 200 / 250 / 300 / 400', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _drumWidthController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Drum Width (mm)', hintText: 'e.g. 100 / 120 / 150', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Drum Installation Location
+            _buildDropdownSelectionField(
+              label: 'Drum Installation Location',
+              value: _drumInstallationController.text,
+              options: _drumInstallationOptions,
+              onChanged: (val) => setState(() => _drumInstallationController.text = val),
+              hint: 'e.g. Motor Shaft / Gearbox Input',
+            ),
+            const SizedBox(height: 12),
+
+            // Mounting Details
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdownSelectionField(
+                    label: 'Mounting Bolt Size',
+                    value: _mountingBoltSizeController.text,
+                    options: _mountingBoltSizeOptions,
+                    onChanged: (val) => setState(() => _mountingBoltSizeController.text = val),
+                    hint: 'e.g. M12',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _mountingBoltCountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'No. of Mounting Bolts', hintText: '4 / 6 / 8', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _mountingLengthController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Mounting Length (mm)', hintText: 'e.g. 350 / 490 / 680', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _mountingWidthController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Mounting Width (mm)', hintText: 'e.g. 65 / 120 / 165', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            TextFormField(
+              controller: _brakeShoeLiningController,
+              decoration: const InputDecoration(labelText: 'Brake Shoe Lining Material / Notes', hintText: 'e.g. Organic Non-Asbestos / Semi-Metallic', border: OutlineInputBorder()),
+            ),
+          ]
+
+          // 5. ACTUATOR SPECIFICATIONS (Electric / Pneumatic / Hydraulic)
+          else if (_selectedType == AssetType.actuator) ...[
+            const Text('Actuator Automation & Valve Specifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const SizedBox(height: 10),
+
+            _buildDropdownSelectionField(
+              label: 'Actuator Technology / Type *',
+              value: _actuatorTypeController.text,
+              options: _actuatorTypeOptions,
+              onChanged: (val) => setState(() => _actuatorTypeController.text = val),
+              hint: 'Select Actuator Type',
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _torqueOrThrustController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Output Torque / Thrust (Nm / kN)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _operatingTimeController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Operating Time (Seconds)', hintText: 'e.g. 15 / 30s', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            _buildDropdownSelectionField(
+              label: 'Control Signal / Protocol',
+              value: _controlSignalController.text,
+              options: _controlSignalOptions,
+              onChanged: (val) => setState(() => _controlSignalController.text = val),
+              hint: 'e.g. 4-20mA Modulating',
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdownSelectionField(
+                    label: 'Valve / Damper Type',
+                    value: _valveTypeController.text,
+                    options: _valveTypeOptions,
+                    onChanged: (val) => setState(() => _valveTypeController.text = val),
+                    hint: 'Select Valve Type',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _valveSizeController,
+                    decoration: const InputDecoration(labelText: 'Valve Size (DN / Inch)', hintText: 'e.g. DN 200 / 8"', border: OutlineInputBorder()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            _buildDropdownSelectionField(
+              label: 'Valve Mounting Flange (ISO)',
+              value: _valveFlangeStandardController.text,
+              options: _valveFlangeOptions,
+              onChanged: (val) => setState(() => _valveFlangeStandardController.text = val),
+              hint: 'e.g. ISO 5211 (F10 / F12)',
+            ),
           ],
           const SizedBox(height: 16),
 
           // Common Bearing Specifications
-          const Text('Bearing Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _bearingDEController,
-                  decoration: const InputDecoration(labelText: 'Drive End (DE) Bearing (e.g. 6314 C3)', border: OutlineInputBorder()),
+          if (_selectedType == AssetType.motor || _selectedType == AssetType.gearbox || _selectedType == AssetType.pump) ...[
+            const Text('Bearing Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _bearingDEController,
+                    decoration: const InputDecoration(labelText: 'Drive End (DE) Bearing (e.g. 6314 C3)', border: OutlineInputBorder()),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _bearingNDEController,
-                  decoration: const InputDecoration(labelText: 'Non-Drive End (NDE) Bearing (e.g. 6312 C3)', border: OutlineInputBorder()),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _bearingNDEController,
+                    decoration: const InputDecoration(labelText: 'Non-Drive End (NDE) Bearing (e.g. 6312 C3)', border: OutlineInputBorder()),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
         ],
       ),
     );
