@@ -234,9 +234,22 @@ class _AssetsTabState extends State<AssetsTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (modalCtx) {
-        String tempStatus = _filterStatus;
-        String tempType = _filterType;
-        String tempCrit = _filterCriticality;
+        const statusOptions = ['All', 'Active', 'Spare', 'Under Maintenance', 'Scrapped'];
+        const typeOptions = ['All', 'Motor', 'Gearbox', 'Pump'];
+        const critOptions = ['All', 'Critical Only', 'Standard Only'];
+
+        String tempStatus = statusOptions.firstWhere(
+          (s) => s.toLowerCase().replaceAll(' ', '') == _filterStatus.toLowerCase().replaceAll(' ', ''),
+          orElse: () => 'All',
+        );
+        String tempType = typeOptions.firstWhere(
+          (t) => t.toLowerCase() == _filterType.toLowerCase(),
+          orElse: () => 'All',
+        );
+        String tempCrit = critOptions.firstWhere(
+          (c) => c.toLowerCase() == _filterCriticality.toLowerCase(),
+          orElse: () => 'All',
+        );
 
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
@@ -272,30 +285,30 @@ class _AssetsTabState extends State<AssetsTab> {
                   DropdownButtonFormField<String>(
                     value: tempStatus,
                     decoration: const InputDecoration(labelText: 'Operational Status', border: OutlineInputBorder(), isDense: true),
-                    items: ['All', 'Active', 'Spare', 'Under Maintenance', 'Scrapped']
+                    items: statusOptions
                         .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
                         .toList(),
-                    onChanged: (v) => setModalState(() => tempStatus = v!),
+                    onChanged: (v) => setModalState(() => tempStatus = v ?? 'All'),
                   ),
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
                     value: tempType,
                     decoration: const InputDecoration(labelText: 'Asset Classification', border: OutlineInputBorder(), isDense: true),
-                    items: ['All', 'Motor', 'Gearbox', 'Pump']
+                    items: typeOptions
                         .map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 12))))
                         .toList(),
-                    onChanged: (v) => setModalState(() => tempType = v!),
+                    onChanged: (v) => setModalState(() => tempType = v ?? 'All'),
                   ),
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
                     value: tempCrit,
                     decoration: const InputDecoration(labelText: 'Asset Criticality', border: OutlineInputBorder(), isDense: true),
-                    items: ['All', 'Critical Only', 'Standard Only']
+                    items: critOptions
                         .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12))))
                         .toList(),
-                    onChanged: (v) => setModalState(() => tempCrit = v!),
+                    onChanged: (v) => setModalState(() => tempCrit = v ?? 'All'),
                   ),
                   const SizedBox(height: 20),
 
@@ -308,7 +321,7 @@ class _AssetsTabState extends State<AssetsTab> {
                     onPressed: () {
                       setState(() {
                         _filterStatus = tempStatus;
-                        _filterType = tempType;
+                        _filterType = tempType.toLowerCase() == 'all' ? 'All' : tempType.toLowerCase();
                         _filterCriticality = tempCrit;
                       });
                       Navigator.pop(modalCtx);
