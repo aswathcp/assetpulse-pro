@@ -637,7 +637,7 @@ class _DataImportPageState extends State<DataImportPage> {
         Sheet motorSheet = excel[sheetName];
 
         final motorCols = [
-          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'type', 'name', 'status', 'installationDate', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
           'motorType', 'powerKw', 'voltage', 'fullLoadCurrent', 'noLoadCurrent', 'speedRpm', 'frequency', 'poles',
           'frameSize', 'mountingType', 'efficiency', 'powerFactor', 'dutyCycle', 'insulationClass',
           'couplingAvailable', 'couplingType', 'efficiencyClass', 'ipRating',
@@ -651,6 +651,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('motor'),
           TextCellValue('BF 1 Sizer Drive Motor'),
           TextCellValue('active'),
+          TextCellValue('2023-04-15'),
           TextCellValue('BF1-SIZER-01'),
           TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
           TextCellValue(''),
@@ -690,6 +691,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('motor'),
           TextCellValue('75kW Standby Spare Motor'),
           TextCellValue('spare'),
+          TextCellValue(''),
           TextCellValue(''),
           TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
           TextCellValue('Central Warehouse - Bay 3, Rack A2'),
@@ -734,7 +736,7 @@ class _DataImportPageState extends State<DataImportPage> {
         Sheet gbxSheet = excel[type == 'gearbox' ? 'Gearbox_Template' : sheetName];
 
         final gbxCols = [
-          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'type', 'name', 'status', 'installationDate', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
           'powerKw', 'gearRatio', 'inputSpeedRpm', 'outputSpeedRpm', 'oilType', 'oilCapacity',
           'inputShaftMm', 'outputShaftMm', 'lubricationMethod', 'mountingOrientation', 'bearingDE', 'bearingNDE',
           'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
@@ -746,6 +748,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('gearbox'),
           TextCellValue('Primary Sizer Speed Reducer Gearbox'),
           TextCellValue('active'),
+          TextCellValue('2022-11-20'),
           TextCellValue('BF1-SIZER-01'),
           TextCellValue('BF1-SIZER-01'),
           TextCellValue(''),
@@ -776,6 +779,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('gearbox'),
           TextCellValue('SNH-315 Helical Gearbox Spare'),
           TextCellValue('spare'),
+          TextCellValue(''),
           TextCellValue(''),
           TextCellValue('BF1-SIZER-01; BF2-SIZER-01'),
           TextCellValue('Mechanical Yard - Bay 2'),
@@ -811,7 +815,7 @@ class _DataImportPageState extends State<DataImportPage> {
         Sheet pumpSheet = excel[type == 'pump' ? 'Pump_Template' : sheetName];
 
         final pumpCols = [
-          'type', 'name', 'status', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
+          'type', 'name', 'status', 'installationDate', 'parentEquipment', 'compatibleSpares', 'spareLocation', 'isCritical',
           'flowRate', 'head', 'pumpSpeed', 'powerKw', 'impellerSize', 'suctionFlangeMm', 'dischargeFlangeMm',
           'sealType', 'casingMaterial', 'greaseType', 'bearingDE', 'bearingNDE',
           'make', 'model', 'serialNo', 'manufacturingYear', 'poNo', 'rfidTag', 'seqNo',
@@ -823,6 +827,7 @@ class _DataImportPageState extends State<DataImportPage> {
           TextCellValue('pump'),
           TextCellValue('Cooling Tower Circulation Pump 1'),
           TextCellValue('active'),
+          TextCellValue('2022-08-10'),
           TextCellValue('CT-PUMP-01'),
           TextCellValue('CT-PUMP-01; CT-PUMP-02'),
           TextCellValue(''),
@@ -1272,6 +1277,28 @@ class _DataImportPageState extends State<DataImportPage> {
     }
   }
 
+  DateTime? _parseImportDate(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is Timestamp) return val.toDate();
+    if (val is num) {
+      // Excel serial date number (base 1899-12-30)
+      return DateTime(1899, 12, 30).add(Duration(days: val.toInt()));
+    }
+    final str = val.toString().trim();
+    if (str.isEmpty) return null;
+    final iso = DateTime.tryParse(str);
+    if (iso != null) return iso;
+    final dmy = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$').firstMatch(str);
+    if (dmy != null) {
+      final d = int.parse(dmy.group(1)!);
+      final m = int.parse(dmy.group(2)!);
+      final y = int.parse(dmy.group(3)!);
+      return DateTime(y, m, d);
+    }
+    return null;
+  }
+
   Future<void> _upload() async {
     final hasErrors = _previewData.any((row) => row['Validation']?.toString().startsWith('Error') == true);
     if (hasErrors) {
@@ -1610,6 +1637,14 @@ class _DataImportPageState extends State<DataImportPage> {
           data['poNo'] = data['poNo']?.toString().trim() ?? '';
           data['rfidTag'] = data['rfidTag']?.toString().trim() ?? '';
           data['seqNo'] = seqStr.padLeft(3, '0');
+
+          // Site Installation Date
+          final rawInstDate = data['installationDate'] ?? data['siteInstallationDate'] ?? data['installation_date'];
+          final parsedInstDate = _parseImportDate(rawInstDate);
+          if (parsedInstDate != null) {
+            data['installationDate'] = Timestamp.fromDate(parsedInstDate);
+          }
+
           data['powerKw'] = double.tryParse(data['powerKw']?.toString() ?? '');
           data['voltage'] = double.tryParse(data['voltage']?.toString() ?? '');
           data['speedRpm'] = double.tryParse(data['speedRpm']?.toString() ?? '');
