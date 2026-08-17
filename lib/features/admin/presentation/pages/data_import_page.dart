@@ -161,8 +161,8 @@ class _DataImportPageState extends State<DataImportPage> {
         };
       case 'assets':
         return {
-          'Cols': 'Dedicated templates available for Motors, Gearboxes, and Pumps!',
-          'Note': 'Choose your specific Asset Type template below to download the exact technical specification columns.\n• Motors: kW, Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease\n• Gearboxes: Ratio, Sump Capacity, Oil Grade, Shafts, Lubrication, Bearings\n• Pumps: Flow Rate, Head, Speed, Impeller, Flange Sizes, Seal Type\n• Spares: Define warehouse location and compatible parent machines (e.g. CB-1; CB-2)!'
+          'Cols': 'Customized templates for Motors, Brakes, Actuators, Gearboxes & Pumps!',
+          'Note': 'Tap "Choose Template" above to download the exact technical specification columns for your equipment:\n• Motors: kW, Voltage, FLC, Poles, Frame Size, Mounting, Bearings, Grease\n• Brakes: AC Thrusters, DC Solenoid, Drum Dia/Width, Torque, Lining\n• Actuators: Multi/Part-Turn, Signal (4-20mA), Valve Type/Size, ISO Flange\n• Gearboxes & Pumps: Ratios, Shafts, Flow, Head, Impeller, Seals\n• Spares: Define warehouse storage location and compatible parent machines!'
         };
       case 'lighting_dbs':
         return {
@@ -2027,51 +2027,14 @@ class _DataImportPageState extends State<DataImportPage> {
                                 TextButton.icon(
                                   onPressed: _downloadTemplate,
                                   icon: const Icon(Icons.download, size: 16),
-                                  label: Text(widget.collectionId == 'assets' ? 'Template Options' : 'Template', style: const TextStyle(fontSize: 12)),
-                                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                  label: Text(widget.collectionId == 'assets' ? 'Choose Template' : 'Download Template', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    foregroundColor: Theme.of(context).colorScheme.primary,
+                                  ),
                                 ),
                               ],
                             ),
-                            if (widget.collectionId == 'assets') ...[
-                              const SizedBox(height: 8),
-                              const Text('Download Specific Template by Asset Type:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  ActionChip(
-                                    avatar: const Icon(Icons.bolt, color: Colors.amberAccent, size: 16),
-                                    label: const Text('Motors Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    backgroundColor: Colors.amber.withValues(alpha: 0.15),
-                                    side: const BorderSide(color: Colors.amberAccent),
-                                    onPressed: () => _downloadAssetTemplate('motor'),
-                                  ),
-                                  ActionChip(
-                                    avatar: const Icon(Icons.settings, color: Colors.orangeAccent, size: 16),
-                                    label: const Text('Gearboxes Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    backgroundColor: Colors.orange.withValues(alpha: 0.15),
-                                    side: const BorderSide(color: Colors.orangeAccent),
-                                    onPressed: () => _downloadAssetTemplate('gearbox'),
-                                  ),
-                                  ActionChip(
-                                    avatar: const Icon(Icons.water_drop, color: Colors.blueAccent, size: 16),
-                                    label: const Text('Pumps Template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    backgroundColor: Colors.blue.withValues(alpha: 0.15),
-                                    side: const BorderSide(color: Colors.blueAccent),
-                                    onPressed: () => _downloadAssetTemplate('pump'),
-                                  ),
-                                  ActionChip(
-                                    avatar: const Icon(Icons.table_chart, color: Colors.greenAccent, size: 16),
-                                    label: const Text('All-in-One (3 Sheets)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    backgroundColor: Colors.green.withValues(alpha: 0.15),
-                                    side: const BorderSide(color: Colors.greenAccent),
-                                    onPressed: () => _downloadAssetTemplate('all'),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                             const SizedBox(height: 4),
                             Text(widget.collectionId == 'assets' ? "Template Guidelines:" : "Required Columns:", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                             Text(instructions['Cols']!, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
@@ -2110,8 +2073,20 @@ class _DataImportPageState extends State<DataImportPage> {
                       Text(_statusMessage!, style: TextStyle(color: _statusMessage!.contains('Error') ? Colors.red : AppColors.primary), textAlign: TextAlign.center),
 
                     // 4. PREVIEW TABLE
-                    if (_previewData.isNotEmpty) ...[ 
-                        Material(
+                    if (_previewData.isNotEmpty) ...[
+                      () {
+                        // Gather all unique column keys preserving first-row order and placing Validation first if present
+                        final allKeys = <String>{};
+                        for (final row in _previewData) {
+                          allKeys.addAll(row.keys);
+                        }
+                        final previewCols = allKeys.toList();
+                        if (previewCols.contains('Validation')) {
+                          previewCols.remove('Validation');
+                          previewCols.insert(0, 'Validation');
+                        }
+
+                        return Material(
                           color: Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                           child: GlassContainer(
@@ -2129,21 +2104,21 @@ class _DataImportPageState extends State<DataImportPage> {
                                   }
                                   return Colors.transparent;
                                 }),
-                                columns: _previewData.first.keys.map((k) => DataColumn(
+                                columns: previewCols.map((k) => DataColumn(
                                   label: Text(
                                     k, 
                                     style: TextStyle(
                                       fontSize: 12, 
                                       fontWeight: FontWeight.bold,
                                       color: Theme.of(context).colorScheme.onSurface,
-                                    )
-                                  )
+                                    ),
+                                  ),
                                 )).toList(),
                                 rows: _previewData.take(50).map((r) {
                                   return DataRow(
-                                    cells: r.entries.map((e) {
-                                      final val = e.value?.toString() ?? '';
-                                      final isValidation = e.key == 'Validation';
+                                    cells: previewCols.map((colKey) {
+                                      final val = r[colKey]?.toString() ?? '';
+                                      final isValidation = colKey == 'Validation';
                                       Color? txtColor;
                                       if (isValidation) {
                                         if (val.startsWith('Error')) {
@@ -2161,28 +2136,29 @@ class _DataImportPageState extends State<DataImportPage> {
                                             fontSize: 11,
                                             color: txtColor ?? Theme.of(context).colorScheme.onSurface,
                                             fontWeight: isValidation ? FontWeight.bold : FontWeight.normal,
-                                          )
-                                        )
+                                          ),
+                                        ),
                                       );
-                                    }).toList()
+                                    }).toList(),
                                   );
                                 }).toList(),
                               ),
                             ),
                           ),
+                        );
+                      }(),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _isProcessing ? null : _upload,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _isProcessing ? null : _upload,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: _isProcessing 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text("Confirm & Import All", style: TextStyle(fontSize: 16, color: Colors.white)),
-                        ),
+                        child: _isProcessing 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text("Confirm & Import All", style: TextStyle(fontSize: 16, color: Colors.white)),
+                      ),
                     ],
                   ],
                 ),
