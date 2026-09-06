@@ -3,6 +3,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:asset_pulse_pro/features/home/presentation/widgets/custom_app_bar.dart';
+import 'package:asset_pulse_pro/core/services/firestore_service.dart';
+import 'package:asset_pulse_pro/features/assets/presentation/pages/asset_detail_page.dart';
 import 'geofenced_checklist_wrapper.dart';
 import 'checklists/dynamic_checklist_form.dart';
 
@@ -36,10 +38,28 @@ class _ChecklistQrScannerPageState extends State<ChecklistQrScannerPage> {
     }
   }
 
-  Future<void> _handleScanResult(String code) async {
+  Future<void> _handleScanResult(String rawCode) async {
+    final code = rawCode.trim();
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     
     try {
+      final firestoreService = FirestoreService();
+
+      // 1. Check if scanned code is an Asset (Tag No / Serial / Document ID)
+      final asset = await firestoreService.getAssetByTagNo(code);
+      if (asset != null) {
+        if (!mounted) return;
+        Navigator.pop(context); // Dismiss loading
+
+        // Navigate directly to Asset Details
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => AssetDetailPage(asset: asset)),
+        );
+        return;
+      }
+
+      // 2. Check if scanned code is a Custom Checklist
       final query = await FirebaseFirestore.instance
           .collection('custom_checklists')
           .where('name', isEqualTo: code)
@@ -50,7 +70,7 @@ class _ChecklistQrScannerPageState extends State<ChecklistQrScannerPage> {
       Navigator.pop(context); // Dismiss loading
       
       if (query.docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unrecognized Checklist QR Code or Target removed.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unrecognized QR Code: $code')));
         setState(() => _isScanned = false);
         return;
       }

@@ -385,11 +385,21 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildLegendItem(Color color, String label, String count) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70), overflow: TextOverflow.ellipsis)),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         Text(count, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
       ],
     );
@@ -453,13 +463,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (val, _) {
+                              final isDark = Theme.of(context).brightness == Brightness.dark;
+                              final labelColor = isDark ? Colors.white70 : const Color(0xFF334155);
                               switch (val.toInt()) {
                                 case 0:
-                                  return Text('Motors ($motors)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                  return Text('Motors ($motors)', style: TextStyle(color: labelColor, fontSize: 10, fontWeight: FontWeight.bold));
                                 case 1:
-                                  return Text('Gearboxes ($gearboxes)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                  return Text('Gearboxes ($gearboxes)', style: TextStyle(color: labelColor, fontSize: 10, fontWeight: FontWeight.bold));
                                 case 2:
-                                  return Text('Pumps ($pumps)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold));
+                                  return Text('Pumps ($pumps)', style: TextStyle(color: labelColor, fontSize: 10, fontWeight: FontWeight.bold));
                                 default:
                                   return const Text('');
                               }
@@ -542,25 +554,53 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildMetricCard(String title, String value, Color color, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
+        color: isDark ? color.withValues(alpha: 0.06) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: isDark ? color.withValues(alpha: 0.2) : const Color(0xFFE2E8F0)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 16),
+              Icon(icon, color: isDark ? color : AppColors.accent, size: 16),
               const SizedBox(width: 6),
-              Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey))),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.grey : const Color(0xFF475569),
+                    fontWeight: isDark ? FontWeight.normal : FontWeight.w500,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isDark ? color : const Color(0xFF0F172A),
+            ),
+          ),
         ],
       ),
     );

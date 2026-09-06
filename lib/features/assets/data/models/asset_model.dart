@@ -229,101 +229,119 @@ class AssetModel {
 
   // Factory to create AssetModel from Firestore Map
   factory AssetModel.fromMap(Map<String, dynamic> map, String docId) {
-    final rawParents = map['applicableParentEquipmentIds'];
+    final rawParents = map['applicableParentEquipmentIds'] ?? map['compatibleEquipments'];
     List<String>? parents;
     if (rawParents is List) {
-      parents = rawParents.map((e) => e.toString()).toList();
+      parents = rawParents.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    } else if (rawParents is String && rawParents.isNotEmpty) {
+      parents = rawParents.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
 
     final dynamic legacySpecs = map['specs'] is Map ? Map<String, dynamic>.from(map['specs'] as Map) : null;
 
+    final parentEq = map['masterEquipmentId']?.toString() ??
+        map['parentEquipment']?.toString() ??
+        map['installedMachine']?.toString() ?? '';
+
+    final tag = map['tagNo']?.toString() ?? map['tagId']?.toString() ?? docId;
+
     return AssetModel(
       id: docId,
-      masterEquipmentId: map['masterEquipmentId'] ?? '',
-      tagNo: map['tagNo'] ?? '',
-      name: map['name'] ?? '',
-      description: map['description'] ?? '',
-      make: map['make'] ?? '',
-      model: map['model'] ?? '',
-      serialNo: map['serialNo'] ?? '',
-      rfidTag: map['rfidTag'],
-      poNo: map['poNo'],
-      manufacturingYear: map['manufacturingYear'] is num ? (map['manufacturingYear'] as num).toInt() : int.tryParse(map['manufacturingYear']?.toString() ?? ''),
-      imageUrl: map['imageUrl'] ?? '',
+      masterEquipmentId: parentEq,
+      tagNo: tag,
+      name: map['name']?.toString() ?? '',
+      description: map['description']?.toString() ?? '',
+      make: map['make']?.toString() ?? '',
+      model: map['model']?.toString() ?? '',
+      serialNo: map['serialNo']?.toString() ?? '',
+      rfidTag: map['rfidTag']?.toString(),
+      poNo: map['poNo']?.toString(),
+      manufacturingYear: _parseInt(map['manufacturingYear']) ?? _parseInt(map['yearOfManufacture']),
+      imageUrl: map['imageUrl']?.toString() ?? '',
       
-      type: AssetType.values.firstWhere(
-        (e) => e.name == (map['type'] ?? 'motor'),
-        orElse: () => AssetType.motor,
-      ),
-      status: AssetStatus.values.firstWhere(
-        (e) => e.name == (map['status'] ?? 'spare'),
-        orElse: () => AssetStatus.spare,
-      ),
+      type: () {
+        final t = (map['type'] ?? 'motor').toString().toLowerCase().trim();
+        if (t.contains('gear')) return AssetType.gearbox;
+        if (t.contains('pump')) return AssetType.pump;
+        if (t.contains('brake')) return AssetType.brake;
+        if (t.contains('actuat')) return AssetType.actuator;
+        return AssetType.motor;
+      }(),
+      status: () {
+        final s = (map['status'] ?? 'active').toString().toLowerCase().trim();
+        if (s.contains('active')) return AssetStatus.active;
+        if (s.contains('maint')) return AssetStatus.underMaintenance;
+        if (s.contains('scrap')) return AssetStatus.scrapped;
+        return AssetStatus.spare;
+      }(),
       
       specs: legacySpecs,
       
+      // Motor Specs
       motorType: map['motorType']?.toString() ?? legacySpecs?['motorType']?.toString(),
-      powerKw: (map['powerKw'] as num?)?.toDouble() ?? (legacySpecs?['pumpPower'] as num?)?.toDouble() ?? (legacySpecs?['inputPowerKw'] as num?)?.toDouble(),
-      voltage: (map['voltage'] as num?)?.toDouble(),
-      fullLoadCurrent: (map['fullLoadCurrent'] as num?)?.toDouble(),
-      noLoadCurrent: (map['noLoadCurrent'] as num?)?.toDouble(),
-      speedRpm: (map['speedRpm'] as num?)?.toDouble() ?? (legacySpecs?['pumpSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['inputSpeedRpm'] as num?)?.toDouble(),
-      poles: (map['poles'] as num?)?.toInt(),
-      frequency: (map['frequency'] as num?)?.toDouble(),
-      efficiency: (map['efficiency'] as num?)?.toDouble(),
-      powerFactor: (map['powerFactor'] as num?)?.toDouble(),
+      powerKw: _parseDouble(map['powerKw']) ?? _parseDouble(legacySpecs?['pumpPower']) ?? _parseDouble(legacySpecs?['inputPowerKw']),
+      voltage: _parseDouble(map['voltage']) ?? _parseDouble(map['supplyVoltage']),
+      fullLoadCurrent: _parseDouble(map['fullLoadCurrent']) ?? _parseDouble(map['ratedCurrent']),
+      noLoadCurrent: _parseDouble(map['noLoadCurrent']),
+      speedRpm: _parseDouble(map['speedRpm']) ?? _parseDouble(legacySpecs?['pumpSpeedRpm']) ?? _parseDouble(legacySpecs?['inputSpeedRpm']),
+      poles: _parseInt(map['poles']),
+      frequency: _parseDouble(map['frequency']),
+      efficiency: _parseDouble(map['efficiency']),
+      powerFactor: _parseDouble(map['powerFactor']),
       frameSize: map['frameSize']?.toString(),
       mountingType: map['mountingType']?.toString(),
-      greaseType: map['greaseType']?.toString() ?? legacySpecs?['greaseType']?.toString(),
+      greaseType: map['greaseType']?.toString() ?? map['greaseGrade']?.toString() ?? map['oilGreaseGrade']?.toString() ?? legacySpecs?['greaseType']?.toString(),
       dutyCycle: map['dutyCycle']?.toString() ?? legacySpecs?['dutyCycle']?.toString(),
       insulationClass: map['insulationClass']?.toString() ?? legacySpecs?['insulationClass']?.toString(),
       couplingAvailable: map['couplingAvailable']?.toString() ?? (map['isCouplingAvailable'] == true ? 'YES' : (map['isCouplingAvailable'] == false ? 'NO' : null)),
       couplingType: map['couplingType']?.toString() ?? legacySpecs?['couplingType']?.toString(),
       efficiencyClass: map['efficiencyClass']?.toString() ?? legacySpecs?['efficiencyClass']?.toString(),
-      ipRating: map['ipRating']?.toString() ?? legacySpecs?['ipRating']?.toString(),
+      ipRating: map['ipRating']?.toString() ?? map['enclosureRating']?.toString() ?? legacySpecs?['ipRating']?.toString(),
       
-      gearRatio: map['gearRatio']?.toString() ?? legacySpecs?['gearRatio']?.toString(),
-      oilType: map['oilType']?.toString() ?? legacySpecs?['oilType']?.toString(),
-      oilCapacity: (map['oilCapacity'] as num?)?.toDouble() ?? (legacySpecs?['oilCapacity'] as num?)?.toDouble(),
-      inputSpeedRpm: (map['inputSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['inputSpeedRpm'] as num?)?.toDouble(),
-      outputSpeedRpm: (map['outputSpeedRpm'] as num?)?.toDouble() ?? (legacySpecs?['outputSpeedRpm'] as num?)?.toDouble(),
-      inputShaftMm: (map['inputShaftMm'] as num?)?.toDouble() ?? (legacySpecs?['inputShaftMm'] as num?)?.toDouble(),
-      outputShaftMm: (map['outputShaftMm'] as num?)?.toDouble() ?? (legacySpecs?['outputShaftMm'] as num?)?.toDouble(),
-      lubricationMethod: map['lubricationMethod']?.toString() ?? legacySpecs?['lubricationMethod']?.toString(),
+      // Gearbox Specs
+      gearRatio: map['gearRatio']?.toString() ?? map['ratio']?.toString() ?? legacySpecs?['gearRatio']?.toString(),
+      oilType: map['oilType']?.toString() ?? map['oilGrade']?.toString() ?? legacySpecs?['oilType']?.toString(),
+      oilCapacity: _parseDouble(map['oilCapacity']) ?? _parseDouble(map['oilCapacityLiters']) ?? _parseDouble(legacySpecs?['oilCapacity']),
+      inputSpeedRpm: _parseDouble(map['inputSpeedRpm']) ?? _parseDouble(legacySpecs?['inputSpeedRpm']),
+      outputSpeedRpm: _parseDouble(map['outputSpeedRpm']) ?? _parseDouble(legacySpecs?['outputSpeedRpm']),
+      inputShaftMm: _parseDouble(map['inputShaftMm']) ?? _parseDouble(map['inputShaftDiameterMm']) ?? _parseDouble(legacySpecs?['inputShaftMm']),
+      outputShaftMm: _parseDouble(map['outputShaftMm']) ?? _parseDouble(map['outputShaftDiameterMm']) ?? _parseDouble(legacySpecs?['outputShaftMm']),
+      lubricationMethod: map['lubricationMethod']?.toString() ?? map['lubricationType']?.toString() ?? legacySpecs?['lubricationMethod']?.toString(),
       mountingOrientation: map['mountingOrientation']?.toString() ?? legacySpecs?['mountingOrientation']?.toString(),
       
-      flowRate: (map['flowRate'] as num?)?.toDouble() ?? (legacySpecs?['flowRate'] as num?)?.toDouble(),
-      head: (map['head'] as num?)?.toDouble() ?? (legacySpecs?['head'] as num?)?.toDouble(),
-      impellerSize: map['impellerSize']?.toString() ?? legacySpecs?['impellerSize']?.toString(),
-      pumpPower: (map['pumpPower'] as num?)?.toDouble() ?? (legacySpecs?['pumpPower'] as num?)?.toDouble(),
-      suctionFlangeMm: (map['suctionFlangeMm'] as num?)?.toDouble() ?? (legacySpecs?['suctionFlangeMm'] as num?)?.toDouble(),
-      dischargeFlangeMm: (map['dischargeFlangeMm'] as num?)?.toDouble() ?? (legacySpecs?['dischargeFlangeMm'] as num?)?.toDouble(),
+      // Pump Specs
+      flowRate: _parseDouble(map['flowRate']) ?? _parseDouble(map['flowRateM3Hr']) ?? _parseDouble(legacySpecs?['flowRate']),
+      head: _parseDouble(map['head']) ?? _parseDouble(map['headMeters']) ?? _parseDouble(legacySpecs?['head']),
+      impellerSize: map['impellerSize']?.toString() ?? map['impellerDiameterMm']?.toString() ?? legacySpecs?['impellerSize']?.toString(),
+      pumpPower: _parseDouble(map['pumpPower']) ?? _parseDouble(map['powerKw']) ?? _parseDouble(legacySpecs?['pumpPower']),
+      suctionFlangeMm: _parseDouble(map['suctionFlangeMm']) ?? _parseDouble(map['suctionSizeMm']) ?? _parseDouble(legacySpecs?['suctionFlangeMm']),
+      dischargeFlangeMm: _parseDouble(map['dischargeFlangeMm']) ?? _parseDouble(map['dischargeSizeMm']) ?? _parseDouble(legacySpecs?['dischargeFlangeMm']),
       sealType: map['sealType']?.toString() ?? legacySpecs?['sealType']?.toString(),
       casingMaterial: map['casingMaterial']?.toString() ?? legacySpecs?['casingMaterial']?.toString(),
       
       // Brake Direct Specs
       brakeType: map['brakeType']?.toString() ?? legacySpecs?['brakeType']?.toString(),
-      thrusterCapacityKg: (map['thrusterCapacityKg'] as num?)?.toDouble() ?? (legacySpecs?['thrusterCapacityKg'] as num?)?.toDouble(),
+      thrusterCapacityKg: _parseDouble(map['thrusterCapacityKg']) ?? _parseDouble(map['thrusterLiftingForceN']) ?? _parseDouble(legacySpecs?['thrusterCapacityKg']),
       voltageType: map['voltageType']?.toString() ?? legacySpecs?['voltageType']?.toString(),
-      voltageRating: (map['voltageRating'] as num?)?.toDouble() ?? (legacySpecs?['voltageRating'] as num?)?.toDouble(),
-      drumDiaMm: (map['drumDiaMm'] as num?)?.toDouble() ?? (legacySpecs?['drumDiaMm'] as num?)?.toDouble(),
-      drumWidthMm: (map['drumWidthMm'] as num?)?.toDouble() ?? (legacySpecs?['drumWidthMm'] as num?)?.toDouble(),
+      voltageRating: _parseDouble(map['voltageRating']) ?? _parseDouble(map['supplyVoltage']) ?? _parseDouble(legacySpecs?['voltageRating']),
+      drumDiaMm: _parseDouble(map['drumDiaMm']) ?? _parseDouble(map['drumDiameterMm']) ?? _parseDouble(legacySpecs?['drumDiaMm']),
+      drumWidthMm: _parseDouble(map['drumWidthMm']) ?? _parseDouble(legacySpecs?['drumWidthMm']),
       drumInstallation: map['drumInstallation']?.toString() ?? legacySpecs?['drumInstallation']?.toString(),
-      mountingBoltSize: map['mountingBoltSize']?.toString() ?? legacySpecs?['mountingBoltSize']?.toString(),
-      mountingBoltCount: (map['mountingBoltCount'] as num?)?.toInt() ?? (legacySpecs?['mountingBoltCount'] as num?)?.toInt(),
-      mountingLengthMm: (map['mountingLengthMm'] as num?)?.toDouble() ?? (legacySpecs?['mountingLengthMm'] as num?)?.toDouble(),
-      mountingWidthMm: (map['mountingWidthMm'] as num?)?.toDouble() ?? (legacySpecs?['mountingWidthMm'] as num?)?.toDouble(),
-      brakingTorqueNm: (map['brakingTorqueNm'] as num?)?.toDouble() ?? (legacySpecs?['brakingTorqueNm'] as num?)?.toDouble(),
-      brakeShoeLining: map['brakeShoeLining']?.toString() ?? legacySpecs?['brakeShoeLining']?.toString(),
+      mountingBoltSize: map['mountingBoltSize']?.toString() ?? map['mountingHolePitch']?.toString() ?? legacySpecs?['mountingBoltSize']?.toString(),
+      mountingBoltCount: _parseInt(map['mountingBoltCount']) ?? _parseInt(legacySpecs?['mountingBoltCount']),
+      mountingLengthMm: _parseDouble(map['mountingLengthMm']) ?? _parseDouble(legacySpecs?['mountingLengthMm']),
+      mountingWidthMm: _parseDouble(map['mountingWidthMm']) ?? _parseDouble(legacySpecs?['mountingWidthMm']),
+      brakingTorqueNm: _parseDouble(map['brakingTorqueNm']) ?? _parseDouble(map['ratedTorqueNm']) ?? _parseDouble(legacySpecs?['brakingTorqueNm']),
+      brakeShoeLining: map['brakeShoeLining']?.toString() ?? map['liningMaterial']?.toString() ?? legacySpecs?['brakeShoeLining']?.toString(),
 
       // Actuator Direct Specs
       actuatorType: map['actuatorType']?.toString() ?? legacySpecs?['actuatorType']?.toString(),
-      torqueOrThrust: (map['torqueOrThrust'] as num?)?.toDouble() ?? (legacySpecs?['torqueOrThrust'] as num?)?.toDouble(),
-      operatingTimeSeconds: (map['operatingTimeSeconds'] as num?)?.toDouble() ?? (legacySpecs?['operatingTimeSeconds'] as num?)?.toDouble(),
-      controlSignal: map['controlSignal']?.toString() ?? legacySpecs?['controlSignal']?.toString(),
-      valveFlangeStandard: map['valveFlangeStandard']?.toString() ?? legacySpecs?['valveFlangeStandard']?.toString(),
+      torqueOrThrust: _parseDouble(map['torqueOrThrust']) ?? _parseDouble(map['operatingTorqueNm']) ?? _parseDouble(legacySpecs?['torqueOrThrust']),
+      operatingTimeSeconds: _parseDouble(map['operatingTimeSeconds']) ?? _parseDouble(legacySpecs?['operatingTimeSeconds']),
+      controlSignal: map['controlSignal']?.toString() ?? map['inputControlSignal']?.toString() ?? legacySpecs?['controlSignal']?.toString(),
+      valveFlangeStandard: map['valveFlangeStandard']?.toString() ?? map['isoFlangeSize']?.toString() ?? legacySpecs?['valveFlangeStandard']?.toString(),
       valveType: map['valveType']?.toString() ?? legacySpecs?['valveType']?.toString(),
-      valveSize: map['valveSize']?.toString() ?? legacySpecs?['valveSize']?.toString(),
+      valveSize: map['valveSize']?.toString() ?? map['valveSizeInch']?.toString() ?? legacySpecs?['valveSize']?.toString(),
       
       healthStatus: AssetHealthStatus.values.firstWhere(
         (e) => e.name == (map['healthStatus'] ?? 'unknown'),
@@ -333,25 +351,58 @@ class AssetModel {
 
       windingResistance: map['windingResistance'] as Map<String, dynamic>?,
       insulationResistance: map['insulationResistance'] as Map<String, dynamic>?,
-      polarizationIndex: (map['polarizationIndex'] as num?)?.toDouble(),
+      polarizationIndex: _parseDouble(map['polarizationIndex']),
       vibration: map['vibration'] as Map<String, dynamic>?,
       
-      bearingDE: map['bearingDE']?.toString(),
-      bearingNDE: map['bearingNDE']?.toString(),
+      bearingDE: map['bearingDE']?.toString() ?? map['driveEndBearing']?.toString() ?? map['bearingDriveEnd']?.toString(),
+      bearingNDE: map['bearingNDE']?.toString() ?? map['nonDriveEndBearing']?.toString() ?? map['bearingNonDriveEnd']?.toString(),
       
-      isCritical: map['isCritical'] ?? false,
+      isCritical: map['isCritical'] == true || map['isCritical']?.toString().toLowerCase() == 'true',
       applicableParentEquipmentIds: parents,
-      spareLocation: map['spareLocation'] as String?,
+      spareLocation: map['spareLocation']?.toString() ?? map['locationInWarehouse']?.toString(),
       seqNo: map['seqNo']?.toString(),
       
       installationDate: _parseDate(map['installationDate']),
       lastServiceDate: _parseDate(map['lastServiceDate']),
       nextServiceDue: _parseDate(map['nextServiceDue']),
       createdAt: _parseDate(map['createdAt']),
-      createdBy: map['createdBy'],
+      createdBy: map['createdBy']?.toString(),
       modifiedAt: _parseDate(map['modifiedAt']) ?? _parseDate(map['updatedAt']),
-      modifiedBy: map['modifiedBy'],
+      modifiedBy: map['modifiedBy']?.toString(),
     );
+  }
+
+  static double? _parseDouble(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    if (val is String) {
+      final trimmed = val.trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'n/a' || trimmed == '-') return null;
+      // If it contains letters/units like "415V", "130A", "50Hz", "1480 RPM", clean and extract first number
+      final direct = double.tryParse(trimmed);
+      if (direct != null) return direct;
+      final match = RegExp(r'[-+]?\d*\.?\d+').firstMatch(trimmed);
+      if (match != null) {
+        return double.tryParse(match.group(0)!);
+      }
+    }
+    return null;
+  }
+
+  static int? _parseInt(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toInt();
+    if (val is String) {
+      final trimmed = val.trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'n/a' || trimmed == '-') return null;
+      final direct = int.tryParse(trimmed);
+      if (direct != null) return direct;
+      final match = RegExp(r'[-+]?\d+').firstMatch(trimmed);
+      if (match != null) {
+        return int.tryParse(match.group(0)!);
+      }
+    }
+    return null;
   }
 
   static DateTime? _parseDate(dynamic val) {

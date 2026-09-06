@@ -160,9 +160,23 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     _updateComputedTagId();
   }
 
-  String get _currentPlantId => widget.plantId ?? (_currentUnitId.isNotEmpty ? widget.asset?.id.split('-').firstOrNull : null) ?? _userPlantId ?? 'PLANT';
-  String get _currentUnitId =>
-      widget.unitId ?? (_currentPlantId.isNotEmpty ? widget.asset?.id.split('-').skip(1).firstOrNull : null) ?? _userUnitId ?? 'UNIT';
+  String get _currentPlantId {
+    if (widget.plantId != null && widget.plantId!.isNotEmpty) return widget.plantId!;
+    if (widget.asset != null && widget.asset!.id.isNotEmpty) {
+      final parts = widget.asset!.id.split('-');
+      if (parts.isNotEmpty) return parts.first;
+    }
+    return _userPlantId ?? 'PLANT';
+  }
+
+  String get _currentUnitId {
+    if (widget.unitId != null && widget.unitId!.isNotEmpty) return widget.unitId!;
+    if (widget.asset != null && widget.asset!.id.isNotEmpty) {
+      final parts = widget.asset!.id.split('-');
+      if (parts.length > 1) return parts[1];
+    }
+    return _userUnitId ?? 'UNIT';
+  }
 
   String _getTypeCode(AssetType type) {
     switch (type) {
@@ -555,53 +569,295 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
     }
   }
 
+  // --- SINGLE PARENT EQUIPMENT PICKER WITH SEARCH ---
+  void _showParentEquipmentPicker() {
+    final TextEditingController searchCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bottomSheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final query = searchCtrl.text.trim().toLowerCase();
+            final filtered = _masterEquipments.where((e) {
+              if (query.isEmpty) return true;
+              return e.name.toLowerCase().contains(query) ||
+                  e.id.toLowerCase().contains(query) ||
+                  e.locationId.toLowerCase().contains(query) ||
+                  e.area.toLowerCase().contains(query);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Select Installed Parent Machine',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(bottomSheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search machines by name, ID, or area...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setModalState(() => searchCtrl.clear());
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (val) => setModalState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text('No machines found matching your query.', style: TextStyle(color: Colors.grey)),
+                          )
+                        : ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (context, idx) {
+                              final eq = filtered[idx];
+                              final isSelected = eq.id == _selectedParentId;
+
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: isSelected ? AppColors.accent : Colors.grey.withValues(alpha: 0.2),
+                                  child: Icon(
+                                    Icons.precision_manufacturing,
+                                    color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                    size: 20,
+                                  ),
+                                ),
+                                title: Text(
+                                  eq.name,
+                                  style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    color: isSelected ? AppColors.accent : Theme.of(context).colorScheme.onSurface,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${eq.id} • ${eq.locationId.isNotEmpty ? eq.locationId : eq.area}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                trailing: isSelected
+                                    ? const Icon(Icons.check_circle, color: AppColors.accent)
+                                    : const Icon(Icons.chevron_right, color: Colors.grey),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedParentId = eq.id;
+                                    if (!_selectedParentIdsForSpares.contains(eq.id)) {
+                                      _selectedParentIdsForSpares.add(eq.id);
+                                    }
+                                  });
+                                  Navigator.pop(bottomSheetCtx);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- MULTIPLE PARENT EQUIPMENT SELECTOR FOR SPARES ---
   void _showSpareParentsSelector() {
-    showDialog(
+    final TextEditingController searchCtrl = TextEditingController();
+    showModalBottomSheet(
       context: context,
-      builder: (dialogCtx) {
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bottomSheetCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Select Applicable Parent Machines', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: _masterEquipments.isEmpty
-                    ? const Text('No master equipments registered in this unit yet.')
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _masterEquipments.length,
-                        itemBuilder: (context, idx) {
-                          final eq = _masterEquipments[idx];
-                          final isSelected = _selectedParentIdsForSpares.contains(eq.id);
+          builder: (context, setModalState) {
+            final query = searchCtrl.text.trim().toLowerCase();
+            final filtered = _masterEquipments.where((e) {
+              if (query.isEmpty) return true;
+              return e.name.toLowerCase().contains(query) ||
+                  e.id.toLowerCase().contains(query) ||
+                  e.locationId.toLowerCase().contains(query) ||
+                  e.area.toLowerCase().contains(query);
+            }).toList();
 
-                          return CheckboxListTile(
-                            title: Text(eq.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                            subtitle: Text('${eq.id} • Location: ${eq.locationId}', style: const TextStyle(fontSize: 11)),
-                            value: isSelected,
-                            activeColor: AppColors.primary,
-                            onChanged: (checked) {
-                              setDialogState(() {
-                                if (checked == true) {
-                                  _selectedParentIdsForSpares.add(eq.id);
-                                } else {
-                                  _selectedParentIdsForSpares.remove(eq.id);
-                                }
-                              });
-                              setState(() {});
-                            },
-                          );
-                        },
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Select Compatible Machines',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${_selectedParentIdsForSpares.length} Selected',
+                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(bottomSheetCtx),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search machines by name, ID, or area...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () => setModalState(() => searchCtrl.clear()),
+                            )
+                          : null,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (val) => setModalState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.select_all, size: 16),
+                        onPressed: () {
+                          setModalState(() {
+                            for (var eq in filtered) {
+                              if (!_selectedParentIdsForSpares.contains(eq.id)) {
+                                _selectedParentIdsForSpares.add(eq.id);
+                              }
+                            }
+                          });
+                          setState(() {});
+                        },
+                        label: const Text('Select All Filtered', style: TextStyle(fontSize: 12)),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        icon: const Icon(Icons.deselect, size: 16, color: Colors.redAccent),
+                        onPressed: () {
+                          setModalState(() {
+                            _selectedParentIdsForSpares.clear();
+                          });
+                          setState(() {});
+                        },
+                        label: const Text('Clear All', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text('No machines found matching your query.', style: TextStyle(color: Colors.grey)),
+                          )
+                        : ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (context, idx) {
+                              final eq = filtered[idx];
+                              final isSelected = _selectedParentIdsForSpares.contains(eq.id);
+
+                              return CheckboxListTile(
+                                dense: true,
+                                activeColor: AppColors.accent,
+                                value: isSelected,
+                                secondary: CircleAvatar(
+                                  backgroundColor: isSelected ? AppColors.accent : Colors.grey.withValues(alpha: 0.2),
+                                  child: Icon(
+                                    Icons.precision_manufacturing,
+                                    color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                    size: 20,
+                                  ),
+                                ),
+                                title: Text(
+                                  eq.name,
+                                  style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    color: isSelected ? AppColors.accent : Theme.of(context).colorScheme.onSurface,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${eq.id} • ${eq.locationId.isNotEmpty ? eq.locationId : eq.area}',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                onChanged: (checked) {
+                                  setModalState(() {
+                                    if (checked == true) {
+                                      _selectedParentIdsForSpares.add(eq.id);
+                                    } else {
+                                      _selectedParentIdsForSpares.remove(eq.id);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(bottomSheetCtx),
+                      child: const Text('Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
-              actions: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  onPressed: () => Navigator.pop(dialogCtx),
-                  child: const Text('Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
             );
           },
         );
@@ -1026,32 +1282,114 @@ class _AddEditAssetPageState extends State<AddEditAssetPage> with SingleTickerPr
             ),
             const SizedBox(height: 14),
           ] else ...[
-            DropdownButtonFormField<String>(
-              value: _masterEquipments.any((e) => e.id == _selectedParentId) ? _selectedParentId : null,
-              decoration: const InputDecoration(
-                labelText: 'Installed Parent Equipment / Machine *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.precision_manufacturing),
-              ),
-              items: _masterEquipments.map((e) {
-                return DropdownMenuItem(
-                  value: e.id,
-                  child: Text('${e.name} (${e.id})', overflow: TextOverflow.ellipsis),
-                );
-              }).toList(),
-              onChanged: (val) {
-                setState(() {
-                  _selectedParentId = val;
-                  if (val != null && !_selectedParentIdsForSpares.contains(val)) {
-                    _selectedParentIdsForSpares.add(val);
-                  }
-                });
-              },
+            FormField<String>(
+              initialValue: _selectedParentId,
               validator: (val) {
-                if (_selectedStatus == AssetStatus.active && (val == null || val.isEmpty)) {
-                  return 'Please select parent equipment';
+                if (_selectedStatus == AssetStatus.active && (_selectedParentId == null || _selectedParentId!.isEmpty)) {
+                  return 'Please select installed parent machine';
                 }
                 return null;
+              },
+              builder: (state) {
+                final selectedEq = _masterEquipments.firstWhere(
+                  (e) => e.id == _selectedParentId,
+                  orElse: () => MasterEquipmentModel(
+                    id: _selectedParentId ?? '',
+                    name: _selectedParentId ?? '',
+                    plantId: '',
+                    unitId: '',
+                    locationId: '',
+                    area: '',
+                    type: 'mechanical',
+                    createdAt: DateTime.now(),
+                  ),
+                );
+                final hasSelection = _selectedParentId != null && _selectedParentId!.isNotEmpty;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        _showParentEquipmentPicker();
+                        state.didChange(_selectedParentId);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).inputDecorationTheme.fillColor ?? Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: state.hasError ? Colors.redAccent : Colors.grey.withValues(alpha: 0.3),
+                            width: state.hasError ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.precision_manufacturing, color: AppColors.accent),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Installed Parent Equipment / Machine *',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: state.hasError ? Colors.redAccent : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    hasSelection
+                                        ? '${selectedEq.name} (${selectedEq.id})'
+                                        : 'Tap to select parent equipment...',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
+                                      color: hasSelection
+                                          ? Theme.of(context).colorScheme.onSurface
+                                          : Theme.of(context).disabledColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (hasSelection)
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Clear',
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedParentId = null;
+                                    state.didChange(null);
+                                  });
+                                },
+                              ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (state.hasError) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: Text(
+                          state.errorText ?? '',
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
               },
             ),
             const SizedBox(height: 14),

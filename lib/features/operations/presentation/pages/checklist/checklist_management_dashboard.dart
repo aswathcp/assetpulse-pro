@@ -11,6 +11,7 @@ import 'panel_room_checklist_page.dart';
 import 'water_cooler_checklist_page.dart';
 import 'high_mast_checklist_page.dart';
 import 'high_mast_trial_page.dart';
+import 'asset_checklist_page.dart';
 
 class ChecklistManagementDashboard extends StatelessWidget {
   const ChecklistManagementDashboard({super.key});
@@ -40,6 +41,13 @@ class ChecklistManagementDashboard extends StatelessWidget {
                 mainAxisSpacing: 16,
                 childAspectRatio: ResponsiveLayout.isDesktop(context) ? 1.25 : 0.85,
                 children: [
+                  _buildDashboardCard(
+                    context,
+                    title: 'Asset\nChecklist',
+                    icon: Icons.inventory_2,
+                    color: Colors.cyanAccent,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetChecklistPage())),
+                  ),
                   _buildDashboardCard(
                     context,
                     title: 'Shift\nChecklist',

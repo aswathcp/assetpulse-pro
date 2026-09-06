@@ -10,6 +10,7 @@ class HealthLogModel {
   final Map<String, dynamic>? insulationResistance; // {'R-Y': 100, 'Y-E': 500, ...}
   final double? polarizationIndex;
   final Map<String, dynamic>? vibration; // {'DE_H': 1.5, 'DE_V': 2.0, ...}
+  final Map<String, dynamic>? specs; // Dynamic measurements for Gearbox, Pump, Brake, Actuator, Fan/Shaft
   final String remarks;
   final String healthStatus; // healthy, warning, critical
 
@@ -23,6 +24,7 @@ class HealthLogModel {
     this.insulationResistance,
     this.polarizationIndex,
     this.vibration,
+    this.specs,
     required this.remarks,
     required this.healthStatus,
   });
@@ -37,6 +39,7 @@ class HealthLogModel {
       'insulationResistance': insulationResistance,
       'polarizationIndex': polarizationIndex,
       'vibration': vibration,
+      'specs': specs,
       'remarks': remarks,
       'healthStatus': healthStatus,
     };
@@ -63,6 +66,7 @@ class HealthLogModel {
       insulationResistance: map['insulationResistance'] is Map ? Map<String, dynamic>.from(map['insulationResistance'] as Map) : null,
       polarizationIndex: (map['polarizationIndex'] as num?)?.toDouble(),
       vibration: map['vibration'] is Map ? Map<String, dynamic>.from(map['vibration'] as Map) : null,
+      specs: map['specs'] is Map ? Map<String, dynamic>.from(map['specs'] as Map) : null,
       remarks: map['remarks']?.toString() ?? '',
       healthStatus: map['healthStatus']?.toString() ?? 'healthy',
     );

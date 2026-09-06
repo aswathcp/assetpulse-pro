@@ -491,49 +491,72 @@ class _ProfilePageState extends State<ProfilePage> {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
                               SizedBox(width: 8),
                               Text('Emergency Plant Breakdown Support', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 13)),
                             ],
                           ),
-                          SizedBox(height: 6),
-                          Text('• Main Control Room: Ext 4001 / 4002\n• Electrical Maintenance Cell: Ext 5100\n• Safety & LOTO Officer: Ext 3300', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                          const SizedBox(height: 6),
+                          Text(
+                            '• Main Control Room: Ext 4001 / 4002\n• Electrical Maintenance Cell: Ext 5100\n• Safety & LOTO Officer: Ext 3300',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : const Color(0xFF475569),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    const Text('Standard Operating Procedures (SOP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                    Text(
+                      'Standard Operating Procedures (SOP)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Theme.of(context).brightness == Brightness.dark ? AppColors.accent : const Color(0xFF1D4ED8),
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     _buildHelpCard(
+                      context: context,
                       icon: Icons.monitor_heart_outlined,
                       title: 'Motor & Asset Diagnostic Tests',
                       desc: 'Open any Asset Detail page -> Log Diagnostic Test. Enter Insulation Resistance (IR in MΩ), Winding Resistance (mΩ), No-Load Current, and DE/NDE Vibration. The system automatically computes IEEE 43 compliant health scores.',
                     ),
                     const SizedBox(height: 8),
                     _buildHelpCard(
+                      context: context,
                       icon: Icons.nfc,
                       title: 'Direct NFC / RFID Tag Scanning',
                       desc: 'Tap the center "SCAN" button on the bottom navigation bar to read asset RFID chips in the field. Tagged equipment opens instantly in Asset Detail.',
                     ),
                     const SizedBox(height: 8),
                     _buildHelpCard(
+                      context: context,
                       icon: Icons.lock_clock_outlined,
                       title: 'LOTO Isolation Management',
                       desc: 'Under Operations -> Isolation Management. Request, approve, or de-isolate physical panel feeders before commencing mechanical or electrical work.',
                     ),
                     const SizedBox(height: 16),
 
-                    const Text('Frequently Asked Questions (FAQ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                    Text(
+                      'Frequently Asked Questions (FAQ)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Theme.of(context).brightness == Brightness.dark ? AppColors.accent : const Color(0xFF1D4ED8),
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    _buildFaqTile('How do I convert a Standby Spare into Active?', 'Go to the active machine\'s Asset Detail page, tap "Replace with Spare", and choose the compatible spare unit. The system automatically shifts the old asset to "Under Maintenance" and activates the spare.'),
-                    _buildFaqTile('Can I export maintenance records to Excel / PDF?', 'Yes! On the Asset Inventory page and each Checklist page, tap the "Excel" or "PDF Report" buttons in the top header to generate instant signed reports.'),
-                    _buildFaqTile('How does offline data sync work?', 'All checklist submissions and diagnostic logs are cached locally in SQLite/Firestore offline persistence. When network connectivity resumes, all logs sync to the cloud automatically.'),
+                    _buildFaqTile(context, 'How do I convert a Standby Spare into Active?', 'Go to the active machine\'s Asset Detail page, tap "Replace with Spare", and choose the compatible spare unit. The system automatically shifts the old asset to "Under Maintenance" and activates the spare.'),
+                    _buildFaqTile(context, 'Can I export maintenance records to Excel / PDF?', 'Yes! On the Asset Inventory page and each Checklist page, tap the "Excel" or "PDF Report" buttons in the top header to generate instant signed reports.'),
+                    _buildFaqTile(context, 'How does offline data sync work?', 'All checklist submissions and diagnostic logs are cached locally in SQLite/Firestore offline persistence. When network connectivity resumes, all logs sync to the cloud automatically.'),
                   ],
                 ),
               ),
@@ -544,26 +567,50 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildHelpCard({required IconData icon, required String title, required String desc}) {
+  Widget _buildHelpCard({required BuildContext context, required IconData icon, required String title, required String desc}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.accent, size: 20),
+          Icon(icon, color: isDark ? AppColors.accent : const Color(0xFF2563EB), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(desc, style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.3)),
+                Text(
+                  desc,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey : const Color(0xFF475569),
+                    height: 1.3,
+                  ),
+                ),
               ],
             ),
           ),
@@ -572,17 +619,36 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildFaqTile(String question, String answer) {
+  Widget _buildFaqTile(BuildContext context, String question, String answer) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white.withValues(alpha: 0.03),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: isDark ? Colors.transparent : const Color(0xFFE2E8F0)),
+      ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        title: Text(question, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        title: Text(
+          question,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
         children: [
-          Text(answer, style: const TextStyle(fontSize: 11, color: Colors.white70, height: 1.4)),
+          Text(
+            answer,
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
@@ -636,8 +702,8 @@ class _AboutRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey : const Color(0xFF64748B))),
+          Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
         ],
       ),
     );

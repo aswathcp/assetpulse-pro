@@ -22,8 +22,23 @@ class AppTheme {
         brightness: Brightness.light,
         surface: cardBg,
         onSurface: textPrimary,
+        primary: primaryColor,
+        onPrimary: Colors.white,
+        secondary: AppColors.accent,
+        outline: borderSubtle,
+        outlineVariant: const Color(0xFFCBD5E1),
       ),
       scaffoldBackgroundColor: scaffoldBg,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: textPrimary,
+        elevation: 0,
+        titleTextStyle: GoogleFonts.outfit(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: textPrimary,
+        ),
+      ),
       cardTheme: CardThemeData(
         color: cardBg,
         elevation: 0,

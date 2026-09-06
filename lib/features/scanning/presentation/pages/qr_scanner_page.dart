@@ -44,13 +44,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void _handleBarcode(Barcode barcode) {
     if (_isProcessing) return;
     
-    setState(() => _isProcessing = true);
-    
-    final String code = barcode.rawValue ?? '';
+    final String code = (barcode.rawValue ?? barcode.displayValue ?? '').trim();
     
     if (code.isNotEmpty) {
-      // Return the scanned code
-      Navigator.pop(context, code);
+      setState(() => _isProcessing = true);
+      if (mounted) {
+        Navigator.pop(context, code);
+      }
     }
   }
 

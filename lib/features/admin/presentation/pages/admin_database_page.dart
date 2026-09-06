@@ -24,6 +24,7 @@ class AdminDatabasePage extends StatelessWidget {
   const AdminDatabasePage({super.key, this.initialCollection});
 
   final Map<String, String> _collections = const {
+    'combined_hierarchy': 'Master Hierarchy Import',
     'locations': 'Physical Areas',
     'panel_rooms': 'Panel Rooms',
     'panels': 'Panels / MCCs',
@@ -35,6 +36,7 @@ class AdminDatabasePage extends StatelessWidget {
   };
 
   final Map<String, IconData> _icons = const {
+    'combined_hierarchy': Icons.account_tree,
     'locations': Icons.map,
     'panel_rooms': Icons.room_preferences,
     'panels': Icons.electric_bolt,
@@ -46,6 +48,7 @@ class AdminDatabasePage extends StatelessWidget {
   };
 
   final Map<String, String> _subtitles = const {
+    'combined_hierarchy': 'Import/Export 5 Levels (Multi-Sheet Excel)',
     'locations': 'Physical Plant Areas (e.g. BF1-RMHS)',
     'panel_rooms': 'Substation Rooms (e.g. MCC 2 & 9)',
     'panels': 'MCCs & PCC Panels',
@@ -71,7 +74,7 @@ class AdminDatabasePage extends StatelessWidget {
         child: GridView.builder(
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: 300,
-           childAspectRatio: 0.9, // Taller cards to prevent overflow
+            childAspectRatio: 0.9,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
@@ -82,53 +85,63 @@ class AdminDatabasePage extends StatelessWidget {
             final icon = _icons[key] ?? Icons.storage;
             
             return GlassContainer(
-               child: InkWell(
-                 onTap: () {
-                   if (['equipment_types', 'fault_types', 'odc_causes'].contains(key)) {
-                       ScaffoldMessenger.of(context).showSnackBar(
-                         const SnackBar(content: Text('Coming Soon!'), behavior: SnackBarBehavior.floating),
-                       );
-                   } else {
-                     Navigator.push(
-                       context, 
-                       MaterialPageRoute(builder: (c) => DatabaseCollectionView(collectionId: key, title: title))
-                     );
-                   }
-                 },
-                 borderRadius: BorderRadius.circular(16),
-                 child: Padding(
-                   padding: const EdgeInsets.all(20),
-                   child: Column(
-                     crossAxisAlignment: CrossAxisAlignment.start,
-                     children: [
-                       Container(
-                         padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(
-                           color: AppColors.primary.withValues(alpha: 0.2),
-                           shape: BoxShape.circle,
-                         ),
-                         child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 32),
-                       ),
-                       const SizedBox(height: 16),
-                       Text(
-                         title, 
-                         style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
-                         maxLines: 2,
-                         overflow: TextOverflow.ellipsis,
-                       ),
-                       const SizedBox(height: 4),
-                       Expanded(
-                         child: Text(
-                           _subtitles[key] ?? '', 
-                           style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
-                           maxLines: 2,
-                           overflow: TextOverflow.ellipsis,
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-               ),
+              child: InkWell(
+                onTap: () {
+                  if (key == 'combined_hierarchy') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => const DataImportPage(
+                          collectionId: 'combined_hierarchy',
+                          title: 'Master Hierarchy Import',
+                        ),
+                      ),
+                    );
+                  } else if (['equipment_types', 'fault_types', 'odc_causes'].contains(key)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Coming Soon!'), behavior: SnackBarBehavior.floating),
+                    );
+                  } else {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (c) => DatabaseCollectionView(collectionId: key, title: title))
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 32),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        title, 
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        child: Text(
+                          _subtitles[key] ?? '', 
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             );
           },
         ),

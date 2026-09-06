@@ -70,6 +70,7 @@ dependencies:
   uuid: ^4.5.2
   geolocator: ^14.0.2
   qr_flutter: ^4.1.0
+  url_launcher: ^6.3.2
 
 
 dev_dependencies:

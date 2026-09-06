@@ -13,16 +13,17 @@ class AssetCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Color _getStatusColor(AssetStatus status) {
+  Color _getStatusColor(BuildContext context, AssetStatus status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case AssetStatus.active:
-        return Colors.greenAccent;
+        return isDark ? Colors.greenAccent : const Color(0xFF059669);
       case AssetStatus.underMaintenance:
-        return Colors.orangeAccent;
+        return isDark ? Colors.orangeAccent : const Color(0xFFD97706);
       case AssetStatus.scrapped:
-        return Colors.redAccent;
+        return isDark ? Colors.redAccent : const Color(0xFFDC2626);
       case AssetStatus.spare:
-        return Colors.cyanAccent;
+        return isDark ? Colors.cyanAccent : const Color(0xFF0891B2);
     }
   }
 
@@ -32,7 +33,7 @@ class AssetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(asset.status);
+    final statusColor = _getStatusColor(context, asset.status);
     final indicatorColor = asset.healthStatus != AssetHealthStatus.unknown
         ? HealthService().getHealthColor(asset.healthStatus)
         : statusColor;
@@ -91,14 +92,14 @@ class AssetCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: _getStatusColor(asset.status).withValues(alpha: 0.2),
+                                color: statusColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: _getStatusColor(asset.status).withValues(alpha: 0.5)),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                               ),
                               child: Text(
                                 _getStatusText(asset.status),
                                 style: TextStyle(
-                                  color: _getStatusColor(asset.status),
+                                  color: statusColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -159,14 +160,22 @@ class AssetCard extends StatelessWidget {
                             if (asset.isCritical) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent.withValues(alpha: 0.15),
+                                  color: Colors.amber.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.4), width: 0.8),
                                 ),
-                                child: const Text(
-                                  'CRITICAL',
-                                  style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.workspace_premium_rounded, size: 9, color: Colors.amberAccent),
+                                    SizedBox(width: 2),
+                                    Text(
+                                      'CRITICAL SPARE',
+                                      style: TextStyle(color: Colors.amberAccent, fontSize: 8.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

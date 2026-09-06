@@ -25,9 +25,13 @@ class OperationsTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Modules',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 16),
             if (isDesktop)
@@ -132,6 +136,7 @@ class OperationsTab extends StatelessWidget {
     bool isComingSoon = false,
     int? badgeCount,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: isComingSoon
           ? () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Module Coming Soon!')))
@@ -173,10 +178,18 @@ class OperationsTab extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.2),
+                    color: isDark ? Colors.amber.withValues(alpha: 0.2) : const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? Colors.amberAccent.withValues(alpha: 0.4) : const Color(0xFFFDE68A)),
                   ),
-                  child: const Text('Coming Soon', style: TextStyle(fontSize: 9.5, color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: isDark ? Colors.amberAccent : const Color(0xFFB45309),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ],

@@ -120,23 +120,25 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(
           width: 3.5,
           height: 16,
           decoration: BoxDecoration(
-            color: AppColors.accent,
+            color: isDark ? AppColors.accent : const Color(0xFF2563EB),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.2,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -146,6 +148,7 @@ class _DashboardTabState extends State<DashboardTab> {
   // --- 1. SHIFT HEADER ---
   Widget _buildShiftHeader(BuildContext context, String currentShift) {
     final user = AuthService().currentUser;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GlassContainer(
       width: double.infinity,
@@ -158,11 +161,11 @@ class _DashboardTabState extends State<DashboardTab> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.15),
+                color: isDark ? AppColors.accent.withValues(alpha: 0.15) : const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                border: Border.all(color: isDark ? AppColors.accent.withValues(alpha: 0.3) : const Color(0xFFBFDBFE)),
               ),
-              child: const Icon(Icons.access_time_filled, color: AppColors.accent, size: 24),
+              child: Icon(Icons.access_time_filled, color: isDark ? AppColors.accent : const Color(0xFF2563EB), size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -174,16 +177,16 @@ class _DashboardTabState extends State<DashboardTab> {
                       Container(
                         width: 7,
                         height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.success,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.success : const Color(0xFF059669),
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         _getShiftLabel(currentShift),
-                        style: const TextStyle(
-                          color: AppColors.accent,
+                        style: TextStyle(
+                          color: isDark ? AppColors.accent : const Color(0xFF1D4ED8),
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -201,8 +204,11 @@ class _DashboardTabState extends State<DashboardTab> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                          color: isDark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                              : const Color(0xFF475569),
                           fontSize: 12,
+                          fontWeight: isDark ? FontWeight.normal : FontWeight.w500,
                         ),
                       );
                     },
@@ -211,7 +217,7 @@ class _DashboardTabState extends State<DashboardTab> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.playlist_add_check, color: AppColors.accent, size: 24),
+              icon: Icon(Icons.playlist_add_check, color: isDark ? AppColors.accent : const Color(0xFF2563EB), size: 24),
               tooltip: 'Open Shift Checklists',
               onPressed: () {
                 Navigator.push(
@@ -228,6 +234,8 @@ class _DashboardTabState extends State<DashboardTab> {
 
   // --- 2. LIVE FLEET OVERVIEW ---
   Widget _buildLiveFleetOverview(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('assets').snapshots(),
       builder: (context, snapshot) {
@@ -235,7 +243,7 @@ class _DashboardTabState extends State<DashboardTab> {
           return Container(
             height: 100,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(20),
             ),
           );
@@ -249,6 +257,17 @@ class _DashboardTabState extends State<DashboardTab> {
         final critical = docs.where((d) => (d.data() as Map<String, dynamic>)['isCritical'] == true).length;
         final readiness = total == 0 ? 0.0 : ((active + spares) / total) * 100;
 
+        final bool isHighReadiness = readiness >= 85;
+        final badgeBg = isDark
+            ? (isHighReadiness ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15))
+            : (isHighReadiness ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7));
+        final badgeBorder = isDark
+            ? (isHighReadiness ? Colors.greenAccent.withValues(alpha: 0.4) : Colors.orangeAccent.withValues(alpha: 0.4))
+            : (isHighReadiness ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A));
+        final badgeText = isDark
+            ? (isHighReadiness ? Colors.greenAccent : Colors.orangeAccent)
+            : (isHighReadiness ? const Color(0xFF15803D) : const Color(0xFFB45309));
+
         return GlassContainer(
           width: double.infinity,
           borderRadius: 20,
@@ -259,24 +278,31 @@ class _DashboardTabState extends State<DashboardTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.hub_outlined, color: AppColors.accent, size: 18),
-                        SizedBox(width: 8),
-                        Text('Plant Asset Fleet Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Icon(Icons.hub_outlined, color: isDark ? AppColors.accent : const Color(0xFF2563EB), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Plant Asset Fleet Status',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
                       ],
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: readiness >= 85 ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
+                        color: badgeBg,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: readiness >= 85 ? Colors.greenAccent.withValues(alpha: 0.4) : Colors.orangeAccent.withValues(alpha: 0.4)),
+                        border: Border.all(color: badgeBorder),
                       ),
                       child: Text(
                         '${readiness.toStringAsFixed(0)}% Fleet Ready',
                         style: TextStyle(
-                          color: readiness >= 85 ? Colors.greenAccent : Colors.orangeAccent,
+                          color: badgeText,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -287,18 +313,65 @@ class _DashboardTabState extends State<DashboardTab> {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    Expanded(child: _buildMetricTile('Total Assets', '$total', Colors.white, Icons.storage_outlined)),
+                    Expanded(
+                      child: _buildMetricTile(
+                        context: context,
+                        label: 'Total Assets',
+                        value: '$total',
+                        icon: Icons.storage_outlined,
+                        darkColor: Colors.white,
+                        lightIconColor: const Color(0xFF334155),
+                        lightValColor: const Color(0xFF0F172A),
+                        lightBg: const Color(0xFFF8FAFC),
+                        lightBorder: const Color(0xFFE2E8F0),
+                        lightLabelColor: const Color(0xFF64748B),
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Expanded(child: _buildMetricTile('In-Service', '$active', Colors.greenAccent, Icons.bolt_outlined)),
+                    Expanded(
+                      child: _buildMetricTile(
+                        context: context,
+                        label: 'In-Service',
+                        value: '$active',
+                        icon: Icons.bolt_outlined,
+                        darkColor: Colors.greenAccent,
+                        lightIconColor: const Color(0xFF059669),
+                        lightValColor: const Color(0xFF047857),
+                        lightBg: const Color(0xFFECFDF5),
+                        lightBorder: const Color(0xFFA7F3D0),
+                        lightLabelColor: const Color(0xFF065F46),
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Expanded(child: _buildMetricTile('Spares', '$spares', Colors.cyanAccent, Icons.inventory_2_outlined)),
+                    Expanded(
+                      child: _buildMetricTile(
+                        context: context,
+                        label: 'Spares',
+                        value: '$spares',
+                        icon: Icons.inventory_2_outlined,
+                        darkColor: Colors.cyanAccent,
+                        lightIconColor: const Color(0xFF0284C7),
+                        lightValColor: const Color(0xFF0369A1),
+                        lightBg: const Color(0xFFF0F9FF),
+                        lightBorder: const Color(0xFFBAE6FD),
+                        lightLabelColor: const Color(0xFF075985),
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Expanded(child: _buildMetricTile(
-                      maintenance > 0 ? 'Maintenance' : 'Critical',
-                      maintenance > 0 ? '$maintenance' : '$critical',
-                      maintenance > 0 ? Colors.redAccent : Colors.orangeAccent,
-                      maintenance > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
-                    )),
+                    Expanded(
+                      child: _buildMetricTile(
+                        context: context,
+                        label: maintenance > 0 ? 'Maintenance' : 'Critical',
+                        value: maintenance > 0 ? '$maintenance' : '$critical',
+                        icon: maintenance > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
+                        darkColor: maintenance > 0 ? Colors.redAccent : Colors.orangeAccent,
+                        lightIconColor: maintenance > 0 ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                        lightValColor: maintenance > 0 ? const Color(0xFFB91C1C) : const Color(0xFFB45309),
+                        lightBg: maintenance > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB),
+                        lightBorder: maintenance > 0 ? const Color(0xFFFECACA) : const Color(0xFFFDE68A),
+                        lightLabelColor: maintenance > 0 ? const Color(0xFF991B1B) : const Color(0xFF92400E),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -309,21 +382,48 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Widget _buildMetricTile(String label, String value, Color color, IconData icon) {
+  Widget _buildMetricTile({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color darkColor,
+    required Color lightIconColor,
+    required Color lightValColor,
+    required Color lightBg,
+    required Color lightBorder,
+    Color? lightLabelColor,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? darkColor.withValues(alpha: 0.08) : lightBg;
+    final border = isDark ? darkColor.withValues(alpha: 0.2) : lightBorder;
+    final icColor = isDark ? darkColor : lightIconColor;
+    final valColor = isDark ? darkColor : lightValColor;
+    final lblColor = isDark ? Colors.white70 : (lightLabelColor ?? const Color(0xFF475569));
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: border),
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 15),
+          Icon(icon, color: icColor, size: 15),
           const SizedBox(height: 3),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: valColor)),
           const SizedBox(height: 2),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: Colors.white70)),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: isDark ? FontWeight.normal : FontWeight.w600,
+              color: lblColor,
+            ),
+          ),
         ],
       ),
     );
@@ -338,7 +438,10 @@ class _DashboardTabState extends State<DashboardTab> {
             context,
             title: 'Log Fault',
             icon: Icons.warning_amber_rounded,
-            color: Colors.redAccent,
+            darkColor: Colors.redAccent,
+            lightIconColor: const Color(0xFFDC2626),
+            lightBg: const Color(0xFFFEF2F2),
+            lightBorder: const Color(0xFFFECACA),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogFaultPage())),
           ),
         ),
@@ -348,7 +451,10 @@ class _DashboardTabState extends State<DashboardTab> {
             context,
             title: 'General Work',
             icon: Icons.engineering_outlined,
-            color: Colors.blueAccent,
+            darkColor: Colors.blueAccent,
+            lightIconColor: const Color(0xFF2563EB),
+            lightBg: const Color(0xFFEFF6FF),
+            lightBorder: const Color(0xFFBFDBFE),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GenWorkLogPage())),
           ),
         ),
@@ -358,7 +464,10 @@ class _DashboardTabState extends State<DashboardTab> {
             context,
             title: 'LOTO Permits',
             icon: Icons.lock_clock_outlined,
-            color: Colors.amberAccent,
+            darkColor: Colors.amberAccent,
+            lightIconColor: const Color(0xFFD97706),
+            lightBg: const Color(0xFFFFFBEB),
+            lightBorder: const Color(0xFFFDE68A),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IsolationManagementPage())),
           ),
         ),
@@ -368,7 +477,10 @@ class _DashboardTabState extends State<DashboardTab> {
             context,
             title: 'Checklists',
             icon: Icons.checklist_outlined,
-            color: Colors.tealAccent,
+            darkColor: Colors.tealAccent,
+            lightIconColor: const Color(0xFF0D9488),
+            lightBg: const Color(0xFFF0FDFA),
+            lightBorder: const Color(0xFF99F6E4),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChecklistManagementDashboard())),
           ),
         ),
@@ -380,21 +492,38 @@ class _DashboardTabState extends State<DashboardTab> {
     BuildContext context, {
     required String title,
     required IconData icon,
-    required Color color,
+    required Color darkColor,
+    required Color lightIconColor,
+    required Color lightBg,
+    required Color lightBorder,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? darkColor.withValues(alpha: 0.1) : lightBg;
+    final border = isDark ? darkColor.withValues(alpha: 0.3) : lightBorder;
+    final icColor = isDark ? darkColor : lightIconColor;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: bg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: border),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
+            Icon(icon, color: icColor, size: 22),
             const SizedBox(height: 6),
             Text(
               title,
@@ -404,7 +533,7 @@ class _DashboardTabState extends State<DashboardTab> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: isDark ? Theme.of(context).colorScheme.onSurface : const Color(0xFF0F172A),
               ),
             ),
           ],
@@ -415,6 +544,8 @@ class _DashboardTabState extends State<DashboardTab> {
 
   // --- 4. LIVE CRITICAL FAULTS STREAM ---
   Widget _buildLiveFaultsStream(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return StreamBuilder<List<FaultLogModel>>(
       stream: _firestoreService.getOpenFaultLogsStream(),
       builder: (context, snapshot) {
@@ -430,18 +561,31 @@ class _DashboardTabState extends State<DashboardTab> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
+                      color: isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 20),
+                    child: Icon(Icons.check_circle_outline, color: isDark ? Colors.greenAccent : const Color(0xFF059669), size: 20),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('All Systems Operating Normally', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text('No active critical breakdown faults recorded', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                        Text(
+                          'All Systems Operating Normally',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'No active critical breakdown faults recorded',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? Colors.grey : const Color(0xFF475569),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -457,13 +601,22 @@ class _DashboardTabState extends State<DashboardTab> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: isDark ? Colors.red.withValues(alpha: 0.1) : const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                border: Border.all(color: isDark ? Colors.redAccent.withValues(alpha: 0.3) : const Color(0xFFFECACA)),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 22),
+                  Icon(Icons.error_outline, color: isDark ? Colors.redAccent : const Color(0xFFDC2626), size: 22),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -474,11 +627,19 @@ class _DashboardTabState extends State<DashboardTab> {
                           children: [
                             Text(
                               fault.masterEquipmentId.isNotEmpty ? fault.masterEquipmentId : 'Plant Equipment',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
                             Text(
                               _getRelativeTime(fault.reportedAt),
-                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? Colors.grey : const Color(0xFF64748B),
+                                fontWeight: isDark ? FontWeight.normal : FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -487,7 +648,10 @@ class _DashboardTabState extends State<DashboardTab> {
                           fault.odc.isNotEmpty ? fault.odc : fault.cause,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11, color: Colors.white70),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white70 : const Color(0xFF475569),
+                          ),
                         ),
                       ],
                     ),
@@ -503,6 +667,8 @@ class _DashboardTabState extends State<DashboardTab> {
 
   // --- 5. LIVE RECENT ACTIVITY LOGS ---
   Widget _buildLiveActivityLogStream(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _firestoreService.getActivityLogsStream(limit: 6),
       builder: (context, snapshot) {
@@ -515,10 +681,16 @@ class _DashboardTabState extends State<DashboardTab> {
         if (logs.isEmpty) {
           return GlassContainer(
             borderRadius: 16,
-            child: const Padding(
-              padding: EdgeInsets.all(20),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
               child: Center(
-                child: Text('No recent activity records found.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                child: Text(
+                  'No recent activity records found.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey : const Color(0xFF64748B),
+                  ),
+                ),
               ),
             ),
           );
@@ -532,28 +704,37 @@ class _DashboardTabState extends State<DashboardTab> {
             final timeStr = _getRelativeTime(ts);
 
             IconData icon = Icons.check_circle_outline;
-            Color iconColor = AppColors.accent;
+            Color iconColor = isDark ? AppColors.accent : const Color(0xFF2563EB);
             if (action.toLowerCase().contains('fault') || action.toLowerCase().contains('breakdown')) {
               icon = Icons.warning_amber_rounded;
-              iconColor = Colors.redAccent;
+              iconColor = isDark ? Colors.redAccent : const Color(0xFFDC2626);
             } else if (action.toLowerCase().contains('diagnostic') || action.toLowerCase().contains('test')) {
               icon = Icons.monitor_heart_outlined;
-              iconColor = Colors.cyanAccent;
+              iconColor = isDark ? Colors.cyanAccent : const Color(0xFF0284C7);
             } else if (action.toLowerCase().contains('spare') || action.toLowerCase().contains('replace')) {
               icon = Icons.swap_horiz;
-              iconColor = Colors.orangeAccent;
+              iconColor = isDark ? Colors.orangeAccent : const Color(0xFFD97706);
             } else if (action.toLowerCase().contains('loto') || action.toLowerCase().contains('isolation')) {
               icon = Icons.lock_clock_outlined;
-              iconColor = Colors.amberAccent;
+              iconColor = isDark ? Colors.amberAccent : const Color(0xFFD97706);
             }
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE2E8F0)),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
               ),
               child: Row(
                 children: [
@@ -563,14 +744,36 @@ class _DashboardTabState extends State<DashboardTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(action, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text(
+                          action,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
                         if (details.isNotEmpty)
-                          Text(details, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(
+                            details,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.grey : const Color(0xFF475569),
+                            ),
+                          ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(timeStr, style: const TextStyle(fontSize: 9, color: Colors.white38)),
+                  Text(
+                    timeStr,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: isDark ? FontWeight.normal : FontWeight.w500,
+                      color: isDark ? Colors.white38 : const Color(0xFF64748B),
+                    ),
+                  ),
                 ],
               ),
             );

@@ -207,13 +207,55 @@ class FirestoreService {
 
   // Find Asset by Tag Number (Top Level)
   Future<AssetModel?> getAssetByTagNo(String tagNo) async {
-    final query = await _db.collection('assets')
-        .where('tagNo', isEqualTo: tagNo)
+    final clean = tagNo.trim();
+    if (clean.isEmpty) return null;
+
+    // 1. Exact match on tagNo
+    var query = await _db.collection('assets')
+        .where('tagNo', isEqualTo: clean)
         .limit(1)
         .get();
     if (query.docs.isNotEmpty) {
       return AssetModel.fromMap(query.docs.first.data(), query.docs.first.id);
     }
+
+    // 2. Uppercase match on tagNo
+    if (clean != clean.toUpperCase()) {
+      query = await _db.collection('assets')
+          .where('tagNo', isEqualTo: clean.toUpperCase())
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        return AssetModel.fromMap(query.docs.first.data(), query.docs.first.id);
+      }
+    }
+
+    // 3. Match on serialNo
+    query = await _db.collection('assets')
+        .where('serialNo', isEqualTo: clean)
+        .limit(1)
+        .get();
+    if (query.docs.isNotEmpty) {
+      return AssetModel.fromMap(query.docs.first.data(), query.docs.first.id);
+    }
+
+    // 4. Match on masterEquipmentId
+    query = await _db.collection('assets')
+        .where('masterEquipmentId', isEqualTo: clean)
+        .limit(1)
+        .get();
+    if (query.docs.isNotEmpty) {
+      return AssetModel.fromMap(query.docs.first.data(), query.docs.first.id);
+    }
+
+    // 5. Match by Document ID
+    try {
+      final doc = await _db.collection('assets').doc(clean).get();
+      if (doc.exists && doc.data() != null) {
+        return AssetModel.fromMap(doc.data()!, doc.id);
+      }
+    } catch (_) {}
+
     return null;
   }
 
@@ -395,24 +437,43 @@ class FirestoreService {
 
   // Generic Batch Save for Bulk Upload
   Future<void> batchSave(String collection, List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) return;
     WriteBatch batch = _db.batch();
     int count = 0;
     
-    for (var item in items) {
+    for (var rawItem in items) {
+       final item = Map<String, dynamic>.from(rawItem);
+       // Remove internal/helper keys
+       item.remove('Validation');
+       item.remove('_sheetName');
+       item.remove('_collection');
+       
+       // Remove nulls and empty keys
+       item.removeWhere((k, v) => k.isEmpty || v == null);
+
        final docId = item['id']?.toString().trim() ?? item['tagNo']?.toString().trim();
        if (docId == null || docId.isEmpty) continue;
+       
        final ref = _db.collection(collection).doc(docId);
        batch.set(ref, item, SetOptions(merge: true));
        
        count++;
-       if (count >= 450) { 
-         await batch.commit();
+       if (count >= 400) { 
+         try {
+           await batch.commit().timeout(const Duration(seconds: 15));
+         } catch (e) {
+           debugPrint('Batch commit timed out or failed: $e, falling back to document writes');
+         }
          batch = _db.batch();
          count = 0;
        }
     }
     if (count > 0) {
-      await batch.commit();
+      try {
+        await batch.commit().timeout(const Duration(seconds: 15));
+      } catch (e) {
+        debugPrint('Final batch commit timed out or failed: $e');
+      }
     }
   }
   

@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
 import '../../../../core/utils/permission_helper.dart';
 import '../../data/models/asset_model.dart';
@@ -100,102 +100,89 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             ? AssetModel.fromMap(snapshot.data!.data()!, snapshot.data!.id)
             : widget.asset;
 
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            title: Text(currentAsset.tagNo),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios, color: Theme.of(context).colorScheme.onSurface),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.add_alert_rounded),
-                tooltip: 'Log Fault',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AddFaultLogPage(
-                        masterEquipmentId: currentAsset.masterEquipmentId,
-                        masterEquipmentName: 'Equipment ${currentAsset.masterEquipmentId}',
-                        assetId: currentAsset.id,
-                      ),
-                    ),
-                  );
-                },
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final onSurfaceCol = Theme.of(context).colorScheme.onSurface;
+
+        return DefaultTabController(
+          length: 4,
+          child: Scaffold(
+            extendBodyBehindAppBar: false,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: false,
+              title: Text(
+                currentAsset.tagNo,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: onSurfaceCol,
+                ),
               ),
-              if (!_isLoading && _canEdit)
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back_ios, color: onSurfaceCol),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
                 IconButton(
-                  icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.onSurface),
+                  icon: const Icon(Icons.add_alert_rounded, color: Colors.amberAccent),
+                  tooltip: 'Log Fault',
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AddEditAssetPage(
-                          asset: currentAsset,
-                          unitId: _assetUnitId,
-                          plantId: _assetPlantId,
+                        builder: (context) => AddFaultLogPage(
+                          masterEquipmentId: currentAsset.masterEquipmentId,
+                          masterEquipmentName: 'Equipment ${currentAsset.masterEquipmentId}',
+                          assetId: currentAsset.id,
                         ),
                       ),
                     );
                   },
                 ),
-            ],
-          ),
-          body: AnimatedGradientBackground(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(top: 100, bottom: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Header Information
-                  _buildHeader(context, currentAsset),
-
-                  const SizedBox(height: 20),
-
-                  // 2. Tabbed Details
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GlassContainer(
-                      width: double.infinity,
-                      height: 620,
-                      borderRadius: 24,
-                      child: DefaultTabController(
-                        length: 4,
-                        child: Column(
-                          children: [
-                            const TabBar(
-                              labelColor: AppColors.accent,
-                              unselectedLabelColor: Colors.grey,
-                              indicatorColor: AppColors.accent,
-                              isScrollable: true,
-                              tabAlignment: TabAlignment.start,
-                              tabs: [
-                                Tab(text: 'Identity'),
-                                Tab(text: 'Specs'),
-                                Tab(text: 'Health'),
-                                Tab(text: 'History'),
-                              ],
-                            ),
-                            Expanded(
-                              child: TabBarView(
-                                children: [
-                                  _buildIdentityTab(context, currentAsset),
-                                  _buildSpecsTab(context, currentAsset),
-                                  _buildHealthTab(context, currentAsset),
-                                  _buildHistoryTab(context, currentAsset),
-                                ],
-                              ),
-                            ),
-                          ],
+                if (!_isLoading && _canEdit)
+                  IconButton(
+                    icon: Icon(Icons.edit, color: isDark ? AppColors.accent : const Color(0xFF0284C7)),
+                    tooltip: 'Edit Asset',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddEditAssetPage(
+                            asset: currentAsset,
+                            unitId: _assetUnitId,
+                            plantId: _assetPlantId,
+                          ),
                         ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            body: AnimatedGradientBackground(
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: _buildHeader(context, currentAsset),
                       ),
                     ),
-                  ),
-                ],
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: const _SliverTabBarDelegate(),
+                    ),
+                  ];
+                },
+                body: TabBarView(
+                  children: [
+                    _buildIdentityTab(context, currentAsset),
+                    _buildSpecsTab(context, currentAsset),
+                    _buildHealthTab(context, currentAsset),
+                    _buildHistoryTab(context, currentAsset),
+                  ],
+                ),
               ),
             ),
           ),
@@ -205,6 +192,8 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
   }
 
   Widget _buildHeader(BuildContext context, AssetModel asset) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Column(
         children: [
@@ -224,9 +213,9 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              _buildStatusBadge(asset.status),
-              _buildTypeBadge(asset.type),
-              if (asset.isCritical) _buildCriticalBadge(),
+              _buildStatusBadge(context, asset.status),
+              _buildTypeBadge(context, asset.type),
+              if (asset.isCritical) _buildCriticalBadge(context),
               if (asset.healthStatus != AssetHealthStatus.unknown) _buildHealthBadge(asset.healthStatus),
             ],
           ),
@@ -235,10 +224,18 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
           if (asset.status == AssetStatus.active) ...[
             TextButton.icon(
               onPressed: () => _showReplaceWithSpareDialog(context, asset),
-              icon: const Icon(Icons.swap_horiz, color: AppColors.accent),
-              label: const Text('Replace with Spare', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+              icon: Icon(Icons.swap_horiz, color: isDark ? AppColors.accent : const Color(0xFF0284C7)),
+              label: Text(
+                'Replace with Spare',
+                style: TextStyle(
+                  color: isDark ? AppColors.accent : const Color(0xFF0284C7),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               style: TextButton.styleFrom(
-                backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                backgroundColor: isDark
+                    ? AppColors.accent.withValues(alpha: 0.1)
+                    : const Color(0xFFE0F2FE),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -271,29 +268,30 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
-  Widget _buildStatusBadge(AssetStatus status) {
+  Widget _buildStatusBadge(BuildContext context, AssetStatus status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color color;
     switch (status) {
       case AssetStatus.active:
-        color = AppColors.success;
+        color = isDark ? Colors.greenAccent : const Color(0xFF059669);
         break;
       case AssetStatus.underMaintenance:
-        color = AppColors.warning;
+        color = isDark ? Colors.orangeAccent : const Color(0xFFD97706);
         break;
       case AssetStatus.scrapped:
-        color = AppColors.error;
+        color = isDark ? Colors.redAccent : const Color(0xFFDC2626);
         break;
       case AssetStatus.spare:
-        color = Colors.cyanAccent;
+        color = isDark ? Colors.cyanAccent : const Color(0xFF0891B2);
         break;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: isDark ? 0.15 : 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.7)),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.7 : 0.4)),
       ),
       child: Text(
         status.name.toUpperCase(),
@@ -302,7 +300,8 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
-  Widget _buildTypeBadge(AssetType type) {
+  Widget _buildTypeBadge(BuildContext context, AssetType type) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     IconData icon;
     switch (type) {
       case AssetType.motor:
@@ -322,43 +321,56 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
         break;
     }
 
+    final badgeColor = isDark ? AppColors.accent : const Color(0xFF1E40AF);
+    final badgeBg = isDark ? AppColors.primary.withValues(alpha: 0.25) : const Color(0xFFEFF6FF);
+    final badgeBorder = isDark ? AppColors.accent.withValues(alpha: 0.6) : const Color(0xFF93C5FD);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.15),
+        color: badgeBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.7)),
+        border: Border.all(color: badgeBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: AppColors.accent),
+          Icon(icon, size: 13, color: badgeColor),
           const SizedBox(width: 5),
           Text(
             type.name.toUpperCase(),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+            style: TextStyle(
+              color: badgeColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCriticalBadge() {
+  Widget _buildCriticalBadge(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final critColor = isDark ? Colors.amberAccent : const Color(0xFFD97706);
+    final critBg = isDark ? Colors.amberAccent.withValues(alpha: 0.15) : const Color(0xFFFEF3C7);
+    final critBorder = isDark ? Colors.amberAccent.withValues(alpha: 0.5) : const Color(0xFFFCD34D);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(alpha: 0.15),
+        color: critBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.redAccent),
+        border: Border.all(color: critBorder),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.warning_amber, color: Colors.redAccent, size: 13),
-          SizedBox(width: 4),
+          Icon(Icons.workspace_premium_rounded, color: critColor, size: 14),
+          const SizedBox(width: 4),
           Text(
-            'CRITICAL',
-            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11),
+            'CRITICAL SPARE',
+            style: TextStyle(color: critColor, fontWeight: FontWeight.bold, fontSize: 11),
           ),
         ],
       ),
@@ -391,6 +403,29 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
+  Future<void> _launchImageUrl(BuildContext context, String urlStr) async {
+    final trimmed = urlStr.trim();
+    if (trimmed.isEmpty) return;
+    try {
+      final uri = Uri.parse(trimmed);
+      final canLaunch = await canLaunchUrl(uri);
+      if (canLaunch) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open image URL: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   // --- TAB 1: IDENTITY & GENERAL ---
   Widget _buildIdentityTab(BuildContext context, AssetModel asset) {
     return SingleChildScrollView(
@@ -398,6 +433,111 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Asset Image Preview Card (if imageUrl is available)
+          if (asset.imageUrl.isNotEmpty) ...[
+            _sectionHeader('Asset Media & Reference Image'),
+            InkWell(
+              onTap: () => _launchImageUrl(context, asset.imageUrl),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Image.network(
+                            asset.imageUrl,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                height: 180,
+                                color: Colors.white.withValues(alpha: 0.05),
+                                child: const Center(child: PulseLoading(size: 36)),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 120,
+                                color: Colors.white.withValues(alpha: 0.05),
+                                child: const Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.broken_image_outlined, color: Colors.grey, size: 28),
+                                      SizedBox(width: 8),
+                                      Text('Image preview unavailable', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          Container(
+                            margin: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.75),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.accent.withValues(alpha: 0.5)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.open_in_browser, color: AppColors.accent, size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  'TAP TO OPEN IN BROWSER',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.link, color: AppColors.accent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              asset.imageUrl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: Colors.cyanAccent, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.launch, color: AppColors.accent, size: 18),
+                            tooltip: 'Open in Browser',
+                            onPressed: () => _launchImageUrl(context, asset.imageUrl),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Divider(color: Theme.of(context).dividerColor, height: 24),
+          ],
+
           _sectionHeader('General Identity'),
           Row(
             children: [
@@ -871,6 +1011,39 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                                       'R-E: ${log.insulationResistance!['R-E'] ?? "-"} MΩ, Y-E: ${log.insulationResistance!['Y-E'] ?? "-"} MΩ, B-E: ${log.insulationResistance!['B-E'] ?? "-"} MΩ'),
                                 ],
                                 if (log.polarizationIndex != null) _buildLogItem('Polarization Index (PI)', '${log.polarizationIndex}'),
+                                if (log.specs?['fanCondition'] != null) _buildLogItem('Cooling Fan & Cowl', '${log.specs!['fanCondition']}'),
+                                if (log.specs?['shaftRotation'] != null) _buildLogItem('Free Shaft Rotation', '${log.specs!['shaftRotation']}'),
+                                if (log.specs?['terminalBox'] != null) _buildLogItem('Terminal Box Glands', '${log.specs!['terminalBox']}'),
+                                if (log.specs?['greaseStatus'] != null) _buildLogItem('Bearing Lubrication', '${log.specs!['greaseStatus']}'),
+                              ] else if (asset.type == AssetType.gearbox) ...[
+                                if (log.specs?['backlash'] != null) _buildLogItem('Backlash / Endplay', '${log.specs!['backlash']} mm'),
+                                if (log.specs?['sumpTemp'] != null) _buildLogItem('Sump Oil Temp', '${log.specs!['sumpTemp']} °C'),
+                                if (log.specs?['oilLevelQuality'] != null) _buildLogItem('Lube Oil Quality', '${log.specs!['oilLevelQuality']}'),
+                                if (log.specs?['breather'] != null) _buildLogItem('Breather Cap', '${log.specs!['breather']}'),
+                                if (log.specs?['toothContact'] != null) _buildLogItem('Gear Tooth Mesh', '${log.specs!['toothContact']}'),
+                                if (log.specs?['oilSeal'] != null) _buildLogItem('Shaft Oil Seal', '${log.specs!['oilSeal']}'),
+                                if (log.specs?['shaftRotation'] != null) _buildLogItem('Hand Rotation', '${log.specs!['shaftRotation']}'),
+                              ] else if (asset.type == AssetType.pump) ...[
+                                if (log.specs?['head'] != null) _buildLogItem('Discharge Head', '${log.specs!['head']} m'),
+                                if (log.specs?['dischargePressure'] != null) _buildLogItem('Discharge Pressure', '${log.specs!['dischargePressure']} Bar'),
+                                if (log.specs?['flowRate'] != null) _buildLogItem('Flow Rate', '${log.specs!['flowRate']} m³/h'),
+                                if (log.specs?['bearingTemp'] != null) _buildLogItem('Bearing Temp', '${log.specs!['bearingTemp']} °C'),
+                                if (log.specs?['sealStatus'] != null) _buildLogItem('Seal / Gland Condition', '${log.specs!['sealStatus']}'),
+                                if (log.specs?['impellerNoise'] != null) _buildLogItem('Impeller / Noise', '${log.specs!['impellerNoise']}'),
+                              ] else if (asset.type == AssetType.brake) ...[
+                                if (log.specs?['stroke'] != null) _buildLogItem('Thruster Stroke', '${log.specs!['stroke']} mm'),
+                                if (log.specs?['lining'] != null) _buildLogItem('Lining Thickness', '${log.specs!['lining']} mm'),
+                                if (log.specs?['drumClearance'] != null) _buildLogItem('Drum Gap / Clearance', '${log.specs!['drumClearance']} mm'),
+                                if (log.specs?['torque'] != null) _buildLogItem('Braking Torque', '${log.specs!['torque']} Nm'),
+                                if (log.specs?['holdingTest'] != null) _buildLogItem('Holding Slip Test', '${log.specs!['holdingTest']}'),
+                                if (log.specs?['manualRelease'] != null) _buildLogItem('Manual Release', '${log.specs!['manualRelease']}'),
+                              ] else if (asset.type == AssetType.actuator) ...[
+                                if (log.specs?['torque'] != null) _buildLogItem('Torque / Thrust Output', '${log.specs!['torque']} Nm/kN'),
+                                if (log.specs?['travelTime'] != null) _buildLogItem('Full Stroke Travel Time', '${log.specs!['travelTime']} s'),
+                                if (log.specs?['feedbackSignal'] != null) _buildLogItem('Positioner Feedback (4-20mA)', '${log.specs!['feedbackSignal']}'),
+                                if (log.specs?['limitSwitch'] != null) _buildLogItem('Limit & Torque Switches', '${log.specs!['limitSwitch']}'),
+                                if (log.specs?['handwheel'] != null) _buildLogItem('Manual Handwheel Engagement', '${log.specs!['handwheel']}'),
+                                if (log.specs?['terminalSeal'] != null) _buildLogItem('Terminal Chamber Seal', '${log.specs!['terminalSeal']}'),
                               ],
                               if (log.vibration != null) ...[
                                 _buildLogItem('DE Vibration',
@@ -941,12 +1114,13 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
 
   // --- Helpers ---
   Widget _sectionHeader(String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.accent,
+        style: TextStyle(
+          color: isDark ? AppColors.accent : const Color(0xFF1E40AF),
           fontWeight: FontWeight.bold,
           letterSpacing: 1.1,
           fontSize: 11.5,
@@ -956,19 +1130,49 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
   }
 
   Widget _buildDetailBox(BuildContext context, String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final boxBg = isDark
+        ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+        : Colors.white;
+    final boxBorder = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFE2E8F0);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withValues(alpha: 0.5),
+        color: boxBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: boxBorder),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              fontSize: 11,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13.5)),
+          Text(
+            value,
+            style: TextStyle(
+              color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+              fontWeight: FontWeight.bold,
+              fontSize: 13.5,
+            ),
+          ),
         ],
       ),
     );
@@ -1202,3 +1406,83 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 }
+
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  const _SliverTabBarDelegate();
+
+  @override
+  double get minExtent => 54;
+
+  @override
+  double get maxExtent => 54;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor = isDark
+        ? const Color(0xFF1E293B).withValues(alpha: 0.9)
+        : const Color(0xFFE2E8F0);
+    final borderColor = isDark
+        ? const Color(0xFF334155).withValues(alpha: 0.8)
+        : const Color(0xFFCBD5E1);
+    final activeTabColor = isDark
+        ? AppColors.primaryLight.withValues(alpha: 0.85)
+        : Colors.white;
+    final selectedTextColor = isDark
+        ? Colors.white
+        : const Color(0xFF0F172A);
+    final unselectedTextColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Container(
+        height: 42,
+        decoration: BoxDecoration(
+          color: trackColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: TabBar(
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            color: activeTabColor,
+            borderRadius: BorderRadius.circular(11),
+            border: isDark
+                ? Border.all(color: AppColors.accent.withValues(alpha: 0.5), width: 1)
+                : null,
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+          ),
+          labelColor: selectedTextColor,
+          unselectedLabelColor: unselectedTextColor,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          tabs: const [
+            Tab(text: 'Identity'),
+            Tab(text: 'Specs'),
+            Tab(text: 'Health'),
+            Tab(text: 'History'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
+    return false;
+  }
+}
+

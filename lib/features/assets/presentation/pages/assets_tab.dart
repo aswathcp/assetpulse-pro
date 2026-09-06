@@ -772,23 +772,34 @@ class _AssetsTabState extends State<AssetsTab> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatItem('Total Fleet', '$_totalAssets', Colors.white, Icons.storage_outlined)),
-                          const SizedBox(width: 6),
-                          Expanded(child: _buildStatItem('In-Service', '$_activeCount', Colors.greenAccent, Icons.bolt_outlined)),
-                          const SizedBox(width: 6),
-                          Expanded(child: _buildStatItem('Spares', '$_spareCount', Colors.cyanAccent, Icons.inventory_2_outlined)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: _buildStatItem(
-                              _maintenanceCount > 0 ? 'Maintenance' : 'Critical Path',
-                              _maintenanceCount > 0 ? '$_maintenanceCount' : '$_criticalCount',
-                              _maintenanceCount > 0 ? Colors.redAccent : Colors.orangeAccent,
-                              _maintenanceCount > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
-                            ),
-                          ),
-                        ],
+                      Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          final inServiceColor = isDark ? Colors.greenAccent : const Color(0xFF059669);
+                          final sparesColor = isDark ? Colors.cyanAccent : const Color(0xFF0891B2);
+                          final alertColor = _maintenanceCount > 0
+                              ? (isDark ? Colors.redAccent : const Color(0xFFDC2626))
+                              : (isDark ? Colors.orangeAccent : const Color(0xFFD97706));
+
+                          return Row(
+                            children: [
+                              Expanded(child: _buildStatItem('Total Fleet', '$_totalAssets', isDark ? Colors.white : const Color(0xFF0F172A), Icons.storage_outlined)),
+                              const SizedBox(width: 6),
+                              Expanded(child: _buildStatItem('In-Service', '$_activeCount', inServiceColor, Icons.bolt_outlined)),
+                              const SizedBox(width: 6),
+                              Expanded(child: _buildStatItem('Spares', '$_spareCount', sparesColor, Icons.inventory_2_outlined)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _buildStatItem(
+                                  _maintenanceCount > 0 ? 'Maintenance' : 'Critical Path',
+                                  _maintenanceCount > 0 ? '$_maintenanceCount' : '$_criticalCount',
+                                  alertColor,
+                                  _maintenanceCount > 0 ? Icons.build_circle_outlined : Icons.warning_amber_outlined,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1215,6 +1226,8 @@ class _AssetsTabState extends State<AssetsTab> {
 
   Widget _buildMainTypeChip(String typeKey, String label) {
     final isSelected = _filterType.toLowerCase() == typeKey.toLowerCase();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return FilterChip(
       selected: isSelected,
       label: Text(
@@ -1222,18 +1235,24 @@ class _AssetsTabState extends State<AssetsTab> {
         style: TextStyle(
           fontSize: 11,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : Colors.white70,
+          color: isSelected
+              ? Colors.white
+              : (isDark ? Colors.white70 : const Color(0xFF334155)),
         ),
       ),
       selectedColor: AppColors.primary,
-      backgroundColor: Colors.white.withValues(alpha: 0.05),
+      backgroundColor: isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : const Color(0xFFF1F5F9),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: isSelected ? AppColors.accent : Colors.white.withValues(alpha: 0.1),
+          color: isSelected
+              ? AppColors.accent
+              : (isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFCBD5E1)),
         ),
       ),
-      checkmarkColor: AppColors.accent,
+      checkmarkColor: isSelected ? Colors.white : AppColors.accent,
       onSelected: (_) {
         setState(() {
           _filterType = isSelected && typeKey != 'All' ? 'All' : typeKey;
@@ -1321,12 +1340,14 @@ class _AssetsTabState extends State<AssetsTab> {
   }
 
   Widget _buildStatItem(String label, String value, Color color, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: isDark ? 0.08 : 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.2 : 0.3)),
       ),
       child: Column(
         children: [
@@ -1346,7 +1367,11 @@ class _AssetsTabState extends State<AssetsTab> {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 9,
+              color: isDark ? Colors.white70 : const Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

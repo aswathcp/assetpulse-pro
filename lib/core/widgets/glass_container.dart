@@ -27,11 +27,11 @@ class GlassContainer extends StatelessWidget {
     
     final backgroundColor = isDark 
         ? const Color(0xFF1E293B).withValues(alpha: 0.7)
-        : const Color(0xFFFFFFFF).withValues(alpha: 0.9);
+        : const Color(0xFFFFFFFF);
 
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.1)
-        : Colors.grey.withValues(alpha: 0.2);
+        : const Color(0xFFE2E8F0);
 
     return Container(
       width: width,
@@ -41,15 +41,23 @@ class GlassContainer extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
           color: borderColor,
-          width: border,
+          width: isDark ? border : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       // Material ancestor is required for ListTile/InkWell/DataTable to paint
       // ink splashes and backgrounds correctly on dark decorated surfaces.

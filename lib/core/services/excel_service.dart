@@ -93,7 +93,22 @@ class ExcelService {
           }
 
           if (!isEmpty) {
-            // Auto-infer type from sheet name if type column is missing or empty
+            rowMap['_sheetName'] = tableName;
+
+            // Auto-infer hierarchy target collection from sheet name
+            if (lowerSheet.contains('location') || lowerSheet.contains('area') || lowerSheet.contains('physical')) {
+              rowMap['_collection'] = 'locations';
+            } else if (lowerSheet.contains('room') || lowerSheet.contains('substation')) {
+              rowMap['_collection'] = 'panel_rooms';
+            } else if (lowerSheet.contains('panel') || lowerSheet.contains('mcc') || lowerSheet.contains('pcc')) {
+              rowMap['_collection'] = 'panels';
+            } else if (lowerSheet.contains('feeder')) {
+              rowMap['_collection'] = 'feeders';
+            } else if (lowerSheet.contains('equipment') || lowerSheet.contains('machin') || lowerSheet.contains('master')) {
+              rowMap['_collection'] = 'master_equipments';
+            }
+
+            // Auto-infer asset type from sheet name if type column is missing or empty
             if (rowMap['type'] == null || rowMap['type'].toString().isEmpty) {
               if (lowerSheet.contains('motor')) {
                 rowMap['type'] = 'motor';
@@ -101,6 +116,10 @@ class ExcelService {
                 rowMap['type'] = 'gearbox';
               } else if (lowerSheet.contains('pump')) {
                 rowMap['type'] = 'pump';
+              } else if (lowerSheet.contains('brake')) {
+                rowMap['type'] = 'brake';
+              } else if (lowerSheet.contains('actuat')) {
+                rowMap['type'] = 'actuator';
               }
             }
             results.add(rowMap);
