@@ -8,8 +8,12 @@ import '../../features/assets/data/models/location_model.dart';
 import '../../features/assets/data/models/panel_model.dart';
 import '../../features/assets/data/models/feeder_model.dart';
 import '../../features/assets/data/models/panel_room_model.dart';
+import '../../features/assets/data/models/transformer_model.dart';
 import '../../features/assets/data/models/fault_log_model.dart';
 import '../../features/assets/data/models/isolation_permit_model.dart';
+import '../../features/log_data/data/models/general_work_log_model.dart';
+import '../../features/admin/data/models/workman_model.dart';
+import '../constants/app_roles.dart';
 import 'hierarchy_service.dart';
 
 class FirestoreService {
@@ -38,11 +42,13 @@ class FirestoreService {
         'employeeId': employeeId,
         'role': role,
         'department': department, // NEW
+        'businessId': businessId,
         'unitId': unit,
         'plantId': plant,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLogin': FieldValue.serverTimestamp(),
         'isValidated': false, // Pending Approval
+        'isRejected': false,
         'isRequestingAuth': false, // Default Grid LOTO
         'isIsolationAuth': false, // Default Grid LOTO
       });
@@ -375,6 +381,22 @@ class FirestoreService {
         .map((s) => s.docs.map((d) => FeederModel.fromMap(d.data(), d.id)).toList());
   }
 
+  // Transformers
+  Future<void> saveTransformer(TransformerModel transformer) async {
+    await _db.collection('transformers').doc(transformer.id).set(transformer.toMap(), SetOptions(merge: true));
+  }
+
+  Stream<List<TransformerModel>> getTransformersStream(String unitId, String plantId) {
+    Query query = _db.collection('transformers');
+    if (plantId.isNotEmpty) {
+      query = query.where('plantId', isEqualTo: plantId);
+    }
+    if (unitId.isNotEmpty) {
+      query = query.where('unitId', isEqualTo: unitId);
+    }
+    return query.snapshots().map((s) => s.docs.map((d) => TransformerModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList());
+  }
+
   // Activity Logs Stream (Sorted by timestamp descending)
   Stream<List<Map<String, dynamic>>> getActivityLogsStream({int limit = 20}) {
     return _db.collection('activity_logs')
@@ -401,7 +423,7 @@ class FirestoreService {
         .map((s) {
           final list = s.docs
               .map((d) => FaultLogModel.fromMap(d.data(), d.id))
-              .where((f) => f.status != FaultStatus.resolved && f.status != FaultStatus.closed)
+              .where((f) => f.status == FaultStatus.pending)
               .toList();
           list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
           return list;
@@ -481,8 +503,11 @@ class FirestoreService {
   Stream<List<Map<String, dynamic>>> getCollectionStream(String collection, String? unitId, String? plantId) {
     Query query = _db.collection(collection);
     
-    if (unitId != null && unitId.isNotEmpty) query = query.where('unitId', isEqualTo: unitId);
-    if (plantId != null && plantId.isNotEmpty) query = query.where('plantId', isEqualTo: plantId);
+    // Fault types and ODC causes are master catalogs that apply broadly
+    if (collection != 'fault_types' && collection != 'odc' && collection != 'odc_causes') {
+      if (unitId != null && unitId.isNotEmpty) query = query.where('unitId', isEqualTo: unitId);
+      if (plantId != null && plantId.isNotEmpty) query = query.where('plantId', isEqualTo: plantId);
+    }
     
     return query.snapshots().map((s) => s.docs.map((d) {
       final data = Map<String, dynamic>.from(d.data() as Map<String, dynamic>);
@@ -494,6 +519,36 @@ class FirestoreService {
   // Delete Doc
   Future<void> deleteDocument(String collection, String id) async {
     await _db.collection(collection).doc(id).delete();
+  }
+
+  // Clear entire collection in batches (for clean re-importing)
+  Future<int> clearCollection(String collection, {String? unitId, String? plantId}) async {
+    Query query = _db.collection(collection);
+    if (collection != 'fault_types' && collection != 'odc' && collection != 'odc_causes') {
+      if (unitId != null && unitId.isNotEmpty) query = query.where('unitId', isEqualTo: unitId);
+      if (plantId != null && plantId.isNotEmpty) query = query.where('plantId', isEqualTo: plantId);
+    }
+
+    final snapshot = await query.get();
+    if (snapshot.docs.isEmpty) return 0;
+
+    int deleted = 0;
+    WriteBatch batch = _db.batch();
+    int count = 0;
+    for (var doc in snapshot.docs) {
+      batch.delete(doc.reference);
+      count++;
+      deleted++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        count = 0;
+      }
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+    return deleted;
   }
   // Save Hierarchy Config
   Future<void> saveHierarchyConfig(String businessId, Map<String, dynamic> data) async {
@@ -512,42 +567,205 @@ class FirestoreService {
   // --- ISOLATION PERMIT (DIGITAL LOTO) ---
 
   Future<void> saveIsolationPermit(IsolationPermitModel permit) async {
-    await _db.collection('isolation_permits').doc(permit.id.isEmpty ? null : permit.id).set(permit.toMap(), SetOptions(merge: true));
+    final docRef = permit.id.isEmpty 
+        ? _db.collection('isolation_permits').doc() 
+        : _db.collection('isolation_permits').doc(permit.id);
+    await docRef.set(permit.toMap(), SetOptions(merge: true));
   }
 
   Stream<List<IsolationPermitModel>> getActiveIsolationsStream({String? businessId, String? plantId, String? unitId}) {
     Query query = _db.collection('isolation_permits').where('status', isEqualTo: 'active');
-    if (businessId != null && businessId.isNotEmpty) query = query.where('businessId', isEqualTo: businessId);
-    if (plantId != null && plantId.isNotEmpty) query = query.where('plantId', isEqualTo: plantId);
-    if (unitId != null && unitId.isNotEmpty) query = query.where('unitId', isEqualTo: unitId);
     
-    return query.snapshots().map((s) => s.docs.map((d) => IsolationPermitModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList());
+    return query.snapshots().map((s) {
+      final list = s.docs
+          .map((d) => IsolationPermitModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .where((p) {
+            final matchesBusiness = businessId == null || businessId.isEmpty || p.businessId.isEmpty || p.businessId == businessId;
+            final matchesPlant = plantId == null || plantId.isEmpty || p.plantId.isEmpty || p.plantId.toLowerCase() == plantId.toLowerCase();
+            final matchesUnit = unitId == null || unitId.isEmpty || p.unitId.isEmpty || p.unitId.toLowerCase() == unitId.toLowerCase();
+            return matchesBusiness && matchesPlant && matchesUnit;
+          })
+          .toList();
+      list.sort((a, b) => b.isolationDateTime.compareTo(a.isolationDateTime));
+      return list;
+    });
   }
 
   Stream<List<IsolationPermitModel>> getIsolationRecordsStream({String? businessId, String? plantId, String? unitId}) {
     Query query = _db.collection('isolation_permits');
-    if (businessId != null && businessId.isNotEmpty) query = query.where('businessId', isEqualTo: businessId);
-    if (plantId != null && plantId.isNotEmpty) query = query.where('plantId', isEqualTo: plantId);
-    if (unitId != null && unitId.isNotEmpty) query = query.where('unitId', isEqualTo: unitId);
     
-    return query.orderBy('isolationDateTime', descending: true).snapshots()
-      .map((s) => s.docs.map((d) => IsolationPermitModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList());
+    return query.snapshots().map((s) {
+      final list = s.docs
+          .map((d) => IsolationPermitModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .where((p) {
+            final matchesBusiness = businessId == null || businessId.isEmpty || p.businessId.isEmpty || p.businessId == businessId;
+            final matchesPlant = plantId == null || plantId.isEmpty || p.plantId.isEmpty || p.plantId.toLowerCase() == plantId.toLowerCase();
+            final matchesUnit = unitId == null || unitId.isEmpty || p.unitId.isEmpty || p.unitId.toLowerCase() == unitId.toLowerCase();
+            return matchesBusiness && matchesPlant && matchesUnit;
+          })
+          .toList();
+      list.sort((a, b) => b.isolationDateTime.compareTo(a.isolationDateTime));
+      return list;
+    });
   }
 
   // Get Users with specific LOTO rights
   Future<List<Map<String, dynamic>>> getLotoAuthorizedUsers({
-    required String businessId,
-    required bool isRequestingAuth,
-    required bool isIsolationAuth,
+    String? businessId,
+    String? plantId,
+    String? unitId,
+    bool isRequestingAuth = false,
+    bool isIsolationAuth = false,
     String? department,
   }) async {
-    Query query = _db.collection('users').where('businessId', isEqualTo: businessId);
-    
-    if (isRequestingAuth) query = query.where('isRequestingAuth', isEqualTo: true);
-    if (isIsolationAuth) query = query.where('isIsolationAuth', isEqualTo: true);
-    if (department != null && department.isNotEmpty) query = query.where('department', isEqualTo: department);
+    try {
+      final snapshot = await _db.collection('users').get();
 
-    final snapshot = await query.get();
-    return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      final higherAuthorityRoles = {
+        AppRoles.developer.toLowerCase(),
+        AppRoles.businessAdmin.toLowerCase(),
+        'admin',
+        AppRoles.plantAdmin.toLowerCase(),
+        AppRoles.plantHod.toLowerCase(),
+        AppRoles.unitAdmin.toLowerCase(),
+        AppRoles.unitHod.toLowerCase(),
+        AppRoles.manager.toLowerCase(),
+        AppRoles.deputyManager.toLowerCase(),
+        AppRoles.associateManager.toLowerCase(),
+        AppRoles.assistantManager.toLowerCase(),
+      };
+
+      final List<Map<String, dynamic>> results = [];
+
+      for (final doc in snapshot.docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        final uid = (data['uid'] ?? doc.id).toString();
+        data['uid'] = uid;
+
+        final displayName = (data['displayName'] ?? data['name'] ?? data['email'] ?? 'User').toString();
+        data['displayName'] = displayName;
+
+        final employeeId = (data['employeeId'] ?? '').toString();
+        data['employeeId'] = employeeId;
+
+        final role = (data['role'] ?? AppRoles.guest).toString().trim();
+        data['role'] = role;
+
+        final userDept = (data['department'] ?? '').toString().trim();
+        data['department'] = userDept;
+
+        final userPlant = (data['plantId'] ?? '').toString().trim();
+        final userUnit = (data['unitId'] ?? '').toString().trim();
+
+        final isHigherAuthority = higherAuthorityRoles.contains(role.toLowerCase()) || data['isAdmin'] == true;
+        final explicitReqAuth = data['isRequestingAuth'] == true;
+        final explicitIsoAuth = data['isIsolationAuth'] == true;
+
+        // Scope match: does user belong to the selected plant & unit?
+        final matchesPlant = plantId == null || plantId.isEmpty || userPlant.isEmpty || userPlant == plantId;
+        final matchesUnit = unitId == null || unitId.isEmpty || userUnit.isEmpty || userUnit == unitId;
+        final matchesScope = matchesPlant && matchesUnit;
+
+        if (isIsolationAuth) {
+          // Higher authority can give isolation across different plants & units
+          // OR user explicitly flagged with isIsolationAuth
+          // OR user is in 'Electrical' department AND assigned to the selected plant and unit
+          final isElectricalInScope = userDept.toLowerCase() == 'electrical' && matchesScope;
+          if (isHigherAuthority || explicitIsoAuth || isElectricalInScope) {
+            results.add(data);
+          }
+        } else if (isRequestingAuth) {
+          // Requesting Officer:
+          // Higher authority (cross-plant/unit allowed)
+          // OR user explicitly flagged with isRequestingAuth
+          // OR user belongs to the requesting department AND assigned to the selected plant and unit
+          final targetDept = department?.trim().toLowerCase() ?? '';
+          final deptMatches = targetDept.isEmpty || userDept.toLowerCase() == targetDept;
+          final isDeptInScope = deptMatches && matchesScope;
+          if (isHigherAuthority || explicitReqAuth || isDeptInScope) {
+            results.add(data);
+          }
+        } else {
+          results.add(data);
+        }
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('Error in getLotoAuthorizedUsers: $e');
+      return [];
+    }
+  }
+
+  // --- GENERAL WORK LOGS ---
+  Stream<List<GeneralWorkLogModel>> getGeneralWorkLogsStream({String? plantId, String? unitId, String? status}) {
+    return _db.collection('general_work_logs')
+        .snapshots()
+        .map((snapshot) {
+          var list = snapshot.docs.map((doc) => GeneralWorkLogModel.fromMap(doc.data(), doc.id)).toList();
+          list.sort((a, b) => b.date.compareTo(a.date));
+
+          if (plantId != null && plantId.isNotEmpty && plantId != 'ALL') {
+            list = list.where((l) => l.plantId == null || l.plantId!.isEmpty || l.plantId!.toLowerCase() == plantId.toLowerCase()).toList();
+          }
+          if (unitId != null && unitId.isNotEmpty && unitId != 'ALL') {
+            list = list.where((l) => l.unitId == null || l.unitId!.isEmpty || l.unitId!.toLowerCase() == unitId.toLowerCase()).toList();
+          }
+          if (status != null && status.isNotEmpty && status != 'All') {
+            list = list.where((l) => l.status.toLowerCase() == status.toLowerCase()).toList();
+          }
+          return list;
+        });
+  }
+
+  Future<void> addGeneralWorkLog(GeneralWorkLogModel log) async {
+    await _db.collection('general_work_logs').add(log.toMap());
+    await logActivity(
+      userId: log.reportedByUserId,
+      action: 'General Work Logged',
+      details: '${log.items.length} tasks by ${log.reportedByName} for ${log.equipmentOrArea.isNotEmpty ? log.equipmentOrArea : (log.unitId ?? "Plant")}',
+    );
+  }
+
+  Future<void> updateGeneralWorkLog(GeneralWorkLogModel log) async {
+    await _db.collection('general_work_logs').doc(log.id).update(log.toMap());
+  }
+
+  Future<void> deleteGeneralWorkLog(String logId) async {
+    await _db.collection('general_work_logs').doc(logId).delete();
+  }
+
+  // --- WORKMEN & CONTRACTORS ---
+  Stream<List<WorkmanModel>> getWorkmenStream({String? plantId, String? unitId, bool? activeOnly}) {
+    return _db.collection('workmen')
+        .snapshots()
+        .map((snapshot) {
+          var list = snapshot.docs.map((doc) => WorkmanModel.fromMap(doc.data(), doc.id)).toList();
+          list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+          if (activeOnly == true) {
+            list = list.where((w) => w.isActive).toList();
+          }
+          if (plantId != null && plantId.isNotEmpty && plantId != 'ALL') {
+            list = list.where((w) => w.plantId == null || w.plantId!.isEmpty || w.plantId!.toLowerCase() == plantId.toLowerCase()).toList();
+          }
+          if (unitId != null && unitId.isNotEmpty && unitId != 'ALL') {
+            list = list.where((w) => w.unitId == null || w.unitId!.isEmpty || w.unitId!.toLowerCase() == unitId.toLowerCase()).toList();
+          }
+          return list;
+        });
+  }
+
+  Future<void> addWorkman(WorkmanModel workman) async {
+    await _db.collection('workmen').add(workman.toMap());
+  }
+
+  Future<void> updateWorkman(WorkmanModel workman) async {
+    await _db.collection('workmen').doc(workman.id).update(workman.toMap());
+  }
+
+  Future<void> deleteWorkman(String workmanId) async {
+    await _db.collection('workmen').doc(workmanId).delete();
   }
 }
+
+

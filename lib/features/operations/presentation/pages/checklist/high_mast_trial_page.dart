@@ -8,7 +8,6 @@ import 'package:asset_pulse_pro/features/home/presentation/widgets/custom_app_ba
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
-import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 
 // Animation & Biometrics
 import 'package:flutter_animate/flutter_animate.dart';
@@ -16,6 +15,7 @@ import 'package:local_auth/local_auth.dart';
 
 import 'package:asset_pulse_pro/features/operations/data/models/high_mast_tower_model.dart';
 import 'package:asset_pulse_pro/core/widgets/responsive_layout.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 
 class HighMastTrialPage extends StatefulWidget {
   const HighMastTrialPage({super.key});
@@ -37,6 +37,7 @@ class _HighMastTrialPageState extends State<HighMastTrialPage> with SingleTicker
   bool _showHelp = false;
 
   // Scope State
+  UserScope? _userScope;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
@@ -44,9 +45,6 @@ class _HighMastTrialPageState extends State<HighMastTrialPage> with SingleTicker
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
   bool _isLoading = true;
-  String? _userPlantId;
-  String? _userUnitId;
-  bool _isAdmin = false;
   String _currentUserName = 'Inspector';
 
   final List<String> _gearboxOilOptions = [
@@ -152,30 +150,21 @@ class _HighMastTrialPageState extends State<HighMastTrialPage> with SingleTicker
     if (user != null) {
       final profile = await _firestoreService.getUserProfile(user.uid);
       if (profile != null) {
-        final role = profile['role'] ?? AppRoles.guest;
-        _userPlantId = profile['plantId'] as String?;
-        _userUnitId = profile['unitId'] as String?;
-        _isAdmin = profile['isAdmin'] == true || role == AppRoles.developer;
         _currentUserName = profile['displayName'] ?? profile['name'] ?? profile['fullName'] ?? 'Inspector';
         _testedByController.text = _currentUserName;
         final userBusinessId = profile['businessId'] as String? ?? 'VISL';
 
         await HierarchyService().init(businessId: userBusinessId);
-        _plants = HierarchyService().getPlants();
+        final allPlants = HierarchyService().getPlants();
 
-        final plantNames = HierarchyService().getPlantNames();
-        if (!_isAdmin && _userPlantId != null && plantNames.containsKey(_userPlantId)) {
-          _selectedPlantId = _userPlantId;
-          _isPlantLocked = true;
-        }
-        _selectedPlantId ??= _plants.isNotEmpty ? _plants.first : null;
+        final userScope = PermissionHelper.resolveUserScope(profile);
+        _userScope = userScope;
+        _plants = userScope.getAvailablePlants(allPlants);
+        _isPlantLocked = userScope.isPlantLocked;
+        _isUnitLocked = userScope.isUnitLocked;
 
+        _selectedPlantId = userScope.getInitialPlant(null, _plants);
         _updateUnitList();
-
-        if (!_isAdmin && _userUnitId != null && _units.contains(_userUnitId)) {
-          _selectedUnitId = _userUnitId;
-          _isUnitLocked = true;
-        }
       }
     }
 
@@ -190,10 +179,15 @@ class _HighMastTrialPageState extends State<HighMastTrialPage> with SingleTicker
       _units = [];
       _selectedUnitId = null;
     } else {
-      _units = HierarchyService().getUnitsForPlant(_selectedPlantId!);
-      if (_units.isEmpty) _units = ['PID1', 'MCD'];
-      if (!_units.contains(_selectedUnitId)) {
-        _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      final allUnits = HierarchyService().getUnitsForPlant(_selectedPlantId!);
+      if (_userScope != null) {
+        _units = _userScope!.getAvailableUnits(_selectedPlantId, allUnits);
+        _selectedUnitId = _userScope!.getInitialUnit(_selectedPlantId, _selectedUnitId, _units);
+      } else {
+        _units = allUnits.isNotEmpty ? allUnits : ['PID1', 'MCD'];
+        if (!_units.contains(_selectedUnitId)) {
+          _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+        }
       }
     }
   }

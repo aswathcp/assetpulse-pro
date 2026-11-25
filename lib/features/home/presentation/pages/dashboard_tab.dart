@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_roles.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
@@ -25,14 +26,33 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   final FirestoreService _firestoreService = FirestoreService();
   bool _isLoading = true;
+  String? _userPlant;
+  String? _userUnit;
+  String? _userRole;
+  Map<String, dynamic>? _userProfile;
 
   @override
   void initState() {
     super.initState();
-    // Simulate brief initial load for zero-CLS shimmer transition
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (mounted) setState(() => _isLoading = false);
-    });
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = AuthService().currentUser;
+    if (user != null) {
+      final profile = await _firestoreService.getUserProfile(user.uid);
+      if (profile != null && mounted) {
+        setState(() {
+          _userProfile = profile;
+          _userRole = profile['role'] ?? AppRoles.guest;
+          _userPlant = profile['plantId'] as String?;
+          _userUnit = profile['unitId'] as String?;
+        });
+      }
+    }
+    // Smooth zero-CLS transition matching assets tab
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) setState(() => _isLoading = false);
   }
 
   // Exact Plant Shift Engine (Matches shift_checklists_page.dart)
@@ -65,13 +85,82 @@ class _DashboardTabState extends State<DashboardTab> {
     return '${diff.inDays}d ago';
   }
 
+  // --- SKELETON SHIMMER LOADER (ZERO CLS - Matches Assets Tab) ---
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+      child: Column(
+        children: [
+          // 1. Shimmer Shift Header
+          Container(
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+
+          // 2. Shimmer Live Fleet Status Card
+          Container(
+            height: 130,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 16),
+
+          // 3. Shimmer Operational Actions
+          Row(
+            children: List.generate(4, (index) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: index < 3 ? 8 : 0),
+                height: 70,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+            )),
+          ),
+          const SizedBox(height: 18),
+
+          // 4. Shimmer Alerts & Faults
+          Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 18),
+
+          // 5. Shimmer Activity Cards
+          ...List.generate(3, (index) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+            ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.08));
+          }),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: CustomAppBar(title: 'Operations Dashboard'),
-        body: Center(child: PulseLoading(size: 40)),
+        appBar: const CustomAppBar(title: 'Dashboard'),
+        body: _buildSkeletonLoader(),
       );
     }
 
@@ -79,7 +168,7 @@ class _DashboardTabState extends State<DashboardTab> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: const CustomAppBar(title: 'Operations Dashboard'),
+      appBar: const CustomAppBar(title: 'Dashboard'),
       body: ResponsiveContentWrapper(
         maxWidth: 1320,
         child: SingleChildScrollView(
@@ -109,7 +198,9 @@ class _DashboardTabState extends State<DashboardTab> {
               const SizedBox(height: 18),
 
               // 5. Live Recent Activity Stream (activity_logs)
-              _buildSectionTitle('Recent Plant Activity Log'),
+              _buildSectionTitle(_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All'
+                  ? 'Recent Activity Log ($_userUnit)'
+                  : 'Recent Plant Activity Log'),
               const SizedBox(height: 10),
               _buildLiveActivityLogStream(context),
             ],
@@ -194,13 +285,16 @@ class _DashboardTabState extends State<DashboardTab> {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  FutureBuilder<Map<String, dynamic>?>(
-                    future: user != null ? _firestoreService.getUserProfile(user.uid) : null,
-                    builder: (context, snapshot) {
-                      final name = snapshot.data?['displayName'] ?? user?.displayName ?? 'Duty Engineer';
-                      final dept = snapshot.data?['department'] ?? 'Operations';
+                  Builder(
+                    builder: (context) {
+                      final name = _userProfile?['displayName'] ?? user?.displayName ?? 'Duty Engineer';
+                      final dept = _userProfile?['department'] ?? 'Operations';
+                      final roleStr = _userRole != null && _userRole!.isNotEmpty ? ' (${_userRole!})' : '';
+                      final scopeStr = (_userPlant != null && _userPlant!.isNotEmpty && _userUnit != null && _userUnit!.isNotEmpty)
+                          ? ' • $_userPlant · $_userUnit'
+                          : (_userUnit != null && _userUnit!.isNotEmpty ? ' • $_userUnit' : '');
                       return Text(
-                        '$name • $dept',
+                        '$name$roleStr • $dept$scopeStr',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -249,7 +343,22 @@ class _DashboardTabState extends State<DashboardTab> {
           );
         }
 
-        final docs = snapshot.data!.docs;
+        final allDocs = snapshot.data!.docs;
+        final docs = (_userUnit == null || _userUnit!.isEmpty || _userUnit == 'All')
+            ? allDocs
+            : allDocs.where((d) {
+                final data = d.data() as Map<String, dynamic>;
+                final u = _userUnit!.toUpperCase();
+                final assetUnit = (data['unitId'] ?? '').toString().toUpperCase();
+                if (assetUnit.isNotEmpty && assetUnit == u) return true;
+                final idUpper = d.id.toUpperCase();
+                final tagUpper = (data['tagNo'] ?? '').toString().toUpperCase();
+                return idUpper.contains('-$u-') ||
+                    tagUpper.contains('-$u-') ||
+                    idUpper.startsWith('$u-') ||
+                    tagUpper.startsWith('$u-');
+              }).toList();
+
         final total = docs.length;
         final active = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'active').length;
         final spares = docs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'spare').length;
@@ -283,7 +392,9 @@ class _DashboardTabState extends State<DashboardTab> {
                         Icon(Icons.hub_outlined, color: isDark ? AppColors.accent : const Color(0xFF2563EB), size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'Plant Asset Fleet Status',
+                          (_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All')
+                              ? '$_userUnit Asset Fleet Status'
+                              : 'Plant Asset Fleet Status',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -549,7 +660,20 @@ class _DashboardTabState extends State<DashboardTab> {
     return StreamBuilder<List<FaultLogModel>>(
       stream: _firestoreService.getOpenFaultLogsStream(),
       builder: (context, snapshot) {
-        final faults = snapshot.data ?? [];
+        var faults = snapshot.data ?? [];
+        if (_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All') {
+          final u = _userUnit!.toUpperCase();
+          faults = faults.where((f) {
+            final fUnit = (f.unitId ?? '').toUpperCase();
+            if (fUnit.isNotEmpty && fUnit == u) return true;
+            final meId = f.masterEquipmentId.toUpperCase();
+            final aId = (f.assetId ?? '').toUpperCase();
+            return meId.contains('-$u-') ||
+                meId.startsWith('$u-') ||
+                aId.contains('-$u-') ||
+                aId.startsWith('$u-');
+          }).toList();
+        }
 
         if (faults.isEmpty) {
           return GlassContainer(
@@ -580,7 +704,9 @@ class _DashboardTabState extends State<DashboardTab> {
                           ),
                         ),
                         Text(
-                          'No active critical breakdown faults recorded',
+                          (_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All')
+                              ? 'No active critical breakdown faults recorded for $_userUnit'
+                              : 'No active critical breakdown faults recorded',
                           style: TextStyle(
                             fontSize: 10,
                             color: isDark ? Colors.grey : const Color(0xFF475569),
@@ -670,13 +796,28 @@ class _DashboardTabState extends State<DashboardTab> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _firestoreService.getActivityLogsStream(limit: 6),
+      stream: _firestoreService.getActivityLogsStream(limit: 25),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: PulseLoading(size: 24));
         }
 
-        final logs = snapshot.data ?? [];
+        var logs = snapshot.data ?? [];
+        if (_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All') {
+          final u = _userUnit!.toUpperCase();
+          logs = logs.where((log) {
+            final logUnit = (log['unitId'] ?? '').toString().toUpperCase();
+            if (logUnit.isNotEmpty && logUnit == u) return true;
+            final details = (log['details'] ?? '').toString().toUpperCase();
+            final action = (log['action'] ?? '').toString().toUpperCase();
+            return details.contains('-$u-') ||
+                details.contains('$u-') ||
+                details.contains('FOR $u') ||
+                details.contains('IN $u') ||
+                action.contains('-$u-') ||
+                action.contains('$u-');
+          }).toList();
+        }
 
         if (logs.isEmpty) {
           return GlassContainer(
@@ -685,7 +826,9 @@ class _DashboardTabState extends State<DashboardTab> {
               padding: const EdgeInsets.all(20),
               child: Center(
                 child: Text(
-                  'No recent activity records found.',
+                  (_userUnit != null && _userUnit!.isNotEmpty && _userUnit != 'All')
+                      ? 'No recent activity records found for $_userUnit.'
+                      : 'No recent activity records found.',
                   style: TextStyle(
                     fontSize: 11,
                     color: isDark ? Colors.grey : const Color(0xFF64748B),
@@ -697,7 +840,7 @@ class _DashboardTabState extends State<DashboardTab> {
         }
 
         return Column(
-          children: logs.map((log) {
+          children: logs.take(6).map((log) {
             final action = log['action']?.toString() ?? 'Operation Performed';
             final details = log['details']?.toString() ?? '';
             final ts = (log['timestamp'] as Timestamp?)?.toDate();

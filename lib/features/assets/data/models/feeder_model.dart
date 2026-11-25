@@ -8,6 +8,9 @@ class FeederModel {
   final String name;
   final String type;
   final String description;
+  final String busSection;
+  final String operatingState;
+  final String? upstreamFeederId;
   final DateTime? createdAt;
   final String? createdBy;
   final DateTime? modifiedAt;
@@ -21,11 +24,16 @@ class FeederModel {
     required this.name,
     this.type = 'Feeder',
     this.description = '',
+    this.busSection = 'MAIN',
+    this.operatingState = 'CLOSED',
+    this.upstreamFeederId,
     this.createdAt,
     this.createdBy,
     this.modifiedAt,
     this.modifiedBy,
   });
+
+  bool get isClosed => operatingState.toUpperCase() == 'CLOSED';
 
   factory FeederModel.fromMap(Map<String, dynamic> map, String id) {
     return FeederModel(
@@ -36,6 +44,9 @@ class FeederModel {
       name: map['name'] ?? '',
       type: map['type'] ?? 'Feeder',
       description: map['description'] ?? '',
+      busSection: map['busSection'] ?? 'MAIN',
+      operatingState: map['operatingState'] ?? 'CLOSED',
+      upstreamFeederId: map['upstreamFeederId'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       createdBy: map['createdBy'],
       modifiedAt: (map['modifiedAt'] as Timestamp?)?.toDate(),
@@ -51,6 +62,9 @@ class FeederModel {
       'name': name,
       'type': type,
       'description': description,
+      'busSection': busSection,
+      'operatingState': operatingState,
+      'upstreamFeederId': upstreamFeederId,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
       'createdBy': createdBy,
       'modifiedAt': modifiedAt ?? FieldValue.serverTimestamp(),

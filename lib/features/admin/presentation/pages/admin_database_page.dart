@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,9 +14,15 @@ import 'package:asset_pulse_pro/features/assets/data/models/location_model.dart'
 import 'package:asset_pulse_pro/features/assets/data/models/panel_model.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/feeder_model.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/panel_room_model.dart';
+import 'package:asset_pulse_pro/features/assets/data/models/transformer_model.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/data_import_page.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/add_edit_master_page.dart';
+import 'package:asset_pulse_pro/features/admin/presentation/pages/add_edit_hierarchy_page.dart';
+import 'package:asset_pulse_pro/features/admin/presentation/pages/workmen_management_page.dart';
+import 'package:asset_pulse_pro/features/admin/presentation/pages/others_review_page.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/master_equipment_model.dart';
+import 'package:asset_pulse_pro/core/constants/app_version.dart';
+import 'package:asset_pulse_pro/core/services/app_version_service.dart';
 
 // --- MAIN DASHBOARD (MENU) ---
 
@@ -29,10 +36,13 @@ class AdminDatabasePage extends StatelessWidget {
     'panel_rooms': 'Panel Rooms',
     'panels': 'Panels / MCCs',
     'feeders': 'Feeders',
+    'transformers': 'Transformers',
     'master_equipments': 'Master Equipment',
-    'equipment_types': 'Equipment Types',
     'fault_types': 'Fault Types',
-    'odc_causes': 'ODC (Damage Cause)',
+    'odc': 'ODC (Damage Cause)',
+    'workmen': 'Plant Workmen & Contractors',
+    'others_suggestions': 'Others Review Queue',
+    'app_version': 'App Version & Release Control',
   };
 
   final Map<String, IconData> _icons = const {
@@ -41,22 +51,28 @@ class AdminDatabasePage extends StatelessWidget {
     'panel_rooms': Icons.room_preferences,
     'panels': Icons.electric_bolt,
     'feeders': Icons.power_input,
+    'transformers': Icons.electrical_services,
     'master_equipments': Icons.precision_manufacturing,
-    'equipment_types': Icons.category,
     'fault_types': Icons.warning_amber,
-    'odc_causes': Icons.broken_image,
+    'odc': Icons.broken_image,
+    'workmen': Icons.engineering,
+    'others_suggestions': Icons.pending_actions,
+    'app_version': Icons.system_update_alt,
   };
 
   final Map<String, String> _subtitles = const {
-    'combined_hierarchy': 'Import/Export 5 Levels (Multi-Sheet Excel)',
+    'combined_hierarchy': 'Import/Export 6 Levels (Multi-Sheet Excel)',
     'locations': 'Physical Plant Areas (e.g. BF1-RMHS)',
     'panel_rooms': 'Substation Rooms (e.g. MCC 2 & 9)',
-    'panels': 'MCCs & PCC Panels',
-    'feeders': 'Power Feeders & Sources',
+    'panels': 'MCCs & PCC Panels (Voltage, Bus Sections)',
+    'feeders': 'Power Feeders & Sources (State, Upstream Source)',
+    'transformers': 'Distribution & Power Step-Down Transformers',
     'master_equipments': 'Functional Tags & Machinery',
-    'equipment_types': 'Standardize Machinery Types',
     'fault_types': 'Root Cause Analysis Codes',
-    'odc_causes': 'Object Damage Categories',
+    'odc': 'Object Damage Categories (ISO 14224)',
+    'workmen': 'Technicians, Tradesmen & Agency Crews',
+    'others_suggestions': 'Review & approve field-submitted catalog additions',
+    'app_version': 'Enforce Min Required Version & Gate Old Builds',
   };
 
   @override
@@ -87,7 +103,26 @@ class AdminDatabasePage extends StatelessWidget {
             return GlassContainer(
               child: InkWell(
                 onTap: () {
-                  if (key == 'combined_hierarchy') {
+                  if (key == 'app_version') {
+                    showDialog(
+                      context: context,
+                      builder: (c) => const AppVersionControlDialog(),
+                    );
+                  } else if (key == 'workmen') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => const WorkmenManagementPage(),
+                      ),
+                    );
+                  } else if (key == 'others_suggestions') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => const OthersReviewPage(),
+                      ),
+                    );
+                  } else if (key == 'combined_hierarchy') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -96,10 +131,6 @@ class AdminDatabasePage extends StatelessWidget {
                           title: 'Master Hierarchy Import',
                         ),
                       ),
-                    );
-                  } else if (['equipment_types', 'fault_types', 'odc_causes'].contains(key)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Coming Soon!'), behavior: SnackBarBehavior.floating),
                     );
                   } else {
                     Navigator.push(
@@ -183,6 +214,10 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
   List<Map<String, dynamic>> _importedData = [];
   bool _isUploading = false;
 
+  // Search Filter State
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -192,6 +227,12 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
     if (widget.collectionId == 'hierarchy_config') {
        // Optional: specific logic for hierarchy?
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadScope() async {
@@ -205,51 +246,23 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
     _userRole = profile['role'] ?? AppRoles.guest;
     final userPlantId = profile['plantId'] as String?;
     final userUnitId = profile['unitId'] as String?;
-    final userBusinessId = profile['businessId'] as String? ?? 'VISL'; // NEW
-    
-    await HierarchyService().init(businessId: userBusinessId); // PREVENT BLANK
+    final userBusinessId = profile['businessId'] as String? ?? 'VISL';
+    await HierarchyService().init(businessId: userBusinessId);
     _selectedBusinessId = HierarchyService().currentBusinessId;
-    
-    _plants = HierarchyService().getPlants();
-    
+
     _isAdmin = profile['isAdmin'] == true;
-    _userPlantId = userPlantId;
-    _userUnitId = userUnitId;
-    
-    final String? cleanPlant = (userPlantId == null || userPlantId.isEmpty || userPlantId == 'Unknown') ? null : userPlantId;
-    final String? cleanUnit = (userUnitId == null || userUnitId.isEmpty || userUnitId == 'Unknown') ? null : userUnitId;
-    
-    final bool hasGlobalAdmin = _isAdmin && cleanPlant == null;
-    final bool hasPlantAdmin = _isAdmin && cleanPlant != null;
+    _userPlantId = profile['plantId'] as String?;
+    _userUnitId = profile['unitId'] as String?;
 
-    final bool isPlantScope = (hasPlantAdmin || _userRole == AppRoles.plantAdmin || _userRole == AppRoles.plantHod) &&
-        _userRole != AppRoles.manager &&
-        _userRole != AppRoles.deputyManager &&
-        _userRole != AppRoles.associateManager &&
-        _userRole != AppRoles.assistantManager &&
-        _userRole != AppRoles.unitAdmin &&
-        _userRole != AppRoles.unitHod;
+    final userScope = PermissionHelper.resolveUserScope(profile);
+    _isPlantLocked = userScope.isPlantLocked;
+    _isUnitLocked = userScope.isUnitLocked;
 
-    if (_userRole == AppRoles.developer || _userRole == AppRoles.auditor || hasGlobalAdmin) {
-      _isPlantLocked = false;
-      _isUnitLocked = false;
-      _selectedPlant = _plants.isNotEmpty ? _plants.first : null;
-    } else if (isPlantScope) {
-      _isPlantLocked = true;
-      _selectedPlant = cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _isUnitLocked = false;
-    } else {
-      _isPlantLocked = true;
-      _selectedPlant = cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _isUnitLocked = true;
-      _selectedUnit = cleanUnit;
-    }
-    
-    _updateUnitList();
-    
-    // If unit is not locked and not selected, pick first
-    if (!_isUnitLocked && _selectedUnit == null) {
-      _selectedUnit = _units.isNotEmpty ? _units.first : null;
+    _plants = userScope.getAvailablePlants();
+    _selectedPlant = userScope.getInitialPlant(_plants);
+    if (_selectedPlant != null) {
+      _units = userScope.getAvailableUnits(_selectedPlant!);
+      _selectedUnit = userScope.getInitialUnit(_units);
     }
     
     setState(() => _isLoadingScope = false);
@@ -315,33 +328,23 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
       );
       return;
     }
-    if (widget.collectionId == 'master_equipments') {
-       Navigator.push(
-         context,
-         MaterialPageRoute(builder: (context) => AddEditMasterPage(
-           unitId: _selectedUnit ?? '', 
-           plantId: _selectedPlant ?? '',
-           userRole: _userRole,
-         )),
-       ).then((_) => setState((){})); // Refresh on return
-    } else {
-      showDialog(
-         context: context,
-         builder: (c) => _AddEntryDialog(
-           collection: widget.collectionId,
-           baseData: {
-             'plantId': _selectedPlant, 
-             'unitId': _selectedUnit,
-             'businessId': _selectedBusinessId,
-           },
-           userRole: _userRole,
-           onSave: (d) async {
-              await FirestoreService().batchSave(widget.collectionId, [d]);
-              setState((){});
-           }
-         )
-      );
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditHierarchyItemPage(
+          collection: widget.collectionId,
+          title: widget.title,
+          baseData: {
+            'plantId': _selectedPlant, 
+            'unitId': _selectedUnit,
+            'businessId': _selectedBusinessId,
+          },
+          userRole: _userRole,
+          isEditing: false,
+          onSave: (d) => setState((){}),
+        ),
+      ),
+    ).then((_) => setState((){}));
   }
 
   @override
@@ -441,6 +444,20 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
                           ),
                         ),
                       ],
+                      if (_userRole == AppRoles.developer || _isAdmin) ...[
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          tooltip: 'Clear / Delete Entire Collection',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.red.withValues(alpha: 0.15),
+                            foregroundColor: Colors.redAccent,
+                            fixedSize: const Size(48, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.delete_sweep_rounded, size: 22),
+                          onPressed: _showWipeConfirmation,
+                        ),
+                      ],
                    ],
                 ),
               ],
@@ -476,80 +493,272 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
                      )))),
                    ],
                  )
-               : StreamBuilder<List<Map<String, dynamic>>>(
-                   stream: FirestoreService().getCollectionStream(widget.collectionId, _selectedUnit, _selectedPlant),
-                   builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: PulseLoading(size: 30));
-                      if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-                      final items = snapshot.data ?? [];
-                      
-                      if (items.isEmpty) return Center(child: Text('No Items in $_selectedPlant/$_selectedUnit', style: const TextStyle(color: Colors.grey)));
-                      
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 80),
-                        itemCount: items.length,
-                        itemBuilder: (context, index) {
-                           final item = items[index];
-                           final id = item['id']?.toString() ?? 'unknown';
-                           final rawId = HierarchyService.stripPrefix(id, _selectedPlant ?? '', _selectedUnit ?? '');
-                           String title = item['name'] ?? rawId;
-                           String typeOrCategory = item['type'] ?? item['category'] ?? '';
-                           String subtitle = typeOrCategory.isEmpty ? 'ID: $rawId' : '$typeOrCategory | ID: $rawId';
-                           
-                           // Enhanced Subtitles for hierarchy
-                           if (widget.collectionId == 'panels') {
-                             final cleanRoom = HierarchyService.stripPrefix(item['panelRoomId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
-                             subtitle += ' | Room: $cleanRoom';
-                           }
-                           if (widget.collectionId == 'feeders') {
-                             final cleanPanel = HierarchyService.stripPrefix(item['panelId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
-                             subtitle += ' | Panel: $cleanPanel';
-                           }
-                           if (widget.collectionId == 'lighting_dbs') {
-                              final loc = item['location'] ?? '-';
-                              final rccbCount = item['rccbCount'] ?? '0';
-                              final incomingSource = item['incomingSource'] ?? '-';
-                              String modifiedStr = '-';
-                              final rawUpdatedAt = item['updatedAt'];
-                              if (rawUpdatedAt is Timestamp) {
-                                modifiedStr = rawUpdatedAt.toDate().toLocal().toString().substring(0, 16);
-                              } else if (rawUpdatedAt is String) {
-                                final parsed = DateTime.tryParse(rawUpdatedAt);
-                                if (parsed != null) modifiedStr = parsed.toLocal().toString().substring(0, 16);
-                              }
-                              subtitle += ' | Loc: $loc | RCCBs: $rccbCount | Source: $incomingSource\nModified At: $modifiedStr';
-                            }
-                           if (widget.collectionId == 'master_equipments') {
-                             final cleanLoc = HierarchyService.stripPrefix(item['locationId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
-                             subtitle += ' | Loc: $cleanLoc';
-                           }
+               : Column(
+                   children: [
+                     // Search bar OUTSIDE StreamBuilder so it never loses focus on rebuild
+                     Padding(
+                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                       child: TextField(
+                         controller: _searchController,
+                         decoration: InputDecoration(
+                           hintText: 'Search ${widget.title} by name, ID, type, panel, voltage, state...',
+                           hintStyle: const TextStyle(fontSize: 13),
+                           prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.accent),
+                           suffixIcon: _searchQuery.isNotEmpty
+                               ? IconButton(
+                                   icon: const Icon(Icons.clear, size: 18),
+                                   onPressed: () {
+                                     _searchController.clear();
+                                     setState(() => _searchQuery = '');
+                                   },
+                                 )
+                               : null,
+                           filled: true,
+                           fillColor: Theme.of(context).cardColor,
+                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                           border: OutlineInputBorder(
+                             borderRadius: BorderRadius.circular(10),
+                             borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                           ),
+                           enabledBorder: OutlineInputBorder(
+                             borderRadius: BorderRadius.circular(10),
+                             borderSide: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                           ),
+                           focusedBorder: OutlineInputBorder(
+                             borderRadius: BorderRadius.circular(10),
+                             borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                           ),
+                         ),
+                         onChanged: (val) => setState(() => _searchQuery = val),
+                       ),
+                     ),
 
-                           return Card(
-                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                             color: Theme.of(context).cardColor,
-                             child: ListTile(
-                               title: Text(title),
-                               subtitle: Text(subtitle),
-                               trailing: _canEdit(item['plantId'] as String?, item['unitId'] as String?)
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
+                     // StreamBuilder only renders the list (doesn't include TextField)
+                     Expanded(
+                       child: StreamBuilder<List<Map<String, dynamic>>>(
+                         stream: FirestoreService().getCollectionStream(widget.collectionId, _selectedUnit, _selectedPlant),
+                         builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                itemCount: 6,
+                                itemBuilder: (context, index) => Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 4),
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
+                                  ),
+                                ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms, color: Colors.white12),
+                              );
+                            }
+                            if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+                            final items = snapshot.data ?? [];
+                            
+                            if (items.isEmpty) return Center(child: Text('No Items in $_selectedPlant/$_selectedUnit', style: const TextStyle(color: Colors.grey)));
+                            
+                            final filteredItems = _searchQuery.isEmpty
+                                ? items
+                                : items.where((item) {
+                                    final q = _searchQuery.toLowerCase().trim();
+                                    final id = item['id']?.toString().toLowerCase() ?? '';
+                                    final rawId = HierarchyService.stripPrefix(item['id']?.toString() ?? '', _selectedPlant ?? '', _selectedUnit ?? '').toLowerCase();
+                                    final name = (item['name']?.toString() ?? '').toLowerCase();
+                                    final type = (item['type']?.toString() ?? item['category']?.toString() ?? '').toLowerCase();
+                                    final desc = (item['description']?.toString() ?? '').toLowerCase();
+                                    final panelId = (item['panelId']?.toString() ?? '').toLowerCase();
+                                    final panelRoomId = (item['panelRoomId']?.toString() ?? '').toLowerCase();
+                                    final locId = (item['locationId']?.toString() ?? '').toLowerCase();
+                                    final volt = (item['voltageLevel']?.toString() ?? '').toLowerCase();
+                                    final busSec = (item['busSection']?.toString() ?? item['busSections']?.toString() ?? '').toLowerCase();
+                                    final opState = (item['operatingState']?.toString() ?? '').toLowerCase();
+                                    final upFeeder = (item['upstreamFeederId']?.toString() ?? '').toLowerCase();
+                                    final secTarget = (item['secondaryTargetPanelId']?.toString() ?? '').toLowerCase();
+                                    final tertTarget = (item['tertiaryTargetPanelId']?.toString() ?? '').toLowerCase();
+
+                                    return id.contains(q) ||
+                                        rawId.contains(q) ||
+                                        name.contains(q) ||
+                                        type.contains(q) ||
+                                        desc.contains(q) ||
+                                        panelId.contains(q) ||
+                                        panelRoomId.contains(q) ||
+                                        locId.contains(q) ||
+                                        volt.contains(q) ||
+                                        busSec.contains(q) ||
+                                        opState.contains(q) ||
+                                        upFeeder.contains(q) ||
+                                        secTarget.contains(q) ||
+                                        tertTarget.contains(q);
+                                  }).toList();
+
+                            return Column(
+                              children: [
+                                // Search Filter Stats Counter
+                                if (_searchQuery.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                    child: Row(
                                       children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.edit, color: AppColors.accent, size: 20),
-                                          onPressed: () => _showEdit(item),
+                                        Text(
+                                          'Showing ${filteredItems.length} of ${items.length} records',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.grey, size: 20),
-                                          onPressed: () => _showDeleteConfirmation(item),
+                                        const Spacer(),
+                                        GestureDetector(
+                                          onTap: () {
+                                            _searchController.clear();
+                                            setState(() => _searchQuery = '');
+                                          },
+                                          child: const Text(
+                                            'Clear',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                                          ),
                                         ),
                                       ],
-                                    )
-                                  : null,
-                             ),
-                           );
-                        },
-                      );
-                   },
+                                    ),
+                                  ),
+
+                                // Items List or Empty Search State
+                                Expanded(
+                                  child: filteredItems.isEmpty
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.search_off, size: 48, color: Colors.grey),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                'No ${widget.title} found matching "$_searchQuery"',
+                                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              TextButton(
+                                                onPressed: () {
+                                                  _searchController.clear();
+                                                  setState(() => _searchQuery = '');
+                                                },
+                                                child: const Text('Clear search filter'),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.only(bottom: 80),
+                                          itemCount: filteredItems.length,
+                                          itemBuilder: (context, index) {
+                                            final item = filteredItems[index];
+                                            final id = item['id']?.toString() ?? 'unknown';
+                                            final rawId = HierarchyService.stripPrefix(id, _selectedPlant ?? '', _selectedUnit ?? '');
+                                            String title = item['name'] ?? rawId;
+                                            String typeOrCategory = item['type'] ?? item['category'] ?? '';
+                                            String subtitle = typeOrCategory.isEmpty ? 'ID: $rawId' : '$typeOrCategory | ID: $rawId';
+                                            
+                                            // Enhanced Subtitles for hierarchy
+                                            if (widget.collectionId == 'panels') {
+                                              final cleanRoom = HierarchyService.stripPrefix(item['panelRoomId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
+                                              final volt = item['voltageLevel'] ?? '415V';
+                                              final busSec = HierarchyService.formatBusSectionsForDisplay(item['busSections']);
+                                              subtitle += ' | Room: $cleanRoom | $volt | Bus: $busSec';
+                                            }
+                                            if (widget.collectionId == 'feeders') {
+                                              final cleanPanel = HierarchyService.stripPrefix(item['panelId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
+                                              final busSec = HierarchyService.normalizeFeederBusSection(item['busSection']);
+                                              final opState = item['operatingState'] ?? 'CLOSED';
+                                              final upSrc = item['upstreamFeederId'] != null && item['upstreamFeederId'].toString().isNotEmpty
+                                                  ? ' | From: ${HierarchyService.stripPrefix(item['upstreamFeederId'].toString(), _selectedPlant ?? '', _selectedUnit ?? '')}'
+                                                  : '';
+                                              subtitle += ' | Panel: $cleanPanel | Sec: $busSec | State: $opState$upSrc';
+                                            }
+                                            if (widget.collectionId == 'transformers') {
+                                              final kva = item['ratingKva']?.toString() ?? '1000';
+                                              final prim = item['primaryVoltage'] ?? '11kV';
+                                              final sec = item['secondaryVoltage'] ?? '415V';
+                                              final tert = item['tertiaryVoltage'] != null && item['tertiaryVoltage'].toString().isNotEmpty ? '/${item['tertiaryVoltage']}' : '';
+                                              final cleanYard = HierarchyService.stripPrefix(item['locationId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
+                                              subtitle += ' | $kva kVA | $prim -> $sec$tert | Yard: $cleanYard';
+                                            }
+                                            if (widget.collectionId == 'rccb_equipments' || widget.collectionId == 'lighting_dbs') {
+                                              final loc = item['location'] ?? '-';
+                                              final rccbCount = item['rccbCount'] ?? '0';
+                                              final incomingSource = item['incomingSource'] ?? '-';
+                                              String modifiedStr = '-';
+                                              final rawUpdatedAt = item['updatedAt'];
+                                              if (rawUpdatedAt is Timestamp) {
+                                                modifiedStr = rawUpdatedAt.toDate().toLocal().toString().substring(0, 16);
+                                              } else if (rawUpdatedAt is String) {
+                                                final parsed = DateTime.tryParse(rawUpdatedAt);
+                                                if (parsed != null) modifiedStr = parsed.toLocal().toString().substring(0, 16);
+                                              }
+                                              subtitle += ' | Loc: $loc | RCCBs: $rccbCount | Source: $incomingSource\nModified At: $modifiedStr';
+                                            }
+                                            if (widget.collectionId == 'master_equipments') {
+                                              final cleanLoc = HierarchyService.stripPrefix(item['locationId'] ?? '-', _selectedPlant ?? '', _selectedUnit ?? '');
+                                              subtitle += ' | Loc: $cleanLoc';
+                                            }
+                                            if (widget.collectionId == 'fault_types') {
+                                              final code = item['faultCode'] ?? item['id'] ?? rawId;
+                                              final cat = item['category'] ?? item['discipline'] ?? 'Electrical';
+                                              final sev = item['severity'] ?? item['defaultSeverity'] ?? 'Major';
+                                              final target = item['targetEquipment'] ?? item['equipmentType'] ?? '';
+                                              title = item['name'] ?? item['faultName'] ?? rawId;
+                                              subtitle = 'Code: $code | $cat ' + (target.isNotEmpty ? '• $target ' : '') + '| Severity: $sev';
+                                            }
+                                            if (widget.collectionId == 'odc' || widget.collectionId == 'odc_causes') {
+                                              final obj = item['objectPart'] ?? item['object'] ?? '';
+                                              final dmg = item['damage'] ?? item['damageMode'] ?? '';
+                                              final cau = item['cause'] ?? item['rootCause'] ?? item['name'] ?? '';
+                                              final eqCat = item['equipmentCategory'] ?? item['category'] ?? '';
+                                              final disc = item['discipline'] ?? '';
+                                              if (obj.isNotEmpty && dmg.isNotEmpty) {
+                                                title = '$obj ➔ $dmg';
+                                                subtitle = 'Root Cause: $cau\nEq: $eqCat ($disc) | Code: $rawId';
+                                              } else {
+                                                title = item['name'] ?? (cau.isNotEmpty ? cau : rawId);
+                                                subtitle = 'Root Cause: $cau | Eq: $eqCat ($disc) | Code: $rawId';
+                                              }
+                                            }
+
+                                            return Card(
+                                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                              color: Theme.of(context).cardColor,
+                                              child: ListTile(
+                                                title: Text(title),
+                                                subtitle: Text(subtitle),
+                                                trailing: _canEdit(item['plantId'] as String?, item['unitId'] as String?)
+                                                    ? Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          IconButton(
+                                                            icon: const Icon(Icons.edit, color: AppColors.accent, size: 20),
+                                                            onPressed: () => _showEdit(item),
+                                                          ),
+                                                          IconButton(
+                                                            icon: const Icon(Icons.delete, color: Colors.grey, size: 20),
+                                                            onPressed: () => _showDeleteConfirmation(item),
+                                                          ),
+                                                        ],
+                                                      )
+                                                    : null,
+                                              ),
+                                            )
+                                                .animate()
+                                                .fadeIn(duration: 250.ms, delay: (index.clamp(0, 10) * 20).ms)
+                                                .slideY(begin: 0.03, end: 0, curve: Curves.easeOutQuad);
+                                          },
+                                        ),
+                                ),
+                              ],
+                            );
+                         },
+                       ),
+                     ),
+                   ],
                  ),
           ),
         ],
@@ -558,36 +767,27 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
   }
 
   void _showEdit(Map<String, dynamic> item) {
-    if (widget.collectionId == 'master_equipments') {
-       final id = item['id']?.toString() ?? '';
-       Navigator.push(
-         context,
-         MaterialPageRoute(
-           builder: (context) => AddEditMasterPage(
-             unitId: _selectedUnit ?? item['unitId'] ?? '',
-             plantId: _selectedPlant ?? item['plantId'] ?? '',
-             userRole: _userRole,
-             existingItem: MasterEquipmentModel.fromMap(item, id),
-           ),
-         ),
-       );
-       return;
+    final scopedItem = Map<String, dynamic>.from(item);
+    if ((scopedItem['plantId'] == null || scopedItem['plantId'].toString().isEmpty || scopedItem['plantId'] == '-') && _selectedPlant != null) {
+      scopedItem['plantId'] = _selectedPlant;
+    }
+    if ((scopedItem['unitId'] == null || scopedItem['unitId'].toString().isEmpty || scopedItem['unitId'] == '-') && _selectedUnit != null) {
+      scopedItem['unitId'] = _selectedUnit;
     }
 
-    showDialog(
-      context: context,
-      builder: (c) => _AddEntryDialog(
-        collection: widget.collectionId,
-        baseData: item,
-        userRole: _userRole,
-        isEditing: true,
-        onSave: (d) async {
-           // Batch save handles single items too
-           await FirestoreService().batchSave(widget.collectionId, [d]);
-           setState((){});
-        }
-      )
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditHierarchyItemPage(
+          collection: widget.collectionId,
+          title: widget.title,
+          baseData: scopedItem,
+          userRole: _userRole,
+          isEditing: true,
+          onSave: (d) => setState((){}),
+        ),
+      ),
+    ).then((_) => setState((){}));
   }
 
   Future<void> _showDeleteConfirmation(Map<String, dynamic> item) async {
@@ -688,478 +888,309 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
       ),
     );
   }
+
+  void _showWipeConfirmation() {
+    final isMasterCatalog = widget.collectionId == 'odc' || widget.collectionId == 'odc_causes' || widget.collectionId == 'fault_types';
+    final scopeDesc = isMasterCatalog ? 'the entire catalog in Firestore' : 'all records for plant ' + (_selectedPlant ?? '') + ' / unit ' + (_selectedUnit ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Wipe ' + widget.title + '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete ' + scopeDesc + '?\n\nThis will permanently delete all records in collection "' + widget.collectionId + '" so you can re-import clean data from Excel. This action CANNOT be undone.',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            icon: const Icon(Icons.delete_forever, size: 18),
+            label: const Text('Delete All'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _isUploading = true);
+              try {
+                int count = await FirestoreService().clearCollection(
+                  widget.collectionId,
+                  unitId: _selectedUnit,
+                  plantId: _selectedPlant,
+                );
+                // Also clean legacy collection if wiping odc
+                if (widget.collectionId == 'odc') {
+                  final legacyCount = await FirestoreService().clearCollection('odc_causes');
+                  count += legacyCount;
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Successfully deleted ' + count.toString() + ' records from ' + widget.title + '! Ready for clean import.'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error wiping collection: ' + e.toString()), backgroundColor: AppColors.error),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isUploading = false);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _AddEntryDialog extends StatefulWidget {
-  final String collection;
-  final Map<String, dynamic> baseData;
-  final String userRole;
-  final bool isEditing;
-  final Function(Map<String, dynamic>) onSave;
-  
-  const _AddEntryDialog({
-    required this.collection, 
-    required this.baseData, 
-    required this.userRole, 
-    this.isEditing = false,
-    required this.onSave
-  });
+class AppVersionControlDialog extends StatefulWidget {
+  const AppVersionControlDialog({super.key});
 
   @override
-  State<_AddEntryDialog> createState() => _AddEntryDialogState();
+  State<AppVersionControlDialog> createState() => _AppVersionControlDialogState();
 }
 
-class _AddEntryDialogState extends State<_AddEntryDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final Map<String, dynamic> _formData = {};
-  final _idController = TextEditingController();
-  
+class _AppVersionControlDialogState extends State<AppVersionControlDialog> {
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String _cloudMinVersion = 'Loading...';
+  String _cloudLatestVersion = 'Loading...';
+  final TextEditingController _minVersionController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    final user = AuthService().currentUser;
-    _formData.addAll(widget.baseData);
-    _formData['businessId'] = widget.baseData['businessId'] ?? HierarchyService().currentBusinessId;
-    if (!widget.isEditing) {
-       _formData['createdBy'] = user?.uid;
-    }
-    _formData['modifiedBy'] = user?.uid;
-    
-    _idController.text = widget.isEditing 
-        ? HierarchyService.stripPrefix(_formData['id']?.toString() ?? '', _formData['plantId'] ?? '', _formData['unitId'] ?? '') 
-        : '';
-
-    _loadReferenceData();
+    _fetchVersionData();
   }
 
   @override
   void dispose() {
-    _idController.dispose();
+    _minVersionController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
-  // Reference Data for Dropdowns
+  Future<void> _fetchVersionData() async {
+    setState(() => _isLoading = true);
+    final doc = await AppVersionService.getVersionDoc();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (doc != null) {
+          _cloudMinVersion = doc['min_supported_version'] ?? 'Not Set';
+          _cloudLatestVersion = doc['latest_version'] ?? 'Not Set';
+          _minVersionController.text = doc['min_supported_version'] ?? AppVersion.currentVersion;
+          _messageController.text = doc['force_update_message'] ?? '';
+        } else {
+          _cloudMinVersion = 'None';
+          _cloudLatestVersion = 'None';
+          _minVersionController.text = AppVersion.currentVersion;
+        }
+      });
+    }
+  }
 
-  List<PanelRoomModel> _refPanelRooms = [];
-  List<PanelModel> _refPanels = [];
-  List<String> _refPlants = [];
-  List<String> _refUnits = [];
-  bool _isLoadingRef = true;
-
-  Future<void> _loadReferenceData() async {
-    setState(() => _isLoadingRef = true);
+  Future<void> _saveVersionSettings(String minVersion, {String? message}) async {
+    setState(() => _isSaving = true);
     try {
-      final plantId = _formData['plantId'] as String?;
-      final unitId = _formData['unitId'] as String?;
-
-      if (widget.userRole == AppRoles.developer) {
-        _refPlants = HierarchyService().getPlants();
-        if (plantId != null) _refUnits = HierarchyService().getUnitsForPlant(plantId);
-      }
-
-      final db = FirebaseFirestore.instance;
-      if (widget.collection == 'panels' || widget.collection == 'master_equipments') {
-         if (unitId != null && plantId != null) {
-           final rooms = await db.collection('panel_rooms')
-             .where('unitId', isEqualTo: unitId)
-             .where('plantId', isEqualTo: plantId)
-             .get();
-           _refPanelRooms = rooms.docs.map((e) => PanelRoomModel.fromMap(e.data(), e.id)).toList();
-         }
-      }
-
-      if (widget.collection == 'feeders' || widget.collection == 'master_equipments') {
-         if (unitId != null && plantId != null) {
-            final pnlSnapshot = await db.collection('panels')
-              .where('unitId', isEqualTo: unitId)
-              .where('plantId', isEqualTo: plantId)
-              .get();
-            _refPanels = pnlSnapshot.docs.map((d) => PanelModel.fromMap(d.data(), d.id)).toList();
-         }
+      await AppVersionService.setMinSupportedVersion(
+        minVersion.trim(),
+        message: message?.trim(),
+        latestVersion: AppVersion.currentVersion,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully updated Cloud Min Required Version to v${minVersion.trim()}! Older versions will now be required to update.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint("Error loading reference data: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating cloud version: $e'), backgroundColor: AppColors.error),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _isLoadingRef = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.isEditing ? 'Modify' : 'Add New';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AlertDialog(
-      title: Text('$title ${widget.collection.replaceAll('_', ' ').toUpperCase()}'),
-      content: _isLoadingRef 
-        ? const SizedBox(height: 120, child: Center(child: PulseLoading(size: 40)))
-        : SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: _buildFields(),
-              ),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.system_update_alt, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'App Version & Release Control',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
+        ],
+      ),
+      content: _isLoading
+          ? const SizedBox(
+              height: 180,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildInfoRow('Running App Build', 'v${AppVersion.currentVersion}', Colors.cyanAccent),
+                        const Divider(height: 16),
+                        _buildInfoRow('Cloud Latest Release', 'v$_cloudLatestVersion', Colors.greenAccent),
+                        const Divider(height: 16),
+                        _buildInfoRow('Cloud Min Required', 'v$_cloudMinVersion', Colors.orangeAccent),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Quick One-Tap Enforce Current Release Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving
+                          ? null
+                          : () => _saveVersionSettings(
+                                AppVersion.currentVersion,
+                                message: _messageController.text,
+                              ),
+                      icon: const Icon(Icons.security_update_good, size: 18),
+                      label: Text('Enforce v${AppVersion.currentVersion} Globally'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Or configure custom requirements:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+
+                  TextField(
+                    controller: _minVersionController,
+                    decoration: InputDecoration(
+                      labelText: 'Minimum Required Version',
+                      hintText: 'e.g. ${AppVersion.currentVersion}',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.tag, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: _messageController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Custom Force Update Message (Optional)',
+                      hintText: 'e.g. Please update to latest APK from your supervisor.',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.message_outlined, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: () async {
-            if (_formKey.currentState!.validate()) {
-              _formKey.currentState!.save();
-              
-              // Ensure ID is prefixed and uppercase/clean
-              if (_formData['id'] != null) {
-                final rawId = _formData['id'].toString().trim().toUpperCase();
-                _formData['id'] = HierarchyService.prefixId(
-                  rawId,
-                  _formData['plantId'] ?? '',
-                  _formData['unitId'] ?? '',
-                );
-                if (widget.collection == 'lighting_dbs') {
-                  _formData['name'] = rawId;
-                }
-              }
-
-              try {
-                final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
-                final createdAtRaw = _formData['createdAt'];
-                DateTime? dtCreatedAt;
-                if (createdAtRaw is Timestamp) {
-                  dtCreatedAt = createdAtRaw.toDate();
-                } else if (createdAtRaw is DateTime) {
-                  dtCreatedAt = createdAtRaw;
-                }
-                final createdBy = !widget.isEditing ? currentUserUid : _formData['createdBy'];
-
-                if (widget.collection == 'locations') {
-                  final loc = LocationModel(
-                    id: _formData['id'],
-                    unitId: _formData['unitId'] ?? '',
-                    plantId: _formData['plantId'] ?? '',
-                    name: _formData['name'],
-                    type: 'Area',
-                    description: _formData['description'] ?? '',
-                    createdAt: dtCreatedAt,
-                    createdBy: createdBy,
-                    modifiedBy: currentUserUid,
-                  );
-                  await FirestoreService().saveLocation(loc);
-                } else if (widget.collection == 'panel_rooms') {
-                  final room = PanelRoomModel(
-                    id: _formData['id'],
-                    unitId: _formData['unitId'] ?? '',
-                    plantId: _formData['plantId'] ?? '',
-                    name: _formData['name'],
-                    description: _formData['description'] ?? '',
-                    createdAt: dtCreatedAt,
-                    createdBy: createdBy,
-                    modifiedBy: currentUserUid,
-                  );
-                  await FirestoreService().savePanelRoom(room);
-                } else if (widget.collection == 'panels') {
-                  final panel = PanelModel(
-                    id: _formData['id'],
-                    plantId: _formData['plantId'] ?? '',
-                    unitId: _formData['unitId'] ?? '',
-                    panelRoomId: _formData['panelRoomId'] ?? _formData['locationId'] ?? '',
-                    name: _formData['name'],
-                    type: _formData['type'] ?? 'MCC',
-                    description: _formData['description'] ?? '',
-                    createdAt: dtCreatedAt,
-                    createdBy: createdBy,
-                    modifiedBy: currentUserUid,
-                  );
-                  await FirestoreService().savePanel(panel);
-                } else if (widget.collection == 'feeders') {
-                  final feeder = FeederModel(
-                    id: _formData['id'],
-                    plantId: _formData['plantId'] ?? '',
-                    unitId: _formData['unitId'] ?? '',
-                    panelId: _formData['panelId'] ?? '',
-                    name: _formData['name'],
-                    type: _formData['type'] ?? 'Feeder',
-                    description: _formData['description'] ?? '',
-                    createdAt: dtCreatedAt,
-                    createdBy: createdBy,
-                    modifiedBy: currentUserUid,
-                  );
-                  await FirestoreService().saveFeeder(feeder);
-                } else {
-                  _formData['modifiedBy'] = currentUserUid;
-                  if (!widget.isEditing) {
-                    _formData['createdBy'] = currentUserUid;
-                    _formData['createdAt'] = dtCreatedAt ?? DateTime.now();
-                  }
-                  _formData['updatedAt'] = DateTime.now();
-                  // Remove unused fields for lighting_dbs
-                  if (widget.collection == 'lighting_dbs') {
-                    _formData.remove('businessId');
-                  }
-                  await FirestoreService().batchSave(widget.collection, [_formData]);
-                }
-                
-                if (context.mounted) Navigator.pop(context);
-              } catch (e) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save Error: $e')));
-              }
-            }
-          },
-          child: const Text('Save'),
-        )
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        if (!_isLoading)
+          ElevatedButton(
+            onPressed: _isSaving
+                ? null
+                : () => _saveVersionSettings(
+                      _minVersionController.text,
+                      message: _messageController.text,
+                    ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Save Changes'),
+          ),
       ],
     );
   }
 
-  List<Widget> _buildFields() {
-    List<Widget> children = [];
-    
-    // 1. Immutable/Auto-filled Context (Show as info if not Developer)
-    // Don't show Plant/Unit info for lighting_dbs — scope is implied
-    if (widget.userRole != AppRoles.developer && widget.collection != 'lighting_dbs') {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              Expanded(child: _buildInfoBox('PLANT', _formData['plantId'] ?? '-')),
-              const SizedBox(width: 8),
-              Expanded(child: _buildInfoBox('UNIT', _formData['unitId'] ?? '-')),
-            ],
+  Widget _buildInfoRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
-        )
-      );
-    } else {
-      // Developer can change plant/unit
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            initialValue: _formData['plantId'],
-            decoration: const InputDecoration(labelText: 'Plant', border: OutlineInputBorder()),
-            items: _refPlants.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-            onChanged: (v) => setState(() {
-              _formData['plantId'] = v;
-              if (v != null) _refUnits = HierarchyService().getUnitsForPlant(v);
-              _formData['unitId'] = _refUnits.isNotEmpty ? _refUnits.first : null;
-              _loadReferenceData(); // Re-load parents for new unit
-            }),
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
           ),
-        )
-      );
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            initialValue: _formData['unitId'],
-            decoration: const InputDecoration(labelText: 'Unit', border: OutlineInputBorder()),
-            items: _refUnits.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-            onChanged: (v) => setState(() {
-               _formData['unitId'] = v;
-               _loadReferenceData(); // Re-load parents
-            }),
-          ),
-        )
-      );
-    }
-
-    // 2. Common Fields (ID and Name)
-    children.add(
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextFormField(
-          controller: _idController,
-          enabled: !widget.isEditing, // Lock ID on edit
-          decoration: InputDecoration(
-            labelText: 'ID (Unique Code)', 
-            border: const OutlineInputBorder(), 
-            hintText: 'e.g. MCC-2',
-            helperText: widget.isEditing ? 'ID cannot be changed.' : 'Must be unique (system will auto-prepend prefix in the background).',
-            fillColor: widget.isEditing ? Colors.grey.withValues(alpha: 0.1) : null,
-            filled: widget.isEditing,
-          ),
-          textCapitalization: TextCapitalization.characters,
-          onSaved: (v) => _formData['id'] = v,
-          validator: (v) => v == null || v.isEmpty ? 'ID is required' : null,
         ),
-      )
-    );
-
-    if (widget.collection != 'lighting_dbs') {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['name']?.toString(),
-            decoration: const InputDecoration(labelText: 'Display Name', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['name'] = v,
-            validator: (v) => v == null || v.isEmpty ? 'Name is required' : null,
-          ),
-        )
-      );
-    }
-
-    // 3. Collection Specific Fields
-    if (widget.collection == 'locations') {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['description']?.toString(),
-            decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['description'] = v,
-          ),
-        )
-      );
-    } else if (widget.collection == 'panel_rooms') {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['description']?.toString(),
-            decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['description'] = v,
-          ),
-        )
-      );
-    } else if (widget.collection == 'panels') {
-      children.add(_buildDropdown('Panel Category', 'type', HierarchyService.panelTypes, _formData['type'] ?? 'MCC'));
-      final safeSelectedRoomId = _refPanelRooms.any((e) => e.id == (_formData['panelRoomId'] ?? _formData['locationId'])) 
-          ? (_formData['panelRoomId'] ?? _formData['locationId']) 
-          : null;
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            initialValue: safeSelectedRoomId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Parent Panel Room', border: OutlineInputBorder(), hintText: 'Select Panel Room'),
-            items: _refPanelRooms.map((e) => DropdownMenuItem(value: e.id, child: Text('${e.name} (${e.id})', overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setState(() => _formData['panelRoomId'] = v),
-            validator: (v) => v == null ? 'Panel Room selection is required' : null,
-          ),
-        )
-      );
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['description']?.toString(),
-            decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['description'] = v,
-          ),
-        )
-      );
-    } else if (widget.collection == 'feeders') {
-      children.add(_buildDropdown('Feeder Type', 'type', HierarchyService.feederTypes, _formData['type'] ?? 'Feeder'));
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: DropdownButtonFormField<String>(
-            initialValue: _formData['panelId'],
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Parent Panel', border: OutlineInputBorder(), hintText: 'Which panel does this belong to?'),
-            items: _refPanels.map((e) => DropdownMenuItem(value: e.id, child: Text('${e.name} (${e.id})', overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setState(() => _formData['panelId'] = v),
-            validator: (v) => v == null ? 'Panel selection is required' : null,
-          ),
-        )
-      );
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['description']?.toString(),
-            decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['description'] = v,
-          ),
-        )
-      );
-    } else if (widget.collection == 'lighting_dbs') {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['location']?.toString(),
-            decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder(), hintText: 'e.g. Near Compressor House'),
-            onSaved: (v) => _formData['location'] = v,
-            validator: (v) => v == null || v.isEmpty ? 'Location is required' : null,
-          ),
-        )
-      );
-
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['rccbCount']?.toString(),
-            decoration: const InputDecoration(labelText: 'No of RCCB', border: OutlineInputBorder(), hintText: 'e.g. 10'),
-            keyboardType: TextInputType.number,
-            onSaved: (v) => _formData['rccbCount'] = v != null ? int.tryParse(v) : null,
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'No of RCCB is required';
-              if (int.tryParse(v) == null) return 'Must be a valid integer';
-              return null;
-            },
-          ),
-        )
-      );
-
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['incomingSource']?.toString(),
-            decoration: const InputDecoration(labelText: 'Incoming Source', border: OutlineInputBorder(), hintText: 'e.g. MCC-1 Feeder 4'),
-            onSaved: (v) => _formData['incomingSource'] = v,
-            validator: (v) => v == null || v.isEmpty ? 'Incoming source is required' : null,
-          ),
-        )
-      );
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextFormField(
-            initialValue: _formData['description']?.toString(),
-            decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-            onSaved: (v) => _formData['description'] = v,
-          ),
-        )
-      );
-    }
-
-    return children;
-  }
-
-  Widget _buildInfoBox(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05), 
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.accent)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDropdown(String label, String key, List<String> items, String current) {
-    final safeCurrent = items.contains(current) ? current : (items.isNotEmpty ? items.first : '');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DropdownButtonFormField<String>(
-        initialValue: safeCurrent,
-        isExpanded: true,
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
-        onChanged: (v) => setState(() => _formData[key] = v),
-      ),
+      ],
     );
   }
 }

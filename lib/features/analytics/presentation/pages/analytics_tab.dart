@@ -10,6 +10,7 @@ import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../core/services/hierarchy_service.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/permission_helper.dart';
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
@@ -23,6 +24,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   final FirestoreService _firestoreService = FirestoreService();
 
   bool _isLoading = true;
+  UserScope? _userScope;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
@@ -46,47 +48,19 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     }
 
     final profile = await _firestoreService.getUserProfile(user.uid);
-    final userRole = profile?['role'] ?? AppRoles.guest;
-    final userPlantId = profile?['plantId'] as String?;
-    final userUnitId = profile?['unitId'] as String?;
     final uBusinessId = profile?['businessId'] as String? ?? 'VISL';
 
     await _hierarchyService.init(businessId: uBusinessId);
-    _plants = _hierarchyService.getPlants();
+    final allPlants = _hierarchyService.getPlants();
 
-    final String? userPlant = (userPlantId == null || userPlantId.isEmpty || userPlantId == 'Unknown') ? null : userPlantId;
-    final String? userUnit = (userUnitId == null || userUnitId.isEmpty || userUnitId == 'Unknown') ? null : userUnitId;
+    final userScope = PermissionHelper.resolveUserScope(profile);
+    _userScope = userScope;
+    _plants = userScope.getAvailablePlants(allPlants);
+    _isPlantLocked = userScope.isPlantLocked;
+    _isUnitLocked = userScope.isUnitLocked;
 
-    final bool hasGlobalAdmin = profile?['isAdmin'] == true && userPlant == null;
-    final bool hasPlantAdmin = profile?['isAdmin'] == true && userPlant != null;
-
-    final bool isPlantScope = (hasPlantAdmin || userRole == AppRoles.plantAdmin || userRole == AppRoles.plantHod) &&
-        userRole != AppRoles.manager &&
-        userRole != AppRoles.deputyManager &&
-        userRole != AppRoles.associateManager &&
-        userRole != AppRoles.assistantManager &&
-        userRole != AppRoles.unitAdmin &&
-        userRole != AppRoles.unitHod;
-
-    if (userRole == AppRoles.developer || userRole == AppRoles.auditor || hasGlobalAdmin) {
-      _isPlantLocked = false;
-      _isUnitLocked = false;
-      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _updateUnitList();
-      _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : null);
-    } else if (isPlantScope) {
-      _isPlantLocked = true;
-      _isUnitLocked = false;
-      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _updateUnitList();
-      _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : null);
-    } else {
-      _isPlantLocked = true;
-      _isUnitLocked = true;
-      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _updateUnitList();
-      _selectedUnitId = userUnit;
-    }
+    _selectedPlantId = userScope.getInitialPlant(null, _plants);
+    _updateUnitList();
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -99,9 +73,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       _selectedUnitId = null;
       return;
     }
-    _units = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
-    if (!_units.contains(_selectedUnitId)) {
-      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+    final allUnits = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
+    if (_userScope != null) {
+      _units = _userScope!.getAvailableUnits(_selectedPlantId, allUnits);
+      _selectedUnitId = _userScope!.getInitialUnit(_selectedPlantId, _selectedUnitId, _units);
+    } else {
+      _units = allUnits;
+      if (!_units.contains(_selectedUnitId)) {
+        _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      }
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart' hide Border;
 import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/constants/app_roles.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/firestore_service.dart';
 import '../../../../../core/services/excel_service.dart';
@@ -12,6 +11,7 @@ import '../../../../../core/widgets/animated_gradient_background.dart';
 import '../../../../home/presentation/widgets/custom_app_bar.dart';
 import '../../../../../core/services/hierarchy_service.dart';
 import '../../../../../core/utils/file_download_helper.dart';
+import '../../../../../core/utils/permission_helper.dart';
 import 'lux_level_checklist_page.dart';
 
 class ChecklistImportPage extends StatefulWidget {
@@ -44,13 +44,12 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
   String? _userPlantId;
 
   // Scope State
+  UserScope? _userScope;
   List<String> _plants = [];
   List<String> _units = [];
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
   bool _isLoadingScope = true;
-  String _userRole = '';
-  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -72,49 +71,19 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
       return;
     }
 
-    _userRole = profile['role'] ?? AppRoles.guest;
-    final userPlantId = profile['plantId'] as String?;
-    final userUnitId = profile['unitId'] as String?;
     final userBusinessId = profile['businessId'] as String? ?? 'VISL';
 
     await HierarchyService().init(businessId: userBusinessId);
-    _plants = HierarchyService().getPlants();
-    _isAdmin = profile['isAdmin'] == true;
+    final allPlants = HierarchyService().getPlants();
 
-    final String? cleanPlant = (userPlantId == null || userPlantId.isEmpty || userPlantId == 'Unknown') ? null : userPlantId;
-    final String? cleanUnit = (userUnitId == null || userUnitId.isEmpty || userUnitId == 'Unknown') ? null : userUnitId;
+    final userScope = PermissionHelper.resolveUserScope(profile);
+    _userScope = userScope;
+    _plants = userScope.getAvailablePlants(allPlants);
+    _isPlantLocked = userScope.isPlantLocked;
+    _isUnitLocked = userScope.isUnitLocked;
 
-    final bool hasGlobalAdmin = _isAdmin && cleanPlant == null;
-    final bool hasPlantAdmin = _isAdmin && cleanPlant != null;
-
-    final bool isPlantScope = (hasPlantAdmin || _userRole == AppRoles.plantAdmin || _userRole == AppRoles.plantHod) &&
-        _userRole != AppRoles.manager &&
-        _userRole != AppRoles.deputyManager &&
-        _userRole != AppRoles.associateManager &&
-        _userRole != AppRoles.assistantManager &&
-        _userRole != AppRoles.unitAdmin &&
-        _userRole != AppRoles.unitHod;
-
-    if (_userRole == AppRoles.developer || _userRole == AppRoles.auditor || hasGlobalAdmin) {
-      _isPlantLocked = false;
-      _isUnitLocked = false;
-      _userPlantId = widget.plantId ?? cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-    } else if (isPlantScope) {
-      _isPlantLocked = true;
-      _userPlantId = widget.plantId ?? cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _isUnitLocked = false;
-    } else {
-      _isPlantLocked = true;
-      _userPlantId = widget.plantId ?? cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _isUnitLocked = true;
-      _userUnitId = widget.unitId ?? cleanUnit;
-    }
-
+    _userPlantId = userScope.getInitialPlant(widget.plantId, _plants);
     _updateUnitList();
-
-    if (!_isUnitLocked) {
-      _userUnitId = widget.unitId ?? cleanUnit ?? (_units.isNotEmpty ? _units.first : null);
-    }
 
     if (mounted) {
       setState(() => _isLoadingScope = false);
@@ -126,9 +95,15 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
       _units = [];
       _userUnitId = null;
     } else {
-      _units = HierarchyService().getUnitsForPlant(_userPlantId!);
-      if (!_units.contains(_userUnitId)) {
-        _userUnitId = _units.isNotEmpty ? _units.first : null;
+      final allUnits = HierarchyService().getUnitsForPlant(_userPlantId!);
+      if (_userScope != null) {
+        _units = _userScope!.getAvailableUnits(_userPlantId, allUnits);
+        _userUnitId = _userScope!.getInitialUnit(_userPlantId, widget.unitId, _units);
+      } else {
+        _units = allUnits;
+        if (!_units.contains(_userUnitId)) {
+          _userUnitId = _units.isNotEmpty ? _units.first : null;
+        }
       }
     }
   }
@@ -164,10 +139,11 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
               '• location: Area name\n'
               '• seqNo: 3-digit sequence number (e.g. 001, 002).'
         };
+      case 'rccb_equipments':
       case 'lighting_dbs':
         return {
-          'Cols': 'id, location, rccbCount, incomingSource, description',
-          'Note': 'Lighting Distribution Board. Location is plain text, and rccbCount is a number (e.g. 12).'
+          'Cols': 'id, location, rccbCount, incomingSource, category, defaultRating, description',
+          'Note': 'RCCB Equipment Registry (LDB, Welding Outlet, Power Socket). Category: LDB / Welding Outlet / Power Socket. defaultRating: 30mA or 100mA.'
         };
       case 'lux_locations':
         return {
@@ -239,7 +215,7 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
             TextCellValue(data['seqNo']?.toString() ?? '001'),
           ]);
         }
-      } else if (widget.collectionId == 'lighting_dbs') {
+      } else if (widget.collectionId == 'rccb_equipments' || widget.collectionId == 'lighting_dbs') {
         for (final doc in querySnapshot.docs) {
           final data = doc.data();
           final rawId = HierarchyService.stripPrefix(doc.id, _userPlantId!, _userUnitId!);
@@ -248,6 +224,8 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
             TextCellValue(data['location']?.toString() ?? ''),
             IntCellValue((data['rccbCount'] as num?)?.toInt() ?? 0),
             TextCellValue(data['incomingSource']?.toString() ?? ''),
+            TextCellValue(data['category']?.toString() ?? 'LDB'),
+            TextCellValue(data['defaultRating']?.toString() ?? '30mA'),
             TextCellValue(data['description']?.toString() ?? ''),
           ]);
         }
@@ -365,7 +343,7 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
         continue;
       }
 
-      if (widget.collectionId == 'lighting_dbs') {
+      if (widget.collectionId == 'rccb_equipments' || widget.collectionId == 'lighting_dbs') {
         final rawId = row['id']?.toString().trim() ?? '';
         final rccbVal = row['rccbCount'];
         final rccbStr = rccbVal?.toString().trim() ?? '';
@@ -377,7 +355,7 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
         } else {
           final fullId = HierarchyService.prefixId(rawId, _userPlantId!, _userUnitId!);
           if (existingIds.contains(fullId.toUpperCase())) {
-            status = 'Warning: Lighting DB exists. Will update.';
+            status = 'Warning: Equipment exists. Will update.';
           }
         }
         row['Validation'] = status;
@@ -417,8 +395,8 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
         allowedExtensions: ['xlsx', 'xls'],
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final pickedFile = result.files.single;
+      if (result.isNotEmpty) {
+        final pickedFile = result.single;
         setState(() {
           _fileName = pickedFile.name;
           _isProcessing = true;
@@ -468,7 +446,7 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
         data['unitId'] = _userUnitId;
         data['plantId'] = _userPlantId;
 
-        if (widget.collectionId == 'lighting_dbs') {
+        if (widget.collectionId == 'rccb_equipments' || widget.collectionId == 'lighting_dbs') {
           if (data['id'] != null) {
             data['id'] = HierarchyService.prefixId(data['id'].toString(), _userPlantId!, _userUnitId!);
           }
@@ -477,6 +455,8 @@ class _ChecklistImportPageState extends State<ChecklistImportPage> {
             final parsed = double.tryParse(rccbRaw.toString());
             if (parsed != null) data['rccbCount'] = parsed.toInt();
           }
+          data['category'] ??= 'LDB';
+          data['defaultRating'] ??= '30mA';
           data.remove('businessId');
         } else if (widget.collectionId == 'lux_locations') {
           if (data['compassOrientation'] == null || data['compassOrientation'].toString().isEmpty) {

@@ -4,14 +4,62 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/hierarchy_service.dart';
+import '../../../../core/utils/permission_helper.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../features/assets/data/models/isolation_permit_model.dart';
 import 'isolation_management_page.dart';
 import '../../../log_data/presentation/pages/log_management_dashboard.dart';
 import 'checklist/checklist_management_dashboard.dart';
 
-class OperationsTab extends StatelessWidget {
+import 'sld/single_line_diagram_page.dart';
+
+class OperationsTab extends StatefulWidget {
   const OperationsTab({super.key});
+
+  @override
+  State<OperationsTab> createState() => _OperationsTabState();
+}
+
+class _OperationsTabState extends State<OperationsTab> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final HierarchyService _hierarchyService = HierarchyService();
+
+  String? _userPlantId;
+  String? _userUnitId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserScope();
+  }
+
+  Future<void> _loadUserScope() async {
+    try {
+      final user = _firestoreService.currentUser;
+      if (user != null) {
+        final profile = await _firestoreService.getUserProfile(user.uid);
+        if (profile != null && mounted) {
+          final businessId = profile['businessId'] as String? ?? 'VISL';
+          await _hierarchyService.init(businessId: businessId);
+
+          final userScope = PermissionHelper.resolveUserScope(profile);
+          final plants = userScope.getAvailablePlants();
+          final initialPlant = userScope.getInitialPlant(plants);
+          String? initialUnit;
+          if (initialPlant != null) {
+            final units = userScope.getAvailableUnits(initialPlant);
+            initialUnit = userScope.getInitialUnit(units);
+          }
+          setState(() {
+            _userPlantId = initialPlant;
+            _userUnitId = initialUnit;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user scope in OperationsTab: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,21 +82,11 @@ class OperationsTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            if (isDesktop)
+            if (isDesktop) ...[
               Row(
                 children: [
-                  Expanded(child: _buildIsolationCard(context)),
+                  Expanded(child: _buildSldCard(context)),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildLogCard(context)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildChecklistCard(context)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildSafetyCard(context)),
-                ],
-              )
-            else ...[
-              Row(
-                children: [
                   Expanded(child: _buildIsolationCard(context)),
                   const SizedBox(width: 16),
                   Expanded(child: _buildLogCard(context)),
@@ -60,6 +98,32 @@ class OperationsTab extends StatelessWidget {
                   Expanded(child: _buildChecklistCard(context)),
                   const SizedBox(width: 16),
                   Expanded(child: _buildSafetyCard(context)),
+                  const SizedBox(width: 16),
+                  const Spacer(),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: _buildSldCard(context)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildIsolationCard(context)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildLogCard(context)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildChecklistCard(context)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildSafetyCard(context)),
+                  const SizedBox(width: 16),
+                  const Spacer(),
                 ],
               ),
             ],
@@ -69,10 +133,25 @@ class OperationsTab extends StatelessWidget {
     );
   }
 
+  Widget _buildSldCard(BuildContext context) {
+    return _buildDashboardCard(
+      context,
+      title: 'Power Flow &\nSingle Line (SLD)',
+      icon: Icons.schema,
+      color: Colors.cyan,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SingleLineDiagramPage()),
+      ),
+    );
+  }
+
   Widget _buildIsolationCard(BuildContext context) {
     return StreamBuilder<List<IsolationPermitModel>>(
-      stream: FirestoreService().getActiveIsolationsStream(
-        businessId: HierarchyService().currentBusinessId,
+      stream: _firestoreService.getActiveIsolationsStream(
+        businessId: _hierarchyService.currentBusinessId,
+        plantId: _userPlantId,
+        unitId: _userUnitId,
       ),
       builder: (context, snapshot) {
         final count = snapshot.data?.length ?? 0;
@@ -82,10 +161,13 @@ class OperationsTab extends StatelessWidget {
           icon: Icons.lock_outline,
           color: Colors.blueAccent,
           badgeCount: count > 0 ? count : null,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const IsolationManagementPage()),
-          ),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IsolationManagementPage()),
+            );
+            _loadUserScope();
+          },
         );
       },
     );

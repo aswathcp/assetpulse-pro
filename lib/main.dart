@@ -8,22 +8,29 @@ import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/firestore_service.dart';
+import 'core/services/app_version_service.dart';
+import 'core/constants/app_version.dart';
 import 'core/constants/app_colors.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/pages/register_page.dart';
+import 'features/auth/presentation/pages/app_update_required_page.dart';
+import 'features/auth/presentation/pages/user_under_review_page.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/home/presentation/pages/splash_page.dart';
 import 'core/widgets/pulse_loading.dart';
 import 'core/widgets/glass_container.dart';
 import 'core/widgets/animated_gradient_background.dart';
 import 'core/services/biometric_service.dart';
+import 'core/services/hierarchy_service.dart';
 import 'features/auth/presentation/pages/app_lock_page.dart';
+import 'core/services/memory_optimization_service.dart';
 // Note: You must generate this file using `flutterfire configure`
 // If it doesn't exist, remove the import and options parameter, but Auth won't work in prod
 import 'firebase_options.dart'; 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MemoryOptimizationService.initialize();
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -51,7 +58,7 @@ class AssetPulseApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: const SplashPage(),
+            home: const AuthWrapper(),
             routes: {
               '/login': (context) => const LoginPage(),
               '/register': (context) => const RegisterPage(),
@@ -73,46 +80,186 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   User? _currentUser;
+  bool _isInitialLoading = true;
   bool _isValidating = false;
   bool _isValidated = false;
   bool _isRejected = false;
+  bool _isPendingApproval = false;
   bool _appLockLocked = true;
+  VersionCheckResult? _versionCheckResult;
   Map<String, dynamic>? _userProfile;
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userDocSubscription;
 
   @override
   void initState() {
     super.initState();
-    _checkAppLockStatus();
+    _initializeSystem();
+  }
+
+  Future<void> _initializeSystem() async {
+    final startTime = DateTime.now();
+
+    try {
+      // 1. Run Hierarchy init, App version check, and biometric check in parallel
+      final results = await Future.wait([
+        HierarchyService().init().catchError((e) {
+          debugPrint("HierarchyService init error: $e");
+          return null;
+        }),
+        AppVersionService.checkVersion().catchError((e) {
+          debugPrint("AppVersionService check error: $e");
+          return VersionCheckResult(
+            isSupported: true,
+            installedVersion: AppVersion.currentVersion,
+            minRequiredVersion: AppVersion.currentVersion,
+            message: '',
+          );
+        }),
+        BiometricService.isAppLockBiometricsEnabled().catchError((e) => false),
+      ]);
+
+      _versionCheckResult = results[1] as VersionCheckResult;
+      final bioEnabled = results[2] as bool;
+
+      // 2. Resolve initial user session
+      final user = AuthService().currentUser;
+      if (user != null) {
+        // Developer auto-provision
+        if (user.email == 'cpstudio.in@gmail.com') {
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+              'uid': user.uid,
+              'email': user.email,
+              'displayName': 'C P Studio',
+              'employeeId': '00000000',
+              'role': 'Developer',
+              'department': 'Operations',
+              'unitId': 'VAB',
+              'plantId': 'VAB',
+              'isValidated': true,
+              'isRejected': false,
+              'isRequestingAuth': true,
+              'isIsolationAuth': true,
+            }, SetOptions(merge: true));
+          } catch (_) {}
+        }
+
+        try {
+          final profile = await FirestoreService()
+              .getUserProfile(user.uid, fromServer: true)
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          _applyUserProfile(user, profile, bioEnabled);
+        } catch (e) {
+          _applyUserProfile(user, null, bioEnabled);
+        }
+      } else {
+        _currentUser = null;
+        _isValidated = false;
+        _isRejected = false;
+        _isPendingApproval = false;
+        _userProfile = null;
+      }
+    } catch (e) {
+      debugPrint("Startup initialization error: $e");
+    }
+
+    // Ensure a brief minimum 400ms duration so splash renders smoothly without jarring flash
+    final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+    if (elapsed < 400) {
+      await Future.delayed(Duration(milliseconds: 400 - elapsed));
+    }
+
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = false;
+      });
+      _startListeners();
+    }
+  }
+
+  void _startListeners() {
+    // 1. Auth state changes
+    _authSubscription?.cancel();
     _authSubscription = AuthService().authStateChanges.listen((user) {
       _handleAuthChange(user);
     });
+
+    // 2. Real-time user doc listener
+    if (_currentUser != null) {
+      _listenToUserDoc(_currentUser!.uid);
+    }
   }
 
-  Future<void> _checkAppLockStatus() async {
-    final bioEnabled = await BiometricService.isAppLockBiometricsEnabled();
-    final pinEnabled = await BiometricService.isAppLockPinEnabled();
-    if (mounted) {
-      setState(() {
-        _appLockLocked = bioEnabled || pinEnabled;
-      });
+  void _listenToUserDoc(String? uid) {
+    _userDocSubscription?.cancel();
+    if (uid == null) return;
+
+    _userDocSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null && mounted) {
+        debugPrint("User document snapshot received in real-time.");
+        final data = snapshot.data()!;
+        _applyUserProfile(_currentUser ?? AuthService().currentUser!, data, _appLockLocked);
+        if (mounted) setState(() {});
+      }
+    }, onError: (e) {
+      debugPrint("Error listening to user doc: $e");
+    });
+  }
+
+  void _applyUserProfile(User user, Map<String, dynamic>? profile, bool bioEnabled) {
+    _currentUser = user;
+    if (profile != null) {
+      _userProfile = profile;
+      if (profile['isRejected'] == true) {
+        _isRejected = true;
+        _isValidated = false;
+        _isPendingApproval = false;
+      } else if (profile['isValidated'] == true) {
+        _isValidated = true;
+        _isRejected = false;
+        _isPendingApproval = false;
+        _appLockLocked = bioEnabled;
+      } else {
+        // Pending approval
+        _isPendingApproval = true;
+        _isValidated = false;
+        _isRejected = false;
+      }
+    } else {
+      _userProfile = {
+        'name': user.displayName ?? user.email,
+        'email': user.email,
+        'isValidated': false,
+        'isRejected': false,
+      };
+      _isPendingApproval = true;
+      _isValidated = false;
+      _isRejected = false;
     }
   }
 
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _userDocSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _handleAuthChange(User? user) async {
     if (user == null) {
+      _userDocSubscription?.cancel();
       if (mounted) {
         setState(() {
           _currentUser = null;
           _isValidating = false;
           _isValidated = false;
           _isRejected = false;
+          _isPendingApproval = false;
           _userProfile = null;
         });
       }
@@ -126,113 +273,76 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     try {
-      if (user.email == 'cpstudio.in@gmail.com') {
-        try {
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'role': 'Developer',
-            'isValidated': true,
-            'isRejected': false,
-          });
-        } catch (_) {
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-            'uid': user.uid,
-            'email': user.email,
-            'displayName': 'C P Studio',
-            'employeeId': '00000000',
-            'role': 'Developer',
-            'department': 'Operations',
-            'unitId': 'VAB',
-            'plantId': 'VAB',
-            'isValidated': true,
-            'isRejected': false,
-            'isRequestingAuth': true,
-            'isIsolationAuth': true,
-          }, SetOptions(merge: true));
-        }
-      }
-
+      await _checkAppVersion();
+      final bioEnabled = await BiometricService.isAppLockBiometricsEnabled().catchError((_) => false);
       final profile = await FirestoreService().getUserProfile(user.uid, fromServer: true);
-      if (profile != null) {
-        if (profile['isRejected'] == true) {
-          if (mounted) {
-            setState(() {
-              _currentUser = user;
-              _userProfile = profile;
-              _isRejected = true;
-              _isValidated = false;
-              _isValidating = false;
-            });
-          }
-        } else if (profile['isValidated'] == true) {
-          final bioEnabled = await BiometricService.isAppLockBiometricsEnabled();
-          final pinEnabled = await BiometricService.isAppLockPinEnabled();
-          if (mounted) {
-            setState(() {
-              _currentUser = user;
-              _userProfile = profile;
-              _appLockLocked = bioEnabled || pinEnabled;
-              _isValidated = true;
-              _isRejected = false;
-              _isValidating = false;
-            });
-          }
-        } else {
-          // Pending approval (isValidated == false)
-          await AuthService().signOut();
-          if (mounted) {
-            setState(() {
-              _currentUser = null;
-              _isValidated = false;
-              _isRejected = false;
-              _isValidating = false;
-              _userProfile = null;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Account pending approval. Please contact Admin.'),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-        }
-      } else {
-        await AuthService().signOut();
-        if (mounted) {
-          setState(() {
-            _currentUser = null;
-            _isValidated = false;
-            _isRejected = false;
-            _isValidating = false;
-            _userProfile = null;
-          });
-        }
-      }
+      _applyUserProfile(user, profile, bioEnabled);
+      _listenToUserDoc(user.uid);
     } catch (e) {
-      await AuthService().signOut();
+      debugPrint("Auth change error: $e");
+    } finally {
       if (mounted) {
         setState(() {
-          _currentUser = null;
-          _isValidated = false;
-          _isRejected = false;
           _isValidating = false;
-          _userProfile = null;
         });
       }
     }
   }
 
+  Future<void> _checkAppVersion() async {
+    final result = await AppVersionService.checkVersion();
+    if (mounted) {
+      setState(() {
+        _versionCheckResult = result;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isValidating) {
-      return const Scaffold(
-        body: Center(child: PulseLoading(size: 60)),
+    // 1. Initial startup splash screen (single loading screen)
+    if (_isInitialLoading) {
+      return const SplashView(statusText: 'Starting AssetPulse Pro...');
+    }
+
+    // 2. Minimum app version gating
+    if (_versionCheckResult != null && !_versionCheckResult!.isSupported) {
+      return AppUpdateRequiredPage(
+        checkResult: _versionCheckResult!,
+        onRetry: () => _checkAppVersion(),
       );
     }
 
+    // 3. Subsequent authentication transition loading
+    if (_isValidating) {
+      return const SplashView(statusText: 'Verifying session...');
+    }
+
+    // 4. Authenticated destinations
     if (_currentUser != null) {
+      // Rejection state
       if (_isRejected && _userProfile != null) {
-        return RequestRejectedPage(user: _currentUser!, profile: _userProfile!);
+        return RequestRejectedPage(
+          user: _currentUser!,
+          profile: _userProfile!,
+          onResubmitted: () {
+            _handleAuthChange(_currentUser);
+          },
+        );
       }
+
+      // Pending admin review state
+      if (_isPendingApproval && _userProfile != null) {
+        return UserUnderReviewPage(
+          user: _currentUser!,
+          userProfile: _userProfile!,
+          onApproved: () {
+            _handleAuthChange(_currentUser);
+          },
+        );
+      }
+
+      // Approved / Validated user state
       if (_isValidated) {
         if (_appLockLocked) {
           return AppLockPage(
@@ -247,6 +357,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
     }
 
+    // 5. Unauthenticated user
     return const LoginPage();
   }
 }
@@ -254,8 +365,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
 class RequestRejectedPage extends StatefulWidget {
   final User user;
   final Map<String, dynamic> profile;
+  final VoidCallback? onResubmitted;
 
-  const RequestRejectedPage({super.key, required this.user, required this.profile});
+  const RequestRejectedPage({
+    super.key,
+    required this.user,
+    required this.profile,
+    this.onResubmitted,
+  });
 
   @override
   State<RequestRejectedPage> createState() => _RequestRejectedPageState();
@@ -270,12 +387,18 @@ class _RequestRejectedPageState extends State<RequestRejectedPage> {
       await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
         'isRejected': false,
         'isValidated': false,
+        'rejectionReason': FieldValue.delete(),
+        'resubmittedAt': FieldValue.serverTimestamp(),
       });
-      await AuthService().signOut();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Request re-submitted successfully! Waiting for admin approval.'), backgroundColor: AppColors.success),
+          const SnackBar(
+            content: Text('Request re-submitted! Awaiting administrator review.'),
+            backgroundColor: AppColors.success,
+          ),
         );
+        widget.onResubmitted?.call();
       }
     } catch (e) {
       if (mounted) {
@@ -289,6 +412,26 @@ class _RequestRejectedPageState extends State<RequestRejectedPage> {
   }
 
   Future<void> _deleteUserData() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account Data?'),
+        content: const Text(
+          'This will permanently remove your registration data from the system so you can re-register with fresh details. Continue?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() => _isLoading = true);
     try {
       await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).delete();
@@ -300,7 +443,7 @@ class _RequestRejectedPageState extends State<RequestRejectedPage> {
       await AuthService().signOut();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User data deleted. You can register again.'), backgroundColor: AppColors.info),
+          const SnackBar(content: Text('Account data cleared. You can register again.'), backgroundColor: AppColors.info),
         );
       }
     } catch (e) {
@@ -323,6 +466,7 @@ class _RequestRejectedPageState extends State<RequestRejectedPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtitleColor = isDark ? Colors.white70 : Colors.black54;
+    final reason = widget.profile['rejectionReason'];
 
     return Scaffold(
       body: AnimatedGradientBackground(
@@ -339,45 +483,93 @@ class _RequestRejectedPageState extends State<RequestRejectedPage> {
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.cancel, color: AppColors.error, size: 64),
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.error.withValues(alpha: 0.15),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.4), width: 2),
+                        ),
+                        child: const Icon(Icons.cancel_outlined, color: AppColors.error, size: 54),
+                      ),
                       const SizedBox(height: 20),
                       Text(
-                        'Request Rejected',
+                        'Registration Rejected',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
-                        'Your account request for Employee ID ${widget.profile['employeeId']} has been rejected by the administrator.',
+                        'Your registration request for Employee ID ${widget.profile['employeeId'] ?? 'N/A'} was not approved by the administrator.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: subtitleColor, fontSize: 14),
+                        style: TextStyle(color: subtitleColor, fontSize: 13.5, height: 1.4),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 18),
+
+                      // Rejection reason note if provided
+                      if (reason != null && reason.toString().trim().isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: AppColors.error, size: 16),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Reason from Administrator:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                reason.toString(),
+                                style: TextStyle(fontSize: 13, color: textColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
                       ElevatedButton.icon(
                         onPressed: _resubmitRequest,
-                        icon: const Icon(Icons.refresh, color: Colors.white),
-                        label: const Text('Re-submit Request', style: TextStyle(color: Colors.white)),
+                        icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
+                        label: const Text('Re-submit Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
-                          minimumSize: const Size(double.infinity, 50),
+                          minimumSize: const Size(double.infinity, 48),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: _deleteUserData,
-                        icon: const Icon(Icons.delete_forever, color: AppColors.error),
-                        label: const Text('Delete My Data', style: TextStyle(color: AppColors.error)),
+                        icon: const Icon(Icons.delete_forever, color: AppColors.error, size: 18),
+                        label: const Text('Delete My Data & Start Over', style: TextStyle(color: AppColors.error)),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: AppColors.error),
-                          minimumSize: const Size(double.infinity, 50),
+                          minimumSize: const Size(double.infinity, 48),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      TextButton(
+                      const SizedBox(height: 16),
+                      TextButton.icon(
                         onPressed: () => AuthService().signOut(),
-                        child: Text('Back to Login', style: TextStyle(color: subtitleColor)),
-                      )
+                        icon: Icon(Icons.logout, size: 16, color: subtitleColor),
+                        label: Text('Sign Out / Use Another Account', style: TextStyle(color: subtitleColor, fontSize: 13)),
+                      ),
                     ],
                   ),
               ),

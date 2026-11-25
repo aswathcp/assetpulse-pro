@@ -8,7 +8,14 @@ import '../../../home/presentation/widgets/custom_app_bar.dart';
 import 'isolation_permit_card.dart';
 
 class IsolationRecordsPage extends StatelessWidget {
-  const IsolationRecordsPage({super.key});
+  final String? plantId;
+  final String? unitId;
+
+  const IsolationRecordsPage({
+    super.key,
+    this.plantId,
+    this.unitId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +25,11 @@ class IsolationRecordsPage extends StatelessWidget {
       appBar: const CustomAppBar(title: 'Isolation Records'),
       body: AnimatedGradientBackground(
         child: StreamBuilder<List<IsolationPermitModel>>(
-          stream: FirestoreService().getIsolationRecordsStream(businessId: businessId),
+          stream: FirestoreService().getIsolationRecordsStream(
+            businessId: businessId,
+            plantId: plantId,
+            unitId: unitId,
+          ),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: PulseLoading(size: 50));

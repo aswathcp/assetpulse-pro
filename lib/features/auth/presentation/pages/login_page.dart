@@ -5,8 +5,9 @@ import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/widgets/pulse_loading.dart';
-import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/biometric_service.dart';
+import '../../../../core/services/app_version_service.dart';
+import 'app_update_required_page.dart';
 
 import '../../../../core/widgets/responsive_layout.dart';
 
@@ -27,7 +28,25 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    _initLoginScreen();
+  }
+
+  Future<void> _initLoginScreen() async {
     _checkBiometrics();
+    try {
+      final versionResult = await AppVersionService.checkVersion();
+      if (!versionResult.isSupported && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AppUpdateRequiredPage(
+              checkResult: versionResult,
+              onRetry: () => _initLoginScreen(),
+            ),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkBiometrics() async {
@@ -65,28 +84,35 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
     try {
+      final versionResult = await AppVersionService.checkVersion();
+      if (!versionResult.isSupported) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AppUpdateRequiredPage(
+                checkResult: versionResult,
+                onRetry: () => _initLoginScreen(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       final cred = await AuthService().signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Check Approval Status
-      if (cred?.user != null) {
-        final profile = await FirestoreService().getUserProfile(cred!.user!.uid, fromServer: true);
-        if (profile != null && profile['isValidated'] == false) {
-           await AuthService().signOut();
-           throw Exception("Account pending approval. Please contact Admin.");
-        }
-
-        // Save credentials if this was normal email/password login
-        if (!isBiometric) {
-          await BiometricService.saveCredentials(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
-          );
-        }
+      // Save credentials if this was normal email/password login
+      if (cred?.user != null && !isBiometric) {
+        await BiometricService.saveCredentials(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
       }
-      // Auth State Stream in main.dart will handle navigation if we didn't sign out
+      // Auth State Stream in main.dart will handle navigation (Home, Review Page, or Rejected Page)
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

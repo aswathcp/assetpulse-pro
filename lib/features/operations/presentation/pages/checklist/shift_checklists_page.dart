@@ -9,6 +9,7 @@ import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
 import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 import 'package:asset_pulse_pro/core/widgets/pulse_loading.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 import 'geofenced_checklist_wrapper.dart';
 import 'checklists/dynamic_checklist_form.dart';
 import 'shift_checklist_management_page.dart';
@@ -104,8 +105,6 @@ class _ShiftChecklistsPageState extends State<ShiftChecklistsPage> {
     _userRole = profile['role'] ?? AppRoles.guest;
     _currentUserName = profile['displayName'] ?? 'Unknown Operator';
     _isAdmin = profile['isAdmin'] == true || _userRole == AppRoles.developer;
-    final userPlantId = profile['plantId'] as String?;
-    final userUnitId = profile['unitId'] as String?;
     final userBusinessId = profile['businessId'] as String? ?? 'VISL';
 
     final hierarchyService = HierarchyService();
@@ -118,52 +117,15 @@ class _ShiftChecklistsPageState extends State<ShiftChecklistsPage> {
           _availableBusinesses.isNotEmpty ? _availableBusinesses.keys.first : null;
     }
 
-    _plants = hierarchyService.getPlants();
+    final userScope = PermissionHelper.resolveUserScope(profile);
+    _isPlantLocked = userScope.isPlantLocked;
+    _isUnitLocked = userScope.isUnitLocked;
 
-    final bool hasGlobalAdmin = profile['isAdmin'] == true && userPlantId == null;
-    final bool hasPlantAdmin = profile['isAdmin'] == true && userPlantId != null;
-
-    final String? cleanPlant =
-        (userPlantId == null || userPlantId.isEmpty || userPlantId == 'Unknown')
-            ? null
-            : userPlantId;
-    final String? cleanUnit =
-        (userUnitId == null || userUnitId.isEmpty || userUnitId == 'Unknown')
-            ? null
-            : userUnitId;
-
-    final bool isPlantScope = (hasPlantAdmin ||
-            _userRole == AppRoles.businessAdmin ||
-            _userRole == AppRoles.plantAdmin ||
-            _userRole == AppRoles.plantHod) &&
-        _userRole != AppRoles.manager &&
-        _userRole != AppRoles.deputyManager &&
-        _userRole != AppRoles.associateManager &&
-        _userRole != AppRoles.assistantManager &&
-        _userRole != AppRoles.unitAdmin &&
-        _userRole != AppRoles.unitHod;
-
-    if (_userRole == AppRoles.developer ||
-        _userRole == AppRoles.auditor ||
-        hasGlobalAdmin) {
-      _isPlantLocked = false;
-      _isUnitLocked = false;
-      _selectedPlantId = _plants.isNotEmpty ? _plants.first : null;
-    } else if (isPlantScope) {
-      _isPlantLocked = true;
-      _isUnitLocked = false;
-      _selectedPlantId = cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-    } else {
-      _isPlantLocked = true;
-      _isUnitLocked = true;
-      _selectedPlantId = cleanPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _selectedUnitId = cleanUnit;
-    }
-
-    _updateUnitList();
-
-    if (!_isUnitLocked && _selectedUnitId == null) {
-      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+    _plants = userScope.getAvailablePlants();
+    _selectedPlantId = userScope.getInitialPlant(_plants);
+    if (_selectedPlantId != null) {
+      _units = userScope.getAvailableUnits(_selectedPlantId!);
+      _selectedUnitId = userScope.getInitialUnit(_units);
     }
 
     await _loadData();
@@ -250,7 +212,11 @@ class _ShiftChecklistsPageState extends State<ShiftChecklistsPage> {
 
   void _launchChecklist(BuildContext context, Map<String, dynamic> checklist,
       {Map<String, dynamic>? existingSubmission}) {
-    final isLocationRequired = checklist['isLocationRequired'] == true;
+    final hasValidCoordinates = checklist['latitude'] != null &&
+        checklist['longitude'] != null &&
+        ((checklist['latitude'] as num).toDouble() != 0.0 ||
+            (checklist['longitude'] as num).toDouble() != 0.0);
+    final isLocationRequired = checklist['isLocationRequired'] == true && hasValidCoordinates;
 
     if (isLocationRequired) {
       Navigator.push(

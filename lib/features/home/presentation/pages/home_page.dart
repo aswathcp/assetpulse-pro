@@ -16,6 +16,7 @@ import '../../../analytics/presentation/pages/analytics_tab.dart';
 import '../../../scanning/presentation/pages/qr_scanner_page.dart';
 import '../../../scanning/presentation/pages/nfc_scanner_page.dart';
 import '../../../scanning/presentation/pages/rfid_scanner_page.dart';
+import '../../../operations/presentation/pages/checklist/rccb_checklists_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -122,15 +123,18 @@ class _HomePageState extends State<HomePage> {
 
       if (checklistQuery.docs.isNotEmpty) {
         final checklist = checklistQuery.docs.first.data();
-        final isLocationRequired = checklist['isLocationRequired'] == true;
+        final lat = (checklist['latitude'] as num?)?.toDouble() ?? 0.0;
+        final lng = (checklist['longitude'] as num?)?.toDouble() ?? 0.0;
+        final isLocationRequired = checklist['isLocationRequired'] == true &&
+            (lat != 0.0 || lng != 0.0);
 
         if (isLocationRequired) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => GeofencedChecklistWrapper(
-                targetLatitude: (checklist['latitude'] as num).toDouble(),
-                targetLongitude: (checklist['longitude'] as num).toDouble(),
+                targetLatitude: lat,
+                targetLongitude: lng,
                 targetName: '${checklist['unitId'] ?? ''} ${checklist['name'] ?? ''}',
                 builder: (pos, verified) => DynamicChecklistForm(
                   checklist: checklist,
@@ -151,10 +155,49 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      // 3. Check if scanned code is an RCCB Safety Board / Outlet / Socket
+      String rccbCode = code;
+      if (rccbCode.toUpperCase().startsWith('RCCB:')) {
+        rccbCode = rccbCode.substring(5).trim();
+      }
+
+      DocumentSnapshot? rccbDoc;
+      final directRccbDoc = await FirebaseFirestore.instance.collection('rccb_equipments').doc(rccbCode).get();
+      if (directRccbDoc.exists) {
+        rccbDoc = directRccbDoc;
+      } else {
+        final queryRccb = await FirebaseFirestore.instance
+            .collection('rccb_equipments')
+            .where('id', isEqualTo: rccbCode)
+            .limit(1)
+            .get();
+        if (queryRccb.docs.isNotEmpty) {
+          rccbDoc = queryRccb.docs.first;
+        } else {
+          // Fallback for legacy lighting_dbs if still present
+          final legacyDoc = await FirebaseFirestore.instance.collection('lighting_dbs').doc(rccbCode).get();
+          if (legacyDoc.exists) {
+            rccbDoc = legacyDoc;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      if (rccbDoc != null && rccbDoc.exists) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RccbChecklistsPage(initialScannedCode: rccbCode),
+          ),
+        );
+        return;
+      }
+
       // Not found
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Unrecognized code: "$code" (Not found in Assets or Checklists)'),
+          content: Text('Unrecognized code: "$code" (Not found in Assets, Checklists, or RCCB boards)'),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),

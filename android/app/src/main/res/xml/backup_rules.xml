@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="root" path="cache" />
+    <exclude domain="root" path="code_cache" />
+    <exclude domain="root" path="no_backup" />
+    <exclude domain="file" path="app_flutter/temp" />
+</full-backup-content>

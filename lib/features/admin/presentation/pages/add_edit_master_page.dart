@@ -9,6 +9,7 @@ import '../../../../core/utils/permission_helper.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
+import '../../../../core/widgets/searchable_selection_field.dart';
 import '../../../home/presentation/widgets/custom_app_bar.dart';
 import '../../../assets/data/models/master_equipment_model.dart';
 import '../../../assets/data/models/location_model.dart';
@@ -322,84 +323,160 @@ class _AddEditMasterPageState extends State<AddEditMasterPage> {
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
-                    // Cascading Dropdowns for Context
-                    _buildGlassDropdown<String>(
-                      label: 'Physical Area',
-                      value: _locations.any((e) => e.id == _selectedLocationId) ? _selectedLocationId : null,
-                      items: _locations
-                          .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
-                          .toList(),
-                      onChanged: (val) {
-                         setState(() {
-                           _selectedLocationId = val;
-                         });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildGlassDropdown<String>(
-                      label: 'Panel Room / Substation',
-                      value: _panelRooms.any((e) => e.id == _selectedPanelRoomId) ? _selectedPanelRoomId : null,
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('None / Mechanical Only', style: TextStyle(fontStyle: FontStyle.italic)),
+                    // Cascading Searchable Pickers for Context
+                    GlassContainer(
+                      width: double.infinity,
+                      height: null,
+                      borderRadius: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: SearchableSelectionField<String>(
+                          label: 'Physical Area',
+                          isGlass: true,
+                          prefixIcon: Icons.map,
+                          selectedValue: _locations.any((e) => e.id == _selectedLocationId) ? _selectedLocationId : null,
+                          items: _locations.map((e) => SearchableItem<String>(
+                            value: e.id,
+                            label: e.name,
+                            subtitle: 'Zone ID: ${e.id}',
+                            leading: const Icon(Icons.location_on, size: 20, color: AppColors.accent),
+                          )).toList(),
+                          onChanged: (val) => setState(() => _selectedLocationId = val),
+                          validator: (v) => v == null || v.isEmpty ? 'Physical Area is required' : null,
                         ),
-                        ..._panelRooms.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))),
-                      ],
-                      onChanged: (val) {
-                          setState(() {
-                            _selectedPanelRoomId = val;
-                            _selectedPanelId = null;
-                            _selectedFeederId = null;
-                            _panels = [];
-                            _feeders = [];
-                          });
-                          if (val != null) _loadPanels(val);
-                      },
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    _buildGlassDropdown<String>(
-                      label: 'Panel / MCC (Optional for Mechanical)',
-                      value: _selectedPanelId,
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null, 
-                          child: Text('None (Optional)', style: TextStyle(fontStyle: FontStyle.italic))
+                    GlassContainer(
+                      width: double.infinity,
+                      height: null,
+                      borderRadius: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: SearchableSelectionField<String>(
+                          label: 'Panel Room / Substation',
+                          isGlass: true,
+                          prefixIcon: Icons.meeting_room,
+                          allowClear: true,
+                          selectedValue: _panelRooms.any((e) => e.id == _selectedPanelRoomId) ? _selectedPanelRoomId : null,
+                          items: [
+                            const SearchableItem<String>(
+                              value: '',
+                              label: 'None / Mechanical Only',
+                              subtitle: 'Equipment not in a panel room',
+                              leading: Icon(Icons.clear, size: 20, color: Colors.grey),
+                            ),
+                            ..._panelRooms.map((e) => SearchableItem<String>(
+                              value: e.id,
+                              label: e.name,
+                              subtitle: 'Room ID: ${e.id}',
+                              leading: const Icon(Icons.meeting_room, size: 20, color: AppColors.primary),
+                            )),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedPanelRoomId = (val == null || val.isEmpty) ? null : val;
+                              _selectedPanelId = null;
+                              _selectedFeederId = null;
+                              _panels = [];
+                              _feeders = [];
+                            });
+                            if (val != null && val.isNotEmpty) _loadPanels(val);
+                          },
                         ),
-                        ..._panels.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))),
-                      ],
-                      onChanged: (val) {
-                         setState(() {
-                           _selectedPanelId = val;
-                           _selectedFeederId = null;
-                           _feeders = [];
-                         });
-                         if (val != null) _loadFeeders(val);
-                      },
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    _buildGlassDropdown<String>(
-                      label: 'Feeder / Source (Optional)',
-                      value: _selectedFeederId,
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null, 
-                          child: Text('None (Optional)', style: TextStyle(fontStyle: FontStyle.italic))
+                    GlassContainer(
+                      width: double.infinity,
+                      height: null,
+                      borderRadius: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: SearchableSelectionField<String>(
+                          label: 'Panel / MCC (Optional for Mechanical)',
+                          isGlass: true,
+                          prefixIcon: Icons.electric_bolt,
+                          allowClear: true,
+                          selectedValue: _selectedPanelId,
+                          items: [
+                            const SearchableItem<String>(
+                              value: '',
+                              label: 'None (Optional)',
+                              subtitle: 'Mechanical equipment, no panel feed',
+                              leading: Icon(Icons.clear, size: 20, color: Colors.grey),
+                            ),
+                            ..._panels.map((e) => SearchableItem<String>(
+                              value: e.id,
+                              label: e.name,
+                              subtitle: 'Panel ID: ${e.id} • ${e.voltageLevel} • ${e.type}',
+                              leading: const Icon(Icons.electric_bolt, size: 20, color: AppColors.accent),
+                            )),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedPanelId = (val == null || val.isEmpty) ? null : val;
+                              _selectedFeederId = null;
+                              _feeders = [];
+                            });
+                            if (val != null && val.isNotEmpty) _loadFeeders(val);
+                          },
                         ),
-                        ..._feeders.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))),
-                      ],
-                      onChanged: (val) {
-                         setState(() { _selectedFeederId = val; });
-                      },
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    _buildGlassDropdown<String>(
-                      label: 'Equipment Type',
-                      value: _selectedType,
-                      items: _equipmentTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                      onChanged: (val) {
-                         setState(() { _selectedType = val; });
-                      },
+                    GlassContainer(
+                      width: double.infinity,
+                      height: null,
+                      borderRadius: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: SearchableSelectionField<String>(
+                          label: 'Feeder / Source (Optional)',
+                          isGlass: true,
+                          prefixIcon: Icons.power_input,
+                          allowClear: true,
+                          selectedValue: _selectedFeederId,
+                          items: [
+                            const SearchableItem<String>(
+                              value: '',
+                              label: 'None (Optional)',
+                              subtitle: 'No specific feeder assigned',
+                              leading: Icon(Icons.clear, size: 20, color: Colors.grey),
+                            ),
+                            ..._feeders.map((e) => SearchableItem<String>(
+                              value: e.id,
+                              label: e.name,
+                              subtitle: 'Feeder ID: ${e.id} • ${e.type}',
+                              leading: const Icon(Icons.power_input, size: 20, color: AppColors.primary),
+                            )),
+                          ],
+                          onChanged: (val) => setState(() => _selectedFeederId = (val == null || val.isEmpty) ? null : val),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    GlassContainer(
+                      width: double.infinity,
+                      height: null,
+                      borderRadius: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: SearchableSelectionField<String>(
+                          label: 'Equipment Type',
+                          isGlass: true,
+                          prefixIcon: Icons.category,
+                          allowClear: false,
+                          selectedValue: _selectedType,
+                          items: _equipmentTypes.map((e) => SearchableItem<String>(
+                            value: e,
+                            label: e,
+                            leading: const Icon(Icons.precision_manufacturing, size: 20, color: AppColors.accent),
+                          )).toList(),
+                          onChanged: (val) => setState(() => _selectedType = val),
+                          validator: (v) => v == null || v.isEmpty ? 'Equipment Type is required' : null,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildGlassField(
@@ -466,6 +543,7 @@ class _AddEditMasterPageState extends State<AddEditMasterPage> {
     );
   }
 
+  // Kept for Developer plant/unit selection (still used above)
   Widget _buildGlassDropdown<T>({
     required String label,
     required T? value,

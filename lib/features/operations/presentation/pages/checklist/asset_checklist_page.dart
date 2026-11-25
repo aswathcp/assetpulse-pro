@@ -15,12 +15,12 @@ import 'package:asset_pulse_pro/core/utils/file_download_helper.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
-import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 import 'package:asset_pulse_pro/features/home/presentation/widgets/custom_app_bar.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/asset_model.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/health_log_model.dart';
 import 'package:asset_pulse_pro/features/assets/presentation/pages/asset_detail_page.dart';
 import 'package:asset_pulse_pro/features/assets/presentation/pages/log_diagnostic_test_page.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 import 'asset_certification_tag_pdf_helper.dart';
 
 class AssetChecklistPage extends StatefulWidget {
@@ -35,6 +35,7 @@ class _AssetChecklistPageState extends State<AssetChecklistPage> with SingleTick
   final TextEditingController _searchController = TextEditingController();
 
   // Hierarchy & Scope
+  UserScope? _userScope;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
@@ -70,35 +71,29 @@ class _AssetChecklistPageState extends State<AssetChecklistPage> with SingleTick
     setState(() => _isLoading = true);
     try {
       final user = AuthService().currentUser;
-      _plants = HierarchyService().getPlants();
-
+      Map<String, dynamic>? profile;
       if (user != null) {
-        final profile = await FirestoreService().getUserProfile(user.uid);
-        if (profile != null) {
-          final userPlant = profile['plantId'] as String?;
-          final userUnit = profile['unitId'] as String?;
-          final role = profile['role']?.toString() ?? AppRoles.guest;
-          final isAdmin = profile['isAdmin'] == true || role == AppRoles.developer;
-
-          if (!isAdmin && role != AppRoles.auditor) {
-            if (userPlant != null && userPlant.isNotEmpty && userPlant != 'Unknown') {
-              _selectedPlantId = userPlant;
-              _isPlantLocked = true;
-            }
-            if (userUnit != null && userUnit.isNotEmpty && userUnit != 'Unknown') {
-              _selectedUnitId = userUnit;
-              _isUnitLocked = true;
-            }
-          }
-        }
+        profile = await FirestoreService().getUserProfile(user.uid);
       }
 
-      _selectedPlantId ??= _plants.isNotEmpty ? _plants.first : null;
+      final userBusinessId = profile?['businessId'] as String? ?? 'VISL';
+      await HierarchyService().init(businessId: userBusinessId);
+
+      final allPlants = HierarchyService().getPlants();
+      final userScope = PermissionHelper.resolveUserScope(profile);
+      _userScope = userScope;
+      _plants = userScope.getAvailablePlants(allPlants);
+      _isPlantLocked = userScope.isPlantLocked;
+      _isUnitLocked = userScope.isUnitLocked;
+
+      _selectedPlantId = userScope.getInitialPlant(null, _plants);
       if (_selectedPlantId != null) {
-        _units = HierarchyService().getUnitsForPlant(_selectedPlantId!);
-        if (_selectedUnitId == null || !_units.contains(_selectedUnitId)) {
-          _selectedUnitId = _units.isNotEmpty ? _units.first : null;
-        }
+        final allUnits = HierarchyService().getUnitsForPlant(_selectedPlantId!);
+        _units = userScope.getAvailableUnits(_selectedPlantId, allUnits);
+        _selectedUnitId = userScope.getInitialUnit(_selectedPlantId, null, _units);
+      } else {
+        _units = [];
+        _selectedUnitId = null;
       }
 
       await _fetchAssets();
@@ -128,8 +123,14 @@ class _AssetChecklistPageState extends State<AssetChecklistPage> with SingleTick
     if (newPlant == null || _isPlantLocked) return;
     setState(() {
       _selectedPlantId = newPlant;
-      _units = HierarchyService().getUnitsForPlant(newPlant);
-      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      final allUnits = HierarchyService().getUnitsForPlant(newPlant);
+      if (_userScope != null) {
+        _units = _userScope!.getAvailableUnits(newPlant, allUnits);
+        _selectedUnitId = _userScope!.getInitialUnit(newPlant, null, _units);
+      } else {
+        _units = allUnits;
+        _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      }
       _selectedAssetIds.clear();
     });
   }

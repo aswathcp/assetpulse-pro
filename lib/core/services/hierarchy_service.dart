@@ -74,7 +74,78 @@ class HierarchyService {
   
   static const List<String> panelTypes = ['MCC', 'PCC', 'LDB', 'Control Panel'];
   
-  static const List<String> feederTypes = ['Feeder', 'Spare', 'Incomer', 'Bus Coupler'];
+  static const List<String> feederTypes = ['Feeder', 'Spare', 'Incomer', 'Bus Coupler', 'Tie'];
+
+  static const List<String> voltageLevels = [
+    '415V', '3.3kV', '6.6kV', '11kV', '22kV', '33kV', '66kV', '110kV', '132kV', '220kV'
+  ];
+
+  static const List<String> tertiaryVoltageLevels = [
+    'None', '415V', '3.3kV', '6.6kV', '11kV', '22kV', '33kV', '66kV', '110kV', '132kV', '220kV'
+  ];
+
+  static const List<String> busSectionOptions = ['MAIN', 'SEC-1 & 2'];
+
+  static const List<String> feederBusSectionOptions = ['MAIN', 'SEC-1', 'SEC-2', 'SEC-1 & 2'];
+
+  /// Parses bus sections from any format (List, comma-delimited, ampersand-delimited e.g. "SEC-1 & 2")
+  /// into a clean list of section strings, e.g. ['SEC-1', 'SEC-2'] or ['MAIN'].
+  static List<String> parseBusSections(dynamic raw) {
+    if (raw == null) return const ['MAIN'];
+    if (raw is List) {
+      if (raw.isEmpty) return const ['MAIN'];
+      final flat = <String>[];
+      for (final item in raw) {
+        final s = item?.toString().trim() ?? '';
+        if (s.isEmpty) continue;
+        if (s.contains('&') || s.contains(',')) {
+          flat.addAll(parseBusSections(s));
+        } else {
+          flat.add(s);
+        }
+      }
+      return flat.isEmpty ? const ['MAIN'] : flat.toSet().toList();
+    }
+    final str = raw.toString().trim();
+    if (str.isEmpty || str.toUpperCase() == 'MAIN') {
+      return const ['MAIN'];
+    }
+    final upper = str.toUpperCase();
+    if (upper.contains('SEC-1') && (upper.contains('SEC-2') || upper.contains('& 2') || upper.contains('&2') || upper.contains(',2') || upper.contains(', 2'))) {
+      return const ['SEC-1', 'SEC-2'];
+    }
+    final parts = str.split(RegExp(r'[,&]')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    return parts.isEmpty ? const ['MAIN'] : parts;
+  }
+
+  /// Formats bus sections for UI dropdowns and Excel export (e.g. ['SEC-1', 'SEC-2'] -> 'SEC-1 & 2').
+  static String formatBusSectionsForDisplay(dynamic raw) {
+    final list = parseBusSections(raw);
+    if (list.length > 1 || (list.contains('SEC-1') && list.contains('SEC-2'))) {
+      return 'SEC-1 & 2';
+    }
+    if (list.isNotEmpty && list.first != 'MAIN') {
+      return list.first;
+    }
+    return 'MAIN';
+  }
+
+  /// Normalizes feeder bus section string to match feederBusSectionOptions ('MAIN', 'SEC-1', 'SEC-2', 'SEC-1 & 2').
+  static String normalizeFeederBusSection(dynamic raw) {
+    if (raw == null) return 'MAIN';
+    final s = raw.toString().trim();
+    final upper = s.toUpperCase();
+    if ((upper.contains('SEC-1') && upper.contains('SEC-2')) || upper.contains('& 2') || upper.contains('&2') || upper == 'SEC-1 & 2') {
+      return 'SEC-1 & 2';
+    }
+    if (upper.contains('SEC-1') || upper == '1') return 'SEC-1';
+    if (upper.contains('SEC-2') || upper == '2') return 'SEC-2';
+    return 'MAIN';
+  }
+
+  static const List<String> feederOperatingStates = ['CLOSED', 'OPEN', 'TRIPPED', 'ISOLATED'];
+
+  static const List<String> transformerWindingTypes = ['two_winding', 'three_winding'];
   
   static const List<String> equipmentTypes = [
     'Conveyor', 'Pump', 'Compressor', 'Drier', 'Fan', 'Blower', 'Motor',

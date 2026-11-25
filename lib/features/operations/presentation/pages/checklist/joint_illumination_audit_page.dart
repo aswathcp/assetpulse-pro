@@ -16,6 +16,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:asset_pulse_pro/core/services/excel_service.dart';
 import 'package:asset_pulse_pro/core/utils/file_download_helper.dart';
 import 'package:asset_pulse_pro/features/operations/data/models/joint_illumination_audit_model.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 import 'lux_level_checklist_page.dart';
@@ -32,6 +33,7 @@ class _JointIlluminationAuditPageState extends State<JointIlluminationAuditPage>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Scope State
+  UserScope? _userScope;
   String? _selectedBusinessId;
   String? _selectedPlantId;
   String? _selectedUnitId;
@@ -40,9 +42,6 @@ class _JointIlluminationAuditPageState extends State<JointIlluminationAuditPage>
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
   bool _isLoading = true;
-  String? _userPlantId;
-  String? _userUnitId;
-  bool _isAdmin = false;
   String _currentUserName = 'Operator';
   String _userRole = 'Electrical Inspector';
 
@@ -123,29 +122,21 @@ class _JointIlluminationAuditPageState extends State<JointIlluminationAuditPage>
         final role = profile['role'] ?? AppRoles.guest;
         final desig = profile['designation'] ?? profile['title'] ?? role;
         _userRole = desig.toString();
-        _userPlantId = profile['plantId'] as String?;
-        _userUnitId = profile['unitId'] as String?;
-        _isAdmin = profile['isAdmin'] == true || role == AppRoles.developer;
         _currentUserName = profile['displayName'] ?? profile['name'] ?? 'Operator';
         final userBusinessId = profile['businessId'] as String? ?? 'VISL';
 
         await HierarchyService().init(businessId: userBusinessId);
         _selectedBusinessId = HierarchyService().currentBusinessId;
-        _plants = HierarchyService().getPlants();
+        final allPlants = HierarchyService().getPlants();
 
-        final plantNames = HierarchyService().getPlantNames();
-        if (!_isAdmin && _userPlantId != null && plantNames.containsKey(_userPlantId)) {
-          _selectedPlantId = _userPlantId;
-          _isPlantLocked = true;
-        }
-        _selectedPlantId ??= _plants.isNotEmpty ? _plants.first : null;
+        final userScope = PermissionHelper.resolveUserScope(profile);
+        _userScope = userScope;
+        _plants = userScope.getAvailablePlants(allPlants);
+        _isPlantLocked = userScope.isPlantLocked;
+        _isUnitLocked = userScope.isUnitLocked;
 
+        _selectedPlantId = userScope.getInitialPlant(null, _plants);
         _updateUnitList();
-
-        if (!_isAdmin && _userUnitId != null && _units.contains(_userUnitId)) {
-          _selectedUnitId = _userUnitId;
-          _isUnitLocked = true;
-        }
       }
     }
 
@@ -158,10 +149,15 @@ class _JointIlluminationAuditPageState extends State<JointIlluminationAuditPage>
       _units = [];
       _selectedUnitId = null;
     } else {
-      _units = HierarchyService().getUnitsForPlant(_selectedPlantId!);
-      if (_units.isEmpty) _units = ['PID1', 'MCD'];
-      if (!_units.contains(_selectedUnitId)) {
-        _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      final allUnits = HierarchyService().getUnitsForPlant(_selectedPlantId!);
+      if (_userScope != null) {
+        _units = _userScope!.getAvailableUnits(_selectedPlantId, allUnits);
+        _selectedUnitId = _userScope!.getInitialUnit(_selectedPlantId, _selectedUnitId, _units);
+      } else {
+        _units = allUnits.isNotEmpty ? allUnits : ['PID1', 'MCD'];
+        if (!_units.contains(_selectedUnitId)) {
+          _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+        }
       }
     }
   }

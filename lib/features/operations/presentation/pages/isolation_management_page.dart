@@ -4,35 +4,158 @@ import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/hierarchy_service.dart';
+import '../../../../core/utils/permission_helper.dart';
 import '../../../home/presentation/widgets/custom_app_bar.dart';
 import '../../../../features/assets/data/models/isolation_permit_model.dart';
 import 'add_isolation_permit_page.dart';
 import 'clear_isolation_page.dart';
 import 'isolation_records_page.dart';
 
-class IsolationManagementPage extends StatelessWidget {
+class IsolationManagementPage extends StatefulWidget {
   const IsolationManagementPage({super.key});
 
   @override
+  State<IsolationManagementPage> createState() => _IsolationManagementPageState();
+}
+
+class _IsolationManagementPageState extends State<IsolationManagementPage> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final HierarchyService _hierarchyService = HierarchyService();
+
+  String? _selectedPlantId;
+  String? _selectedUnitId;
+  List<String> _plants = [];
+  List<String> _units = [];
+  bool _isPlantLocked = false;
+  bool _isUnitLocked = false;
+  bool _isLoadingScope = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserScope();
+  }
+
+  Future<void> _loadUserScope() async {
+    try {
+      final user = _firestoreService.currentUser;
+      _plants = _hierarchyService.getPlants();
+
+      if (user != null) {
+        final profile = await _firestoreService.getUserProfile(user.uid);
+        if (profile != null) {
+          final businessId = profile['businessId'] as String? ?? 'VISL';
+          await _hierarchyService.init(businessId: businessId);
+
+          final userScope = PermissionHelper.resolveUserScope(profile);
+          _isPlantLocked = userScope.isPlantLocked;
+          _isUnitLocked = userScope.isUnitLocked;
+
+          _plants = userScope.getAvailablePlants();
+          _selectedPlantId = userScope.getInitialPlant(_plants);
+          if (_selectedPlantId != null) {
+            _units = userScope.getAvailableUnits(_selectedPlantId!);
+            _selectedUnitId = userScope.getInitialUnit(_units);
+          }
+        }
+      }
+
+      _selectedPlantId ??= _plants.isNotEmpty ? _plants.first : null;
+      if (_selectedPlantId != null) {
+        _units = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
+        if (_selectedUnitId == null || !_units.contains(_selectedUnitId)) {
+          _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading scope in IsolationManagementPage: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingScope = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final businessId = HierarchyService().currentBusinessId;
+    final businessId = _hierarchyService.currentBusinessId;
 
     return Scaffold(
       extendBodyBehindAppBar: false,
       appBar: const CustomAppBar(title: 'Isolation Management'),
       body: AnimatedGradientBackground(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 24),
-              _buildStatsSection(context, businessId),
-              const SizedBox(height: 32),
-              _buildActionGrid(context),
-            ],
-          ),
+        child: _isLoadingScope
+            ? const Center(child: PulseLoading(size: 50))
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(context),
+                    const SizedBox(height: 20),
+                    _buildScopeSelector(context),
+                    const SizedBox(height: 24),
+                    _buildStatsSection(context, businessId),
+                    const SizedBox(height: 32),
+                    _buildActionGrid(context),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildScopeSelector(BuildContext context) {
+    return GlassContainer(
+      width: double.infinity,
+      height: null,
+      borderRadius: 16,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('dash_plant_$_selectedPlantId'),
+                initialValue: _selectedPlantId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Select Plant', 
+                  border: InputBorder.none,
+                  prefixIcon: Icon(Icons.business_outlined, size: 20),
+                ),
+                items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: _isPlantLocked ? null : (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedPlantId = val;
+                      _units = _hierarchyService.getUnitsForPlant(val);
+                      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+                    });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('dash_unit_${_selectedPlantId}_$_selectedUnitId'),
+                initialValue: _selectedUnitId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Select Unit', 
+                  border: InputBorder.none,
+                  prefixIcon: Icon(Icons.factory_outlined, size: 20),
+                ),
+                items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: _isUnitLocked ? null : (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedUnitId = val;
+                    });
+                  }
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -61,7 +184,11 @@ class IsolationManagementPage extends StatelessWidget {
 
   Widget _buildStatsSection(BuildContext context, String businessId) {
     return StreamBuilder<List<IsolationPermitModel>>(
-      stream: FirestoreService().getActiveIsolationsStream(businessId: businessId),
+      stream: _firestoreService.getActiveIsolationsStream(
+        businessId: businessId,
+        plantId: _selectedPlantId,
+        unitId: _selectedUnitId,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: PulseLoading(size: 30));
@@ -148,7 +275,12 @@ class IsolationManagementPage extends StatelessWidget {
           color: Colors.green,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const AddIsolationPermitPage()),
+            MaterialPageRoute(
+              builder: (_) => AddIsolationPermitPage(
+                plantId: _selectedPlantId,
+                unitId: _selectedUnitId,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -160,7 +292,12 @@ class IsolationManagementPage extends StatelessWidget {
           color: Colors.orange,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const ClearIsolationPage()),
+            MaterialPageRoute(
+              builder: (_) => ClearIsolationPage(
+                plantId: _selectedPlantId,
+                unitId: _selectedUnitId,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -172,7 +309,12 @@ class IsolationManagementPage extends StatelessWidget {
           color: Colors.blue,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const IsolationRecordsPage()),
+            MaterialPageRoute(
+              builder: (_) => IsolationRecordsPage(
+                plantId: _selectedPlantId,
+                unitId: _selectedUnitId,
+              ),
+            ),
           ),
         ),
       ],

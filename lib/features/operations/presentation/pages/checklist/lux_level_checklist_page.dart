@@ -8,7 +8,6 @@ import 'package:asset_pulse_pro/features/home/presentation/widgets/custom_app_ba
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
-import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 import 'package:uuid/uuid.dart';
 
 // PDF, Excel & Import Pages
@@ -18,6 +17,7 @@ import 'package:asset_pulse_pro/core/services/excel_service.dart';
 import 'package:asset_pulse_pro/core/utils/file_download_helper.dart';
 import 'package:asset_pulse_pro/features/operations/data/models/lux_level_report_model.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/data_import_page.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 
@@ -505,6 +505,7 @@ class _LuxLevelChecklistPageState extends State<LuxLevelChecklistPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Scope State
+  UserScope? _userScope;
   String? _selectedBusinessId;
   String? _selectedPlantId;
   String? _selectedUnitId;
@@ -513,10 +514,8 @@ class _LuxLevelChecklistPageState extends State<LuxLevelChecklistPage> {
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
   bool _isLoading = true;
-  String? _userPlantId;
-  String? _userUnitId;
-  bool _isAdmin = false;
   String _currentUserName = 'Operator';
+  bool get _isAdmin => _userScope?.isAdmin == true;
 
   // Data & Filter State
   List<Map<String, dynamic>> _locations = [];
@@ -589,30 +588,21 @@ class _LuxLevelChecklistPageState extends State<LuxLevelChecklistPage> {
     if (user != null) {
       final profile = await _firestoreService.getUserProfile(user.uid);
       if (profile != null) {
-        final role = profile['role'] ?? AppRoles.guest;
-        _userPlantId = profile['plantId'] as String?;
-        _userUnitId = profile['unitId'] as String?;
-        _isAdmin = profile['isAdmin'] == true || role == AppRoles.developer;
         _currentUserName = profile['displayName'] ?? profile['name'] ?? 'Operator';
         final userBusinessId = profile['businessId'] as String? ?? 'VISL';
 
         await HierarchyService().init(businessId: userBusinessId);
         _selectedBusinessId = HierarchyService().currentBusinessId;
-        _plants = HierarchyService().getPlants();
+        final allPlants = HierarchyService().getPlants();
 
-        final plantNames = HierarchyService().getPlantNames();
-        if (!_isAdmin && _userPlantId != null && plantNames.containsKey(_userPlantId)) {
-          _selectedPlantId = _userPlantId;
-          _isPlantLocked = true;
-        }
-        _selectedPlantId ??= _plants.isNotEmpty ? _plants.first : null;
+        final userScope = PermissionHelper.resolveUserScope(profile);
+        _userScope = userScope;
+        _plants = userScope.getAvailablePlants(allPlants);
+        _isPlantLocked = userScope.isPlantLocked;
+        _isUnitLocked = userScope.isUnitLocked;
 
+        _selectedPlantId = userScope.getInitialPlant(null, _plants);
         _updateUnitList();
-
-        if (!_isAdmin && _userUnitId != null && _units.contains(_userUnitId)) {
-          _selectedUnitId = _userUnitId;
-          _isUnitLocked = true;
-        }
       }
     }
 
@@ -625,10 +615,15 @@ class _LuxLevelChecklistPageState extends State<LuxLevelChecklistPage> {
       _units = [];
       _selectedUnitId = null;
     } else {
-      _units = HierarchyService().getUnitsForPlant(_selectedPlantId!);
-      if (_units.isEmpty) _units = ['PID1', 'MCD'];
-      if (!_units.contains(_selectedUnitId)) {
-        _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+      final allUnits = HierarchyService().getUnitsForPlant(_selectedPlantId!);
+      if (_userScope != null) {
+        _units = _userScope!.getAvailableUnits(_selectedPlantId, allUnits);
+        _selectedUnitId = _userScope!.getInitialUnit(_selectedPlantId, _selectedUnitId, _units);
+      } else {
+        _units = allUnits.isNotEmpty ? allUnits : ['PID1', 'MCD'];
+        if (!_units.contains(_selectedUnitId)) {
+          _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+        }
       }
     }
   }

@@ -4,6 +4,7 @@ class PanelRoomModel {
   final String id;
   final String plantId;
   final String unitId;
+  final String locationId;
   final String name;
   final String description;
   final DateTime? createdAt;
@@ -15,6 +16,7 @@ class PanelRoomModel {
     required this.id,
     required this.plantId,
     required this.unitId,
+    this.locationId = '',
     required this.name,
     this.description = '',
     this.createdAt,
@@ -28,6 +30,7 @@ class PanelRoomModel {
       id: id,
       plantId: map['plantId'] ?? '',
       unitId: map['unitId'] ?? '',
+      locationId: map['locationId'] ?? '',
       name: map['name'] ?? '',
       description: map['description'] ?? '',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -41,6 +44,7 @@ class PanelRoomModel {
     return {
       'plantId': plantId,
       'unitId': unitId,
+      'locationId': locationId,
       'name': name,
       'description': description,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),

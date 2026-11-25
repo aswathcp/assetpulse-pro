@@ -21,6 +21,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 import 'package:asset_pulse_pro/core/services/excel_service.dart';
 import 'package:asset_pulse_pro/core/utils/file_download_helper.dart';
+import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
 
 class PanelRoomChecklistPage extends StatefulWidget {
   const PanelRoomChecklistPage({super.key});
@@ -34,6 +35,7 @@ class _PanelRoomChecklistPageState extends State<PanelRoomChecklistPage> {
   final HierarchyService _hierarchyService = HierarchyService();
 
   // Scope State
+  UserScope? _userScope;
   String? _selectedPlantId;
   String? _selectedUnitId;
   List<String> _plants = [];
@@ -154,22 +156,24 @@ class _PanelRoomChecklistPageState extends State<PanelRoomChecklistPage> {
             _currentUserName = user.email!;
           }
 
-          final userPlant = data['plantId'] as String?;
-          final userUnit = data['unitId'] as String?;
+          final userBusinessId = data['businessId'] as String? ?? 'VISL';
+          await _hierarchyService.init(businessId: userBusinessId);
 
-          _plants = _hierarchyService.getPlants();
+          final userScope = PermissionHelper.resolveUserScope(data);
+          _userScope = userScope;
+          final allPlants = _hierarchyService.getPlants();
+          _plants = userScope.getAvailablePlants(allPlants);
+          _isPlantLocked = userScope.isPlantLocked;
+          _isUnitLocked = userScope.isUnitLocked;
 
-          if (_isAdmin) {
-            _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : 'VISL');
-            _units = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
-            _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : 'UNIT-1');
+          _selectedPlantId = userScope.getInitialPlant(null, _plants);
+          if (_selectedPlantId != null) {
+            final allUnits = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
+            _units = userScope.getAvailableUnits(_selectedPlantId, allUnits);
+            _selectedUnitId = userScope.getInitialUnit(_selectedPlantId, null, _units);
           } else {
-            _isPlantLocked = userPlant != null && userPlant.isNotEmpty;
-            _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : 'VISL');
-
-            _units = _hierarchyService.getUnitsForPlant(_selectedPlantId!);
-            _isUnitLocked = userUnit != null && userUnit.isNotEmpty;
-            _selectedUnitId = userUnit ?? (_units.isNotEmpty ? _units.first : 'UNIT-1');
+            _units = [];
+            _selectedUnitId = null;
           }
         } else {
           _plants = _hierarchyService.getPlants();
@@ -898,8 +902,14 @@ class _PanelRoomChecklistPageState extends State<PanelRoomChecklistPage> {
                                 if (val != null) {
                                   setState(() {
                                     _selectedPlantId = val;
-                                    _units = _hierarchyService.getUnitsForPlant(val);
-                                    _selectedUnitId = _units.isNotEmpty ? _units.first : 'UNIT-1';
+                                    final allUnits = _hierarchyService.getUnitsForPlant(val);
+                                    if (_userScope != null) {
+                                      _units = _userScope!.getAvailableUnits(val, allUnits);
+                                      _selectedUnitId = _userScope!.getInitialUnit(val, null, _units);
+                                    } else {
+                                      _units = allUnits;
+                                      _selectedUnitId = _units.isNotEmpty ? _units.first : 'UNIT-1';
+                                    }
                                     _isLoading = true;
                                   });
                                   await _fetchData();

@@ -20,6 +20,7 @@ import '../../../../core/constants/app_roles.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../core/utils/file_download_helper.dart';
+import '../../../../core/utils/permission_helper.dart';
 import '../../../admin/presentation/pages/data_import_page.dart';
 import 'asset_detail_page.dart';
 import 'add_edit_asset_page.dart';
@@ -113,41 +114,15 @@ class _AssetsTabState extends State<AssetsTab> {
 
     await HierarchyService().init(businessId: uBusinessId);
 
-    _plants = HierarchyService().getPlants();
+    final userScope = PermissionHelper.resolveUserScope(profile);
+    _isPlantLocked = userScope.isPlantLocked;
+    _isUnitLocked = userScope.isUnitLocked;
 
-    final String? userPlant = (_userPlantId == null || _userPlantId!.isEmpty || _userPlantId == 'Unknown') ? null : _userPlantId;
-    final String? userUnit = (_userUnitId == null || _userUnitId!.isEmpty || _userUnitId == 'Unknown') ? null : _userUnitId;
-
-    final bool hasGlobalAdmin = profile['isAdmin'] == true && userPlant == null;
-    final bool hasPlantAdmin = profile['isAdmin'] == true && userPlant != null;
-
-    final bool isPlantScope = (hasPlantAdmin || _userRole == AppRoles.plantAdmin || _userRole == AppRoles.plantHod) &&
-        _userRole != AppRoles.manager &&
-        _userRole != AppRoles.deputyManager &&
-        _userRole != AppRoles.associateManager &&
-        _userRole != AppRoles.assistantManager &&
-        _userRole != AppRoles.unitAdmin &&
-        _userRole != AppRoles.unitHod;
-
-    if (_userRole == AppRoles.developer || _userRole == AppRoles.auditor || hasGlobalAdmin) {
-      _isPlantLocked = false;
-      _isUnitLocked = false;
-      _selectedPlantId = _plants.isNotEmpty ? _plants.first : null;
-    } else if (isPlantScope) {
-      _isPlantLocked = true;
-      _isUnitLocked = false;
-      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-    } else {
-      _isPlantLocked = true;
-      _isUnitLocked = true;
-      _selectedPlantId = userPlant ?? (_plants.isNotEmpty ? _plants.first : null);
-      _selectedUnitId = userUnit;
-    }
-
-    _updateUnitList();
-
-    if (!_isUnitLocked && _selectedUnitId == null) {
-      _selectedUnitId = _units.isNotEmpty ? _units.first : null;
+    _plants = userScope.getAvailablePlants();
+    _selectedPlantId = userScope.getInitialPlant(_plants);
+    if (_selectedPlantId != null) {
+      _units = userScope.getAvailableUnits(_selectedPlantId!);
+      _selectedUnitId = userScope.getInitialUnit(_units);
     }
 
     await _fetchAssets();

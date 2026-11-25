@@ -38,36 +38,69 @@ class _GeofencedChecklistWrapperState extends State<GeofencedChecklistWrapper> {
   }
 
   Future<void> _verifyLocation() async {
-    final locationService = LocationVerificationService();
-    final currentPos = await locationService.getCurrentLocation();
-
-    if (currentPos == null) {
+    // If target location is not set (0, 0), auto-bypass without blocking
+    if (widget.targetLatitude == 0.0 && widget.targetLongitude == 0.0) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Could not fetch location. Please ensure location permissions are enabled. For Web, ensure you are allowing location access in your browser.';
+          _isVerified = true;
+          _isVerifiedByGps = false;
+          _startPosition = Position(
+            latitude: 0.0,
+            longitude: 0.0,
+            timestamp: DateTime.now(),
+            accuracy: 0,
+            altitude: 0,
+            heading: 0,
+            speed: 0,
+            speedAccuracy: 0,
+            altitudeAccuracy: 0,
+            headingAccuracy: 0,
+          );
         });
       }
       return;
     }
 
-    final isWithin = locationService.isWithinRadius(
-      currentPos,
-      widget.targetLatitude,
-      widget.targetLongitude,
-      radiusInMeters: 50.0, // Initial leniency for GPS drift
-    );
+    try {
+      final locationService = LocationVerificationService();
+      final currentPos = await locationService.getCurrentLocation();
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _startPosition = currentPos;
-        _isVerified = isWithin;
-        _isVerifiedByGps = isWithin;
-        if (!isWithin) {
-          _errorMessage = 'You are not within the required range (50m) of ${widget.targetName}. Please move closer and try again.';
+      if (currentPos == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Could not acquire GPS position. Please check permissions or proceed without verification.';
+          });
         }
-      });
+        return;
+      }
+
+      final isWithin = locationService.isWithinRadius(
+        currentPos,
+        widget.targetLatitude,
+        widget.targetLongitude,
+        radiusInMeters: 50.0,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _startPosition = currentPos;
+          _isVerified = isWithin;
+          _isVerifiedByGps = isWithin;
+          if (!isWithin) {
+            _errorMessage = 'You are outside the required range (50m) of ${widget.targetName}.';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'GPS error: $e';
+        });
+      }
     }
   }
 
@@ -156,9 +189,20 @@ class _GeofencedChecklistWrapperState extends State<GeofencedChecklistWrapper> {
       );
     }
 
-    return Scaffold(
-      appBar: CustomAppBar(title: widget.targetName),
-      body: widget.builder(_startPosition!, _isVerifiedByGps),
-    );
+    final safePos = _startPosition ??
+        Position(
+          longitude: widget.targetLongitude,
+          latitude: widget.targetLatitude,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+          altitudeAccuracy: 0,
+          headingAccuracy: 0,
+        );
+
+    return widget.builder(safePos, _isVerifiedByGps);
   }
 }

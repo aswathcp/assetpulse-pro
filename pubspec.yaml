@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 2.5.3+1
 
 environment:
   sdk: ^3.8.1
@@ -31,46 +31,44 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-  google_fonts: ^8.1.0
+  google_fonts: ^8.2.1
   
   # UI & Animation
-  glassmorphism: ^3.0.0
   flutter_animate: ^4.5.2
   
   # Scanning
-  mobile_scanner: ^7.1.4
-  image_picker: ^1.1.2
-  nfc_manager: ^4.1.1
+  mobile_scanner: ^7.4.0
+  image_picker: ^1.2.3
+  nfc_manager: ^4.2.1
   
   # Charts & Data
-  fl_chart: ^1.1.0
+  fl_chart: ^1.2.0
   
   # Document Generation
   pdf: ^3.11.1
-  printing: ^5.13.0
-  share_plus: any
-  open_file: ^3.3.0
+  share_plus: ^13.3.0
+  open_file: ^4.0.0
   
   # Firebase
-  firebase_core: ^4.2.1
-  firebase_auth: ^6.1.2
-  cloud_firestore: ^6.1.0
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
   local_auth: ^3.0.2
   
   # State & Storage
-  provider: ^6.1.5
-  shared_preferences: ^2.5.4
+  provider: ^6.1.5+1
+  shared_preferences: ^2.5.5
   path_provider: ^2.1.6
   nfc_manager_ndef: ^1.1.0
   excel: ^4.0.6
-  file_picker: ^12.0.0-beta.7
-  uuid: ^4.5.2
-  geolocator: ^14.0.2
+  archive: ^3.6.1
+  xml: ^6.5.0
+  file_picker: ^12.2.0
+  uuid: ^4.6.0
+  geolocator: ^14.0.3
   qr_flutter: ^4.1.0
   url_launcher: ^6.3.2
+  http: ^1.2.0
 
 
 dev_dependencies:

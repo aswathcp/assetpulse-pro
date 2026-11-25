@@ -34,9 +34,9 @@ class DataImportPage extends StatelessWidget {
       );
     }
 
-    if (['locations', 'panel_rooms', 'panels', 'feeders', 'master_equipments', 'combined_hierarchy', 'hierarchy_config'].contains(collectionId)) {
+    if (['locations', 'panel_rooms', 'panels', 'feeders', 'transformers', 'master_equipments', 'combined_hierarchy', 'hierarchy_config', 'fault_types', 'odc', 'odc_causes'].contains(collectionId)) {
       return HierarchyImportPage(
-        collectionId: collectionId,
+        collectionId: collectionId == 'odc_causes' ? 'odc' : collectionId,
         title: title,
         unitId: unitId,
         plantId: plantId,

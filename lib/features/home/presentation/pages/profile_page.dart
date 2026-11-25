@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/admin_database_page.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_version.dart';
 import '../../../../core/constants/app_roles.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
 import '../../../../core/widgets/glass_container.dart';
@@ -25,8 +26,6 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   bool _bioAvailable = false;
   bool _bioEnabled = false;
-  bool _pinEnabled = false;
-  String? _currentPin;
 
   @override
   void initState() {
@@ -37,91 +36,15 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadAppLockSettings() async {
     final available = await BiometricService.isBiometricAvailable();
     final bioEnabled = await BiometricService.isAppLockBiometricsEnabled();
-    final pinEnabled = await BiometricService.isAppLockPinEnabled();
-    final pin = await BiometricService.getAppLockPin();
     if (mounted) {
       setState(() {
         _bioAvailable = available;
         _bioEnabled = bioEnabled;
-        _pinEnabled = pinEnabled;
-        _currentPin = pin;
       });
     }
   }
 
-  Future<void> _showSetPinDialog() async {
-    final pinController = TextEditingController();
-    final confirmController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
 
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Set App Lock PIN'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: pinController,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                decoration: const InputDecoration(labelText: 'Enter PIN (4-6 digits)'),
-                validator: (val) {
-                  if (val == null || val.length < 4) {
-                    return 'PIN must be 4 to 6 digits';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: confirmController,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                decoration: const InputDecoration(labelText: 'Confirm PIN'),
-                validator: (val) {
-                  if (val != pinController.text) {
-                    return 'PINs do not match';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() == true) {
-                final nav = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                await BiometricService.setAppLockPin(pinController.text);
-                await BiometricService.setAppLockPinEnabled(true);
-                nav.pop();
-                _loadAppLockSettings();
-                if (mounted) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('PIN App Lock enabled!'), backgroundColor: AppColors.success),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Save PIN', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,30 +165,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             Divider(color: dividerColor, height: 1),
                           ],
                           
-                          // PIN Lock Settings (Mobile Only)
-                          if (!kIsWeb) ...[
-                            ListTile(
-                              leading: Icon(Icons.lock_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-                              title: Text('PIN Code App Lock', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-                              subtitle: _currentPin != null
-                                  ? Text('PIN Configured', style: TextStyle(color: subtitleColor, fontSize: 12))
-                                  : null,
-                              trailing: Switch(
-                                value: _pinEnabled,
-                                activeThumbColor: AppColors.accent,
-                                onChanged: (val) async {
-                                  if (val) {
-                                    _showSetPinDialog();
-                                  } else {
-                                    await BiometricService.setAppLockPinEnabled(false);
-                                    _loadAppLockSettings();
-                                  }
-                                },
-                              ),
-                              onTap: _pinEnabled ? _showSetPinDialog : null,
-                            ),
-                            Divider(color: dividerColor, height: 1),
-                          ],
+
 
                           if (role == AppRoles.developer || userData['isAdmin'] == true) 
                             _buildMenuItem(
@@ -334,9 +234,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                     
                     const SizedBox(height: 24),
-                    const Text(
-                      'AssetPulse Pro v2.4.0 (Build 2026.2) • ISO 55000 Certified',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    Text(
+                      'AssetPulse Pro v${AppVersion.currentVersion} • ISO 55000 Certified',
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   ],
                 ),
@@ -406,13 +306,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    _AboutRow(label: 'Application Version', value: 'v2.4.0 (Enterprise Production)'),
-                    _AboutRow(label: 'Build Number', value: '2026.2.14-PRO'),
-                    _AboutRow(label: 'Standard Compliance', value: 'ISO 55000 / IEC 60034 / IEEE 43'),
-                    _AboutRow(label: 'Security & Auth', value: 'RBAC Multi-Tier + Biometric/PIN Lock'),
-                    _AboutRow(label: 'Telemetry Engine', value: 'Direct NFC/RFID In-Situ Scanning'),
+                    _AboutRow(label: 'Application Version', value: 'v${AppVersion.currentVersion} (Enterprise Production)'),
+                    _AboutRow(label: 'Build Number', value: '2026.${AppVersion.currentVersion.replaceAll('.', '')}-PRO'),
+                    const _AboutRow(label: 'Standard Compliance', value: 'ISO 55000 / IEC 60034 / IEEE 43'),
+                    const _AboutRow(label: 'Security & Auth', value: 'RBAC Multi-Tier + Biometric Lock'),
+                    const _AboutRow(label: 'Telemetry Engine', value: 'Direct NFC/RFID In-Situ Scanning'),
                   ],
                 ),
               ),

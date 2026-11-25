@@ -1,52 +1,41 @@
 import 'package:flutter/material.dart';
-import '../../../../core/services/hierarchy_service.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_version.dart';
 import '../../../../core/widgets/pulse_loading.dart';
 import '../../../../main.dart'; // For AuthWrapper
 
-class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
+class SplashView extends StatelessWidget {
+  final String statusText;
 
-  @override
-  State<SplashPage> createState() => _SplashPageState();
-}
-
-class _SplashPageState extends State<SplashPage> {
-  @override
-  void initState() {
-    super.initState();
-    _initApp();
-  }
-
-  Future<void> _initApp() async {
-    // 1. Initialize Hierarchy (Fetch & Cache)
-    await HierarchyService().init();
-
-    // 2. Artificial delay for smooth UX (optional)
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      // 3. Navigation to Auth Wrapper
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AuthWrapper()),
-      );
-    }
-  }
+  const SplashView({
+    super.key,
+    this.statusText = 'Loading Environment...',
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Stack(
         children: [
-          // Background - Use App Theme Gradient or Fallback
+          // Background - Deep professional industrial gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                   Theme.of(context).colorScheme.primaryContainer,
-                   Theme.of(context).colorScheme.surface,
-                ],
+                colors: isDark
+                    ? [
+                        const Color(0xFF0F172A),
+                        const Color(0xFF1E293B),
+                        const Color(0xFF0B1329),
+                      ]
+                    : [
+                        const Color(0xFFEEF2FF),
+                        const Color(0xFFF8FAFC),
+                        const Color(0xFFE2E8F0),
+                      ],
               ),
             ),
           ),
@@ -54,25 +43,75 @@ class _SplashPageState extends State<SplashPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo or Title
-                Icon(Icons.hub, size: 80, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 20),
+                // Branded Icon Badge
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                        blurRadius: 30,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.precision_manufacturing_outlined,
+                    size: 64,
+                    color: AppColors.accent,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Title
                 Text(
                   "ASSETPULSE PRO",
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 2.0,
+                    letterSpacing: 3.0,
                   ),
                 ),
-                const SizedBox(height: 40),
-                // Use our Pulse Loading widget
-                PulseLoading(size: 40, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 6),
+
+                // Version Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    "v${AppVersion.currentVersion}",
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 36),
+
+                // Single smooth pulse loading indicator
+                const PulseLoading(size: 42, color: AppColors.accent),
                 const SizedBox(height: 16),
+
                 Text(
-                  "Loading Environment...",
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                  statusText,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                    fontSize: 12.5,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ],
             ),
@@ -80,5 +119,14 @@ class _SplashPageState extends State<SplashPage> {
         ],
       ),
     );
+  }
+}
+
+class SplashPage extends StatelessWidget {
+  const SplashPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AuthWrapper();
   }
 }

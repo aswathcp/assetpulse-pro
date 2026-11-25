@@ -1,7 +1,7 @@
 class AppRoles {
-  // Special / Developer / Administrative Roles (Internally set or Legacy)
+  // Special / Developer / Administrative Roles
   static const String developer = 'Developer';
-  static const String businessAdmin = 'Admin';
+  static const String businessAdmin = 'Business Admin';
   static const String plantAdmin = 'Plant Admin';
   static const String unitAdmin = 'Unit Admin';
 
@@ -45,4 +45,28 @@ class AppRoles {
     guest,
     auditor,
   ];
+
+  /// Normalize legacy role strings if needed (e.g. legacy 'Admin' -> 'Business Admin')
+  static String normalizeRole(String? role) {
+    if (role == null || role.isEmpty) return guest;
+    if (role.toLowerCase() == 'admin' || role == 'Business Admin') {
+      return businessAdmin;
+    }
+    return role;
+  }
+
+  /// Whether the role possesses administrative authority
+  static bool isAdminRole(String? role) {
+    final r = normalizeRole(role);
+    return r == developer ||
+        r == businessAdmin ||
+        r == plantAdmin ||
+        r == unitAdmin;
+  }
+
+  /// Whether the role is strictly view-only (Plant HOD and Unit HOD can view but not edit)
+  static bool isViewOnlyRole(String? role) {
+    final r = normalizeRole(role);
+    return r == plantHod || r == unitHod || r == auditor || r == guest;
+  }
 }

@@ -93,17 +93,15 @@ class _RegisterPageState extends State<RegisterPage> {
           debugPrint('DEBUG: User Profile Saved Successfully.');
           
             if (mounted) {
-               ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Registration Successful! Please wait for Admin approval to login.'),
+                  content: Text('Registration submitted! Awaiting administrator approval.'),
                   backgroundColor: AppColors.success,
                   duration: Duration(seconds: 4),
                 ),
               );
-              // Force logout so AuthStream doesn't push them to Home Page
-              await AuthService().signOut();
-              // Navigate back to Login Page
-              if (mounted) Navigator.of(context).pop(); 
+              // Pop back to root/AuthWrapper which will display UserUnderReviewPage
+              Navigator.of(context).pop(); 
             }
         }
       } catch (e) {

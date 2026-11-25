@@ -45,5 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required to scan asset QR/barcodes and capture asset photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is required to attach asset images.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>NFC access is required to read and write asset NFC tags.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access is required to record asset inspection coordinates.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID is used to authenticate access to AssetPulse Pro.</string>
 </dict>
 </plist>

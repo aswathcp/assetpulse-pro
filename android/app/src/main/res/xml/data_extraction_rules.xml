@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude temporary caches and export artifacts from cloud backup -->
+        <exclude domain="root" path="cache" />
+        <exclude domain="root" path="code_cache" />
+        <exclude domain="root" path="no_backup" />
+        <exclude domain="file" path="app_flutter/temp" />
+    </cloud-backup>
+    <device-transfer>
+        <!-- Allow settings and offline data migration while excluding volatile caches -->
+        <exclude domain="root" path="cache" />
+        <exclude domain="root" path="code_cache" />
+        <exclude domain="file" path="app_flutter/temp" />
+    </device-transfer>
+</data-extraction-rules>

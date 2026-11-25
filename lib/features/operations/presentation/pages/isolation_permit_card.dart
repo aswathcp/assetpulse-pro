@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/isolation_permit_model.dart';
 import 'add_isolation_permit_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/services/hierarchy_service.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/widgets/glass_container.dart';
 
@@ -20,6 +22,82 @@ class IsolationPermitCard extends StatefulWidget {
 
 class _IsolationPermitCardState extends State<IsolationPermitCard> {
   bool _isExpanded = false;
+  static final Map<String, String> _userNamesCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAndResolveNames();
+  }
+
+  @override
+  void didUpdateWidget(covariant IsolationPermitCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.permit.id != widget.permit.id) {
+      _checkAndResolveNames();
+    }
+  }
+
+  void _checkAndResolveNames() {
+    if (widget.permit.requestingOfficerName == null || widget.permit.requestingOfficerName!.isEmpty) {
+      _resolveUserName(widget.permit.requestingOfficerId);
+    }
+    if (widget.permit.isolationOfficerName == null || widget.permit.isolationOfficerName!.isEmpty) {
+      _resolveUserName(widget.permit.isolationOfficerId);
+    }
+    if (widget.permit.clearingOfficerId != null && widget.permit.clearingOfficerId!.isNotEmpty) {
+      _resolveUserName(widget.permit.clearingOfficerId!);
+    }
+    if (widget.permit.normalizingOfficerId != null && widget.permit.normalizingOfficerId!.isNotEmpty) {
+      _resolveUserName(widget.permit.normalizingOfficerId!);
+    }
+  }
+
+  Future<void> _resolveUserName(String uid) async {
+    if (uid.isEmpty || _userNamesCache.containsKey(uid)) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        final name = (data?['displayName'] ?? data?['name'] ?? data?['email'] ?? uid).toString();
+        setState(() {
+          _userNamesCache[uid] = name;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String get _feederDisplay {
+    if (widget.permit.feederName != null && widget.permit.feederName!.isNotEmpty) {
+      return widget.permit.feederName!;
+    }
+    return HierarchyService.stripPrefix(widget.permit.feederId, widget.permit.plantId, widget.permit.unitId);
+  }
+
+  String get _panelDisplay {
+    if (widget.permit.panelName != null && widget.permit.panelName!.isNotEmpty) {
+      return widget.permit.panelName!;
+    }
+    return HierarchyService.stripPrefix(widget.permit.panelId, widget.permit.plantId, widget.permit.unitId);
+  }
+
+  String get _locationDisplay {
+    return HierarchyService.stripPrefix(widget.permit.locationId, widget.permit.plantId, widget.permit.unitId);
+  }
+
+  String get _requesterDisplay {
+    if (widget.permit.requestingOfficerName != null && widget.permit.requestingOfficerName!.isNotEmpty) {
+      return widget.permit.requestingOfficerName!;
+    }
+    return _userNamesCache[widget.permit.requestingOfficerId] ?? widget.permit.requestingOfficerId;
+  }
+
+  String get _isolatorDisplay {
+    if (widget.permit.isolationOfficerName != null && widget.permit.isolationOfficerName!.isNotEmpty) {
+      return widget.permit.isolationOfficerName!;
+    }
+    return _userNamesCache[widget.permit.isolationOfficerId] ?? widget.permit.isolationOfficerId;
+  }
 
   String _getDuration() {
     final end = widget.permit.clearanceDateTime ?? DateTime.now();
@@ -107,8 +185,8 @@ class _IsolationPermitCardState extends State<IsolationPermitCard> {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Feeder: ${widget.permit.feederId}',
-            style: const TextStyle(fontSize: 14),
+            'Feeder: $_feederDisplay',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         Text(
@@ -124,12 +202,16 @@ class _IsolationPermitCardState extends State<IsolationPermitCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildInfoRow('Reason', widget.permit.reason),
-        _buildInfoRow('Location', widget.permit.locationId),
-        _buildInfoRow('Panel', widget.permit.panelId),
+        _buildInfoRow('Location', _locationDisplay),
+        _buildInfoRow('Panel', _panelDisplay),
         const SizedBox(height: 12),
         const Text('Authorized Personnel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-        _buildInfoRow('Requester', widget.permit.requestingOfficerId),
-        _buildInfoRow('Isolator', widget.permit.isolationOfficerId),
+        _buildInfoRow('Requester', _requesterDisplay),
+        _buildInfoRow('Isolator', _isolatorDisplay),
+        if (widget.permit.clearingOfficerId != null && widget.permit.clearingOfficerId!.isNotEmpty)
+          _buildInfoRow('Cleared By', widget.permit.clearingOfficerName ?? (_userNamesCache[widget.permit.clearingOfficerId] ?? widget.permit.clearingOfficerId!)),
+        if (widget.permit.normalizingOfficerId != null && widget.permit.normalizingOfficerId!.isNotEmpty)
+          _buildInfoRow('Normalized By', widget.permit.normalizingOfficerName ?? (_userNamesCache[widget.permit.normalizingOfficerId] ?? widget.permit.normalizingOfficerId!)),
         const SizedBox(height: 12),
         _buildInfoRow('Locks', 'Req: ${widget.permit.requesterLockNo} | Iso: ${widget.permit.isolationOfficerLockNo}'),
         if (widget.permit.personalLocksCount > 0) 
@@ -144,8 +226,8 @@ class _IsolationPermitCardState extends State<IsolationPermitCard> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 80, child: Text('$label:', style: const TextStyle(color: Colors.grey, fontSize: 12))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
+          SizedBox(width: 90, child: Text('$label:', style: const TextStyle(color: Colors.grey, fontSize: 12))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -212,9 +294,11 @@ class _ClearPermitDialogState extends State<_ClearPermitDialog> {
   Future<void> _fetchAuthorizedPersonnel() async {
     final businessId = widget.permit.businessId;
     
-    // Requesting Officers for clearance (same department)
+    // Requesting Officers for clearance (same department or higher authority)
     final req = await _firestoreService.getLotoAuthorizedUsers(
       businessId: businessId,
+      plantId: widget.permit.plantId,
+      unitId: widget.permit.unitId,
       isRequestingAuth: true,
       isIsolationAuth: false,
       department: widget.permit.requestingDepartment,
@@ -223,14 +307,18 @@ class _ClearPermitDialogState extends State<_ClearPermitDialog> {
     // Isolation Officers (Normalizing)
     final iso = await _firestoreService.getLotoAuthorizedUsers(
       businessId: businessId,
+      plantId: widget.permit.plantId,
+      unitId: widget.permit.unitId,
       isRequestingAuth: false,
       isIsolationAuth: true,
     );
 
-    setState(() {
-      _reqOfficers = req;
-      _isoOfficers = iso;
-    });
+    if (mounted) {
+      setState(() {
+        _reqOfficers = req;
+        _isoOfficers = iso;
+      });
+    }
   }
 
   @override
@@ -279,17 +367,23 @@ class _ClearPermitDialogState extends State<_ClearPermitDialog> {
         locationId: widget.permit.locationId,
         panelId: widget.permit.panelId,
         feederId: widget.permit.feederId,
+        panelName: widget.permit.panelName,
+        feederName: widget.permit.feederName,
         requestingDepartment: widget.permit.requestingDepartment,
         reason: widget.permit.reason,
         isolationDateTime: widget.permit.isolationDateTime,
         requestingOfficerId: widget.permit.requestingOfficerId,
         isolationOfficerId: widget.permit.isolationOfficerId,
+        requestingOfficerName: widget.permit.requestingOfficerName,
+        isolationOfficerName: widget.permit.isolationOfficerName,
         requesterLockNo: widget.permit.requesterLockNo,
         isolationOfficerLockNo: widget.permit.isolationOfficerLockNo,
         personalLocksCount: widget.permit.personalLocksCount,
         status: IsolationStatus.cleared,
         clearingOfficerId: _selectedClearingOfficerId,
         normalizingOfficerId: _selectedNormalizingOfficerId,
+        clearingOfficerName: _reqOfficers.firstWhere((u) => u['uid'] == _selectedClearingOfficerId, orElse: () => {})['displayName'],
+        normalizingOfficerName: _isoOfficers.firstWhere((u) => u['uid'] == _selectedNormalizingOfficerId, orElse: () => {})['displayName'],
         clearanceDateTime: DateTime.now(),
         renewalHistory: widget.permit.renewalHistory,
       );

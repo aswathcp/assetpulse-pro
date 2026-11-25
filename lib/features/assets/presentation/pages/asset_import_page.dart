@@ -550,8 +550,8 @@ class _AssetImportPageState extends State<AssetImportPage> {
         allowedExtensions: ['xlsx', 'xls'],
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final pickedFile = result.files.single;
+      if (result.isNotEmpty) {
+        final pickedFile = result.single;
         setState(() {
           _fileName = pickedFile.name;
           _isProcessing = true;
