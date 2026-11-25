@@ -39,7 +39,7 @@ dependencies:
   # Scanning
   mobile_scanner: ^7.4.0
   image_picker: ^1.2.3
-  nfc_manager: ^4.2.1
+  nfc_manager: ^4.4.0
   
   # Charts & Data
   fl_chart: ^1.2.0
@@ -50,9 +50,9 @@ dependencies:
   open_file: ^4.0.0
   
   # Firebase
-  firebase_core: ^4.14.0
-  firebase_auth: ^6.6.1
-  cloud_firestore: ^6.9.0
+  firebase_core: ^5.2.0
+  firebase_auth: ^7.1.0
+  cloud_firestore: ^7.2.0
   local_auth: ^3.0.2
   
   # State & Storage
