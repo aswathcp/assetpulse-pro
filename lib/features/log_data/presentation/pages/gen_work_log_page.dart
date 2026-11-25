@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -195,7 +195,7 @@ class _GenWorkLogPageState extends State<GenWorkLogPage> {
       ),
     );
 
-    Share.share(text, subject: 'Shift General Work Log');
+    SharePlus.instance.share(ShareParams(text: text, subject: 'Shift General Work Log'));
   }
 
   @override
@@ -324,7 +324,7 @@ class _GenWorkLogPageState extends State<GenWorkLogPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _plants.contains(_activePlant) ? _activePlant : (_plants.isNotEmpty ? _plants.first : null),
+                  initialValue: _plants.contains(_activePlant) ? _activePlant : (_plants.isNotEmpty ? _plants.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Select Plant', border: InputBorder.none),
                   items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),
@@ -343,7 +343,7 @@ class _GenWorkLogPageState extends State<GenWorkLogPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _units.contains(_activeUnit) ? _activeUnit : (_units.isNotEmpty ? _units.first : null),
+                  initialValue: _units.contains(_activeUnit) ? _activeUnit : (_units.isNotEmpty ? _units.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Select Unit', border: InputBorder.none),
                   items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),

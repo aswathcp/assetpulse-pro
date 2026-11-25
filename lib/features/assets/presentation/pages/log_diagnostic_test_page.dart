@@ -1,7 +1,7 @@
 // ignore_for_file: deprecated_member_use, use_build_context_synchronously
 
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_auth/local_auth.dart';
@@ -48,17 +48,17 @@ class _LogDiagnosticTestPageState extends State<LogDiagnosticTestPage> {
 
   String _motorFanCondition = 'Clean & Good';
   String _motorShaftRotation = 'Smooth Hand Rotation';
-  String _motorTerminalBox = 'Sealed & Dry';
-  String _motorGreaseStatus = 'Greased OK';
+  final String _motorTerminalBox = 'Sealed & Dry';
+  final String _motorGreaseStatus = 'Greased OK';
 
   // 2. Gearbox Diagnostic Controllers & Checkpoints
   final _gbxBacklashController = TextEditingController();
   final _gbxSumpTempController = TextEditingController();
   String _gbxOilLevelQuality = 'Clean & Normal';
-  String _gbxBreather = 'Clean & Free';
+  final String _gbxBreather = 'Clean & Free';
   String _gbxToothContact = 'Normal Mesh Pattern';
   String _gbxOilSeal = 'Zero Leak (Pass)';
-  String _gbxShaftRotation = 'Smooth Hand Rotation';
+  final String _gbxShaftRotation = 'Smooth Hand Rotation';
 
   // 3. Pump Diagnostic Controllers & Checkpoints
   final _pmpHeadController = TextEditingController();
@@ -74,15 +74,15 @@ class _LogDiagnosticTestPageState extends State<LogDiagnosticTestPage> {
   final _brkDrumClearanceController = TextEditingController();
   final _brkTorqueController = TextEditingController();
   String _brkHoldingTest = 'Pass (Zero Slip)';
-  String _brkManualRelease = 'Free & Smooth';
+  final String _brkManualRelease = 'Free & Smooth';
 
   // 5. Actuator Diagnostic Controllers & Checkpoints
   final _actTorqueController = TextEditingController();
   final _actTravelTimeController = TextEditingController();
   String _actFeedbackSignal = 'Linear 4.0 - 20.0 mA';
   String _actLimitSwitch = 'Open/Close Trip OK';
-  String _actHandwheel = 'Smooth Engagement';
-  String _actTerminalSeal = 'Sealed & Dry';
+  final String _actHandwheel = 'Smooth Engagement';
+  final String _actTerminalSeal = 'Sealed & Dry';
 
   // 6. Universal Vibration Controllers
   final _vibDeHController = TextEditingController();

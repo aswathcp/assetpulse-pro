@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/constants/app_roles.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
@@ -170,7 +170,7 @@ class _WorkmenManagementPageState extends State<WorkmenManagementPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _trades.contains(selectedTrade) ? selectedTrade : _trades.first,
+                    initialValue: _trades.contains(selectedTrade) ? selectedTrade : _trades.first,
                     decoration: InputDecoration(
                       labelText: 'Trade / Skill *',
                       prefixIcon: const Icon(Icons.handyman_outlined),
@@ -226,15 +226,16 @@ class _WorkmenManagementPageState extends State<WorkmenManagementPage> {
                     title: const Text('Active Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     subtitle: const Text('Available for selection in shift work logs', style: TextStyle(fontSize: 11)),
                     value: isActive,
-                    activeColor: Colors.greenAccent,
+                    activeThumbColor: Colors.greenAccent,
                     onChanged: (val) => setModalState(() => isActive = val),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       final name = nameController.text.trim();
                       if (name.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(content: Text('Please enter a name for the workman.')),
                         );
                         return;
@@ -262,7 +263,7 @@ class _WorkmenManagementPageState extends State<WorkmenManagementPage> {
 
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           SnackBar(
                             content: Text(workman != null ? 'Workman updated!' : 'Workman added successfully!'),
                             backgroundColor: Colors.green,
@@ -428,7 +429,7 @@ class _WorkmenManagementPageState extends State<WorkmenManagementPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _plants.contains(_selectedPlant) ? _selectedPlant : (_plants.isNotEmpty ? _plants.first : null),
+                  initialValue: _plants.contains(_selectedPlant) ? _selectedPlant : (_plants.isNotEmpty ? _plants.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Plant Scope', border: InputBorder.none),
                   items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),
@@ -447,7 +448,7 @@ class _WorkmenManagementPageState extends State<WorkmenManagementPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _units.contains(_selectedUnit) ? _selectedUnit : (_units.isNotEmpty ? _units.first : null),
+                  initialValue: _units.contains(_selectedUnit) ? _selectedUnit : (_units.isNotEmpty ? _units.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Unit Scope', border: InputBorder.none),
                   items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),

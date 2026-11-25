@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
@@ -218,7 +218,7 @@ class _LogFaultPageState extends State<LogFaultPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _plants.contains(_activePlant) ? _activePlant : (_plants.isNotEmpty ? _plants.first : null),
+                  initialValue: _plants.contains(_activePlant) ? _activePlant : (_plants.isNotEmpty ? _plants.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Select Plant', border: InputBorder.none),
                   items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),
@@ -237,7 +237,7 @@ class _LogFaultPageState extends State<LogFaultPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _units.contains(_activeUnit) ? _activeUnit : (_units.isNotEmpty ? _units.first : null),
+                  initialValue: _units.contains(_activeUnit) ? _activeUnit : (_units.isNotEmpty ? _units.first : null),
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Select Unit', border: InputBorder.none),
                   items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),

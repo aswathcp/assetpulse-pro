@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/isolation_permit_model.dart';
 import '../../../../core/widgets/animated_gradient_background.dart';
 import '../../../../core/widgets/pulse_loading.dart';

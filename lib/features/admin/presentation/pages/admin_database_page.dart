@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
@@ -697,7 +697,8 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
                                               final sev = item['severity'] ?? item['defaultSeverity'] ?? 'Major';
                                               final target = item['targetEquipment'] ?? item['equipmentType'] ?? '';
                                               title = item['name'] ?? item['faultName'] ?? rawId;
-                                              subtitle = 'Code: $code | $cat ' + (target.isNotEmpty ? '• $target ' : '') + '| Severity: $sev';
+                                              final targetPart = target.isNotEmpty ? '• $target ' : '';
+                                              subtitle = 'Code: $code | $cat $targetPart| Severity: $sev';
                                             }
                                             if (widget.collectionId == 'odc' || widget.collectionId == 'odc_causes') {
                                               final obj = item['objectPart'] ?? item['object'] ?? '';
@@ -881,7 +882,7 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
 
   void _showWipeConfirmation() {
     final isMasterCatalog = widget.collectionId == 'odc' || widget.collectionId == 'odc_causes' || widget.collectionId == 'fault_types';
-    final scopeDesc = isMasterCatalog ? 'the entire catalog in Firestore' : 'all records for plant ' + (_selectedPlant ?? '') + ' / unit ' + (_selectedUnit ?? '');
+    final scopeDesc = isMasterCatalog ? 'the entire catalog in Firestore' : 'all records for plant ${_selectedPlant ?? ''} / unit ${_selectedUnit ?? ''}';
 
     showDialog(
       context: context,
@@ -892,11 +893,11 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
           children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
             const SizedBox(width: 10),
-            Expanded(child: Text('Wipe ' + widget.title + '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            Expanded(child: Text('Wipe ${widget.title}?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
           ],
         ),
         content: Text(
-          'Are you sure you want to delete ' + scopeDesc + '?\n\nThis will permanently delete all records in collection "' + widget.collectionId + '" so you can re-import clean data from Excel. This action CANNOT be undone.',
+          'Are you sure you want to delete $scopeDesc?\n\nThis will permanently delete all records in collection "${widget.collectionId}" so you can re-import clean data from Excel. This action CANNOT be undone.',
           style: const TextStyle(fontSize: 13),
         ),
         actions: [
@@ -925,7 +926,7 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Successfully deleted ' + count.toString() + ' records from ' + widget.title + '! Ready for clean import.'),
+                      content: Text('Successfully deleted $count records from ${widget.title}! Ready for clean import.'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -933,7 +934,7 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error wiping collection: ' + e.toString()), backgroundColor: AppColors.error),
+                    SnackBar(content: Text('Error wiping collection: $e'), backgroundColor: AppColors.error),
                   );
                 }
               } finally {

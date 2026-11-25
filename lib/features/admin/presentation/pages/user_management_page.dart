@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -1059,17 +1059,21 @@ class _RejectUserDialogState extends State<_RejectUserDialog> {
               ),
             ),
             const SizedBox(height: 6),
-            ..._reasons.map((r) => RadioListTile<String>(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(r, style: const TextStyle(fontSize: 12.5)),
-              value: r,
+            RadioGroup<String>(
               groupValue: _selectedReason,
-              activeColor: AppColors.error,
               onChanged: (val) {
                 if (val != null) setState(() => _selectedReason = val);
               },
-            )),
+              child: Column(
+                children: _reasons.map((r) => RadioListTile<String>(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(r, style: const TextStyle(fontSize: 12.5)),
+                  value: r,
+                  activeColor: AppColors.error,
+                )).toList(),
+              ),
+            ),
             if (isOther) ...[
               const SizedBox(height: 8),
               TextField(

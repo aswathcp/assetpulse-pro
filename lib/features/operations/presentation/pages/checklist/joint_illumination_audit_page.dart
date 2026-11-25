@@ -1,5 +1,5 @@
 // ignore_for_file: deprecated_member_use
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:asset_pulse_pro/core/constants/app_colors.dart';
 import 'package:asset_pulse_pro/core/widgets/glass_container.dart';
@@ -730,10 +730,11 @@ class _JointIlluminationAuditPageState extends State<JointIlluminationAuditPage>
                   icon: const Icon(Icons.open_in_new, size: 14, color: Colors.white),
                   label: const Text('Open', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                   onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
                     final result = await OpenFile.open(path);
                     if (result.type != ResultType.done && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         SnackBar(content: Text('Could not open file: ${result.message}')),
                       );
                     }

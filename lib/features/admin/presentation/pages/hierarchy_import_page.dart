@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart' hide Border;
 import '../../../../core/constants/app_colors.dart';
@@ -757,7 +757,9 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                   label: const Text('Share', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: () async {
                     Navigator.pop(context);
-                    await Share.shareXFiles([XFile(path)], text: 'Hierarchy Template: $fileName');
+                    await SharePlus.instance.share(
+                      ShareParams(files: [XFile(path)], text: 'Hierarchy Template: $fileName'),
+                    );
                   },
                 ),
                 const SizedBox(width: 6),
@@ -1518,7 +1520,7 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _plants.contains(_userPlantId) ? _userPlantId : (_plants.isNotEmpty ? _plants.first : null),
+                              initialValue: _plants.contains(_userPlantId) ? _userPlantId : (_plants.isNotEmpty ? _plants.first : null),
                               isExpanded: true,
                               decoration: const InputDecoration(labelText: 'Select Plant', border: InputBorder.none),
                               items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),
@@ -1541,7 +1543,7 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _units.contains(_userUnitId) ? _userUnitId : (_units.isNotEmpty ? _units.first : null),
+                              initialValue: _units.contains(_userUnitId) ? _userUnitId : (_units.isNotEmpty ? _units.first : null),
                               isExpanded: true,
                               decoration: const InputDecoration(labelText: 'Select Unit', border: InputBorder.none),
                               items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis))).toList(),
@@ -1568,7 +1570,7 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: _locations.any((l) => l.id == _selectedLocationId) ? _selectedLocationId : null,
+                                initialValue: _locations.any((l) => l.id == _selectedLocationId) ? _selectedLocationId : null,
                                 isExpanded: true,
                                 decoration: InputDecoration(
                                   labelText: widget.collectionId == 'panels' ? 'Select Panel Room (Target)' : 'Select Location (Target)',
@@ -1582,7 +1584,7 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                               const SizedBox(width: 16),
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  value: _panels.any((p) => p.id == _selectedPanelId) ? _selectedPanelId : null,
+                                  initialValue: _panels.any((p) => p.id == _selectedPanelId) ? _selectedPanelId : null,
                                   isExpanded: true,
                                   decoration: const InputDecoration(labelText: 'Select Panel (Target)', border: InputBorder.none),
                                   items: _panels.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis))).toList(),

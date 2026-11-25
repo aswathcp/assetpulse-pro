@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -701,6 +701,7 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
         }
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -715,6 +716,7 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('AI Extraction failed: $e'), backgroundColor: Colors.red),
       );
@@ -836,12 +838,13 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
             if (savedKey.isNotEmpty)
               TextButton(
                 onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   await aiService.saveApiKey('');
                   await aiService.setDeveloperKeyEnabled(true);
                   await _checkApiKey();
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(content: Text('Personal key cleared. Switched to developer key.'), backgroundColor: Colors.orange),
                     );
                   }
@@ -854,6 +857,7 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 final newKey = controller.text.trim();
                 await aiService.saveApiKey(newKey);
                 await aiService.setDeveloperKeyEnabled(localDevEnabled);
@@ -865,7 +869,7 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
                       : localDevEnabled
                           ? 'Using shared Developer Key. Cloud AI enabled!'
                           : 'AI key cleared. Using Offline NLP mode.';
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(msg), backgroundColor: Colors.green),
                   );
                 }

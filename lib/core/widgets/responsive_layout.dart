@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Reusable Responsive Breakpoint Utility & Layout Builder for AssetPulse-Pro Multiplatform Architecture
 class ResponsiveLayout extends StatelessWidget {

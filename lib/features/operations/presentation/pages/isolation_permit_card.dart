@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:asset_pulse_pro/features/assets/data/models/isolation_permit_model.dart';
 import 'add_isolation_permit_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

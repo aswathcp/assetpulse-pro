@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:nfc_manager/nfc_manager.dart';
 // import 'package:nfc_manager_ndef/nfc_manager_ndef.dart'; // Commented out to check if it's needed or if nfc_manager exports it

@@ -1,5 +1,5 @@
 import '../../features/assets/data/models/asset_model.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class HealthService {
   // Singleton pattern (optional, but good for consistency)

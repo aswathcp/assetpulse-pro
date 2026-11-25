@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -149,7 +149,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedPlantId,
+                          initialValue: _selectedPlantId,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Plant', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
                           items: _plants.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
@@ -166,7 +166,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _selectedUnitId,
+                          initialValue: _selectedUnitId,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Unit', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
                           items: _units.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -520,7 +520,7 @@ class _AddFaultLogPageState extends State<AddFaultLogPage> {
                     title: const Text('Use Developer Shared Key', style: TextStyle(fontSize: 13)),
                     subtitle: const Text('Enable Gemini AI without a personal key', style: TextStyle(fontSize: 11)),
                     value: localDevEnabled,
-                    activeColor: Colors.greenAccent,
+                    activeThumbColor: Colors.greenAccent,
                     onChanged: (v) => setDialogState(() => localDevEnabled = v),
                   ),
                   const Divider(),
@@ -559,12 +559,13 @@ class _AddFaultLogPageState extends State<AddFaultLogPage> {
             if (savedKey.isNotEmpty)
               TextButton(
                 onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   await aiService.saveApiKey('');
                   await aiService.setDeveloperKeyEnabled(true);
                   await _checkApiKey();
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(content: Text('Personal key cleared. Switched to developer key.'), backgroundColor: Colors.orange),
                     );
                   }
@@ -577,6 +578,7 @@ class _AddFaultLogPageState extends State<AddFaultLogPage> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 final newKey = controller.text.trim();
                 await aiService.saveApiKey(newKey);
                 await aiService.setDeveloperKeyEnabled(localDevEnabled);
@@ -588,7 +590,7 @@ class _AddFaultLogPageState extends State<AddFaultLogPage> {
                       : localDevEnabled
                           ? 'Using shared Developer Key. Cloud AI enabled!'
                           : 'AI key cleared. Using Offline NLP mode.';
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(msg), backgroundColor: Colors.green),
                   );
                 }
