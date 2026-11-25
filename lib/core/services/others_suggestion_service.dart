@@ -107,7 +107,7 @@ class OthersSuggestionService {
         .where('status', isEqualTo: 'pending')
         .orderBy('submittedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => OthersSuggestion.fromMap(d.data() as Map<String, dynamic>, d.id)).toList());
+        .map((s) => s.docs.map((d) => OthersSuggestion.fromMap(d.data(), d.id)).toList());
   }
 
   static Stream<List<OthersSuggestion>> allStream({String? filterCollection}) {

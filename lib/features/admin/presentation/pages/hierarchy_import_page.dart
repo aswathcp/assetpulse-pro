@@ -46,14 +46,12 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
   String? _statusMessage;
   String? _userUnitId;
   String? _userPlantId;
-  bool _isLoadingHierarchy = false;
 
   // Scope State
   List<String> _plants = [];
   List<String> _units = [];
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
-  bool _isLoadingScope = true;
   String _userRole = '';
   bool _isAdmin = false;
 
@@ -70,16 +68,13 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
   }
 
   Future<void> _loadScope() async {
-    setState(() => _isLoadingScope = true);
     final user = AuthService().currentUser;
     if (user == null) {
-      if (mounted) setState(() => _isLoadingScope = false);
       return;
     }
 
     final profile = await _firestoreService.getUserProfile(user.uid);
     if (profile == null) {
-      if (mounted) setState(() => _isLoadingScope = false);
       return;
     }
 
@@ -128,7 +123,7 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
     }
 
     if (mounted) {
-      setState(() => _isLoadingScope = false);
+      setState(() {});
       _loadHierarchyData();
     }
   }
@@ -149,7 +144,6 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
     if (_userUnitId == null || _userPlantId == null) return;
 
     if (['panels', 'feeders', 'master_equipments'].contains(widget.collectionId)) {
-      setState(() => _isLoadingHierarchy = true);
       if (widget.collectionId == 'panels') {
         _firestoreService.getPanelRoomsStream(_userUnitId!, _userPlantId!).listen((rooms) {
           if (mounted) {
@@ -162,7 +156,6 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
                 type: 'Panel Room',
                 description: r.description,
               )).toList();
-              _isLoadingHierarchy = false;
             });
           }
         });
@@ -171,7 +164,6 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
           if (mounted) {
             setState(() {
               _locations = locs;
-              _isLoadingHierarchy = false;
             });
           }
         });
@@ -184,14 +176,12 @@ class _HierarchyImportPageState extends State<HierarchyImportPage> {
       _selectedLocationId = locId;
       _selectedPanelId = null;
       _panels = [];
-      if (locId != null) _isLoadingHierarchy = true;
     });
     if (locId != null) {
       _firestoreService.getPanelsStream(locId).listen((ps) {
         if (mounted) {
           setState(() {
             _panels = ps;
-            _isLoadingHierarchy = false;
           });
         }
       });

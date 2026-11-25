@@ -47,8 +47,6 @@ class _AssetsTabState extends State<AssetsTab> {
   bool _isUnitLocked = false;
   String _userRole = '';
   bool _isAdmin = false;
-  String? _userPlantId;
-  String? _userUnitId;
 
   bool _isLoading = true;
   bool _isManagingAssets = false;
@@ -108,8 +106,6 @@ class _AssetsTabState extends State<AssetsTab> {
 
     _userRole = profile['role'] ?? AppRoles.guest;
     _isAdmin = profile['isAdmin'] == true || _userRole == AppRoles.developer;
-    _userPlantId = profile['plantId'] as String?;
-    _userUnitId = profile['unitId'] as String?;
     final uBusinessId = profile['businessId'] as String? ?? 'VISL';
 
     await HierarchyService().init(businessId: uBusinessId);

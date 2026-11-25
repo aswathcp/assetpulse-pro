@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_roles.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/hierarchy_service.dart';
@@ -37,8 +36,6 @@ class _LogFaultPageState extends State<LogFaultPage> {
   List<String> _units = [];
   bool _isPlantLocked = false;
   bool _isUnitLocked = false;
-  bool _isLoadingScope = false;
-  String _userRole = '';
 
   @override
   void initState() {
@@ -62,21 +59,16 @@ class _LogFaultPageState extends State<LogFaultPage> {
   }
 
   Future<void> _loadScope() async {
-    setState(() => _isLoadingScope = true);
     final user = AuthService().currentUser;
     if (user == null) {
-      if (mounted) setState(() => _isLoadingScope = false);
       return;
     }
 
     final profile = await FirestoreService().getUserProfile(user.uid);
     if (profile == null) {
-      if (mounted) setState(() => _isLoadingScope = false);
       return;
     }
 
-    _userRole = profile['role'] ?? AppRoles.guest;
-    final userPlantId = profile['plantId'] as String?;
     final userBusinessId = profile['businessId'] as String? ?? 'VISL';
     await HierarchyService().init(businessId: userBusinessId);
 
@@ -91,7 +83,7 @@ class _LogFaultPageState extends State<LogFaultPage> {
       _activeUnit = widget.unitId ?? userScope.getInitialUnit(_units);
     }
 
-    if (mounted) setState(() => _isLoadingScope = false);
+    if (mounted) setState(() {});
   }
 
   void _updateUnitList() {

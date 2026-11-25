@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:asset_pulse_pro/core/constants/app_colors.dart';
-import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
@@ -52,17 +51,6 @@ class _AddEditHierarchyItemPageState extends State<AddEditHierarchyItemPage> {
   List<PanelRoomModel> _refPanelRooms = [];
   List<PanelModel> _refPanels = [];
   List<FeederModel> _refFeeders = [];
-  List<String> _refPlants = [];
-  List<String> _refUnits = [];
-
-  static const List<String> faultCategories = [
-    'Electrical', 'Mechanical', 'Thermal', 'Instrumentation', 'Control & Automation', 'Civil', 'Other'
-  ];
-
-  static const List<String> odcCategories = [
-    'Wear & Tear', 'Contamination', 'Electrical Stress', 'Mechanical Overload',
-    'Human / Operational', 'Environmental', 'Material Defect', 'Improper Maintenance', 'Other'
-  ];
 
   @override
   void initState() {
@@ -111,11 +99,6 @@ class _AddEditHierarchyItemPageState extends State<AddEditHierarchyItemPage> {
     try {
       final plantId = _formData['plantId'] as String?;
       final unitId = _formData['unitId'] as String?;
-
-      if (widget.userRole == AppRoles.developer) {
-        _refPlants = HierarchyService().getPlants();
-        if (plantId != null) _refUnits = HierarchyService().getUnitsForPlant(plantId);
-      }
 
       final db = FirebaseFirestore.instance;
       if (unitId != null && plantId != null) {

@@ -3,24 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:asset_pulse_pro/core/services/firestore_service.dart';
 import 'package:asset_pulse_pro/core/services/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:asset_pulse_pro/core/services/hierarchy_service.dart';
 import 'package:asset_pulse_pro/core/widgets/glass_container.dart';
 import 'package:asset_pulse_pro/core/constants/app_colors.dart';
 import 'package:asset_pulse_pro/core/widgets/pulse_loading.dart';
 import 'package:asset_pulse_pro/core/constants/app_roles.dart';
 import 'package:asset_pulse_pro/core/utils/permission_helper.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/location_model.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/panel_model.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/feeder_model.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/panel_room_model.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/transformer_model.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/data_import_page.dart';
-import 'package:asset_pulse_pro/features/admin/presentation/pages/add_edit_master_page.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/add_edit_hierarchy_page.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/workmen_management_page.dart';
 import 'package:asset_pulse_pro/features/admin/presentation/pages/others_review_page.dart';
-import 'package:asset_pulse_pro/features/assets/data/models/master_equipment_model.dart';
 import 'package:asset_pulse_pro/core/constants/app_version.dart';
 import 'package:asset_pulse_pro/core/services/app_version_service.dart';
 
@@ -244,8 +236,6 @@ class _DatabaseCollectionViewState extends State<DatabaseCollectionView> {
     if (profile == null) return;
     
     _userRole = profile['role'] ?? AppRoles.guest;
-    final userPlantId = profile['plantId'] as String?;
-    final userUnitId = profile['unitId'] as String?;
     final userBusinessId = profile['businessId'] as String? ?? 'VISL';
     await HierarchyService().init(businessId: userBusinessId);
     _selectedBusinessId = HierarchyService().currentBusinessId;
