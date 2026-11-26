@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/assets/data/models/fault_log_model.dart';
 import '../../features/assets/data/models/master_equipment_model.dart';
 import '../../features/assets/data/models/asset_model.dart';
 import '../constants/odc_catalog_data.dart';
+import 'gemini_model_service.dart';
 
 class ParsedFaultLogDraft {
   final String? equipmentId;
@@ -30,6 +31,7 @@ class ParsedFaultLogDraft {
   final FaultStatus status;
   final int? downtimeMinutes;
   final String aiSummary;
+  final String? usedModel;
 
   ParsedFaultLogDraft({
     this.equipmentId,
@@ -54,6 +56,7 @@ class ParsedFaultLogDraft {
     this.status = FaultStatus.pending,
     this.downtimeMinutes,
     required this.aiSummary,
+    this.usedModel,
   });
 }
 
@@ -213,7 +216,7 @@ class AiFaultLogService {
     );
   }
 
-  /// Cloud Gemini Flash parser using direct Google Generative AI REST endpoint
+  /// Cloud Gemini parser using auto-discovered best free-tier model & `package:http`
   Future<ParsedFaultLogDraft?> _callGeminiApi({
     required String rawPrompt,
     required String apiKey,
@@ -222,26 +225,35 @@ class AiFaultLogService {
     required List<Map<String, dynamic>> availableFaultTypes,
     required List<Map<String, dynamic>> availableOdcCauses,
   }) async {
-    final models = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-    ];
+    final models = await GeminiModelService().getCandidateModelIds(apiKey);
 
     final equipmentCatalog = availableEquipments
+        .take(150)
         .map((e) => '{"id": "${e.id}", "name": "${e.name}", "type": "${e.type}"}')
+        .join(',\n');
+
+    final subAssetCatalog = availableSubAssets
         .take(60)
+        .map((a) => '{"id": "${a.id}", "tagNo": "${a.tagNo}", "type": "${a.type.name}"}')
         .join(',\n');
 
     final faultTypeCatalog = availableFaultTypes
-        .map((f) => '{"id": "${f['id']}", "name": "${f['name'] ?? f['faultTypeName'] ?? f['id']}", "category": "${f['category'] ?? ''}"}')
-        .take(50)
+        .take(80)
+        .map((f) => '{"id": "${f['id']}", "name": "${f['name'] ?? f['faultTypeName'] ?? f['id']}", "category": "${f['category'] ?? f['discipline'] ?? ''}"}')
         .join(',\n');
 
-    final odcCatalog = OdcCatalogData.allCatalog
-        .take(50)
-        .map((o) => '{"object": "${o.objectName}", "damage": "${o.damageName}", "cause": "${o.causeName}"}')
-        .join(',\n');
+    final odcCatalog = availableOdcCauses.isNotEmpty
+        ? availableOdcCauses.take(100).map((o) {
+            final obj = o['objectPart'] ?? o['Object_Part'] ?? o['object'] ?? '';
+            final dmg = o['damage'] ?? o['Damage_Mode'] ?? o['damageMode'] ?? '';
+            final cau = o['cause'] ?? o['Root_Cause'] ?? o['rootCause'] ?? o['name'] ?? '';
+            final disc = o['discipline'] ?? o['category'] ?? '';
+            return '{"object": "$obj", "damage": "$dmg", "cause": "$cau", "discipline": "$disc"}';
+          }).join(',\n')
+        : OdcCatalogData.allCatalog
+            .take(60)
+            .map((o) => '{"object": "${o.objectName}", "damage": "${o.damageName}", "cause": "${o.causeName}"}')
+            .join(',\n');
 
     final systemInstruction = """
 You are an expert Industrial Reliability & Plant Maintenance AI for an industrial facility.
@@ -255,6 +267,9 @@ $rawPrompt
 ACTIVE EQUIPMENT DATABASE:
 [$equipmentCatalog]
 
+SUB-ASSETS FOR SELECTED EQUIPMENT:
+[$subAssetCatalog]
+
 FAULT TYPES CATALOG:
 [$faultTypeCatalog]
 
@@ -263,23 +278,24 @@ ODC ISO 14224 CATALOG (Object, Damage, Cause):
 
 CRITICAL RULES:
 1. SPELLING & GRAMMAR: Fix all typos and phonetic errors. Produce polished, professional engineering English.
-2. "problemDescription": Concise, professional engineering statement of the failure/symptom (e.g. "BF1 Blower 2 Motor tripped on earth fault. Insulation Resistance (IR) test indicates motor winding short-circuited to ground.").
-3. "actionTaken": Clear summary of remedial action taken (e.g. "Self isolation taken, faulty motor replaced, termination completed, and trial run taken and found OK.").
-4. "status": strictly one of ["pending", "closed"]. If trial was taken and found OK / normal / restored, or repair complete, status MUST be "closed". If work is ongoing, troubleshooting, or awaiting parts, status MUST be "pending".
+2. "problemDescription": Concise, professional engineering statement of the failure/symptom.
+3. "actionTaken": Clear summary of remedial action taken.
+4. "status": strictly one of ["pending", "closed"]. If trial was taken and found OK / normal / restored, or repair complete, status MUST be "closed". Otherwise "pending".
 5. "category": strictly one of ["electrical", "mechanical", "instrumentation", "operational"].
-6. "priority": strictly one of ["critical", "high", "medium", "low"]. If tripped on fault, shorted, stopped equipment -> "critical" or "high".
+6. "priority": strictly one of ["critical", "high", "medium", "low"].
 7. "shift": strictly one of ["as", "bs", "cs", "gs"] (Default "as").
-8. "odcObject": Component part (e.g. "Stator Winding", "Drive-End (DE) Bearing", "Contactor Power Pole").
-9. "odcDamages": JSON list of damage modes (e.g. ["Winding Insulation Breakdown", "Earth Fault"]).
-10. "odcCauses": JSON list of root causes (e.g. ["Insulation Degradation / Short Circuit to Ground", "Thermal Stress"]).
-11. "isOdcApplicable": true if root defect identified.
-12. "isOdcClosed": true if action resolved the defect.
-13. "matchedEquipmentId": ID from the equipment catalog if matched, otherwise null.
+8. "matchedEquipmentId": EXACT "id" from ACTIVE EQUIPMENT DATABASE if matched, otherwise null.
+9. "matchedSubAssetId": EXACT "id" from SUB-ASSETS if matched, otherwise null.
+10. "matchedFaultTypeId": EXACT "id" from FAULT TYPES CATALOG if matched, otherwise null.
+11. "odcObject", "odcDamages", "odcCauses": MUST prefer EXACT strings from ODC ISO 14224 CATALOG when available.
+12. "isOdcApplicable": true if root defect identified.
+13. "isOdcClosed": true if action resolved the defect.
 14. "aiSummary": 1-line bullet summary of findings.
 
 OUTPUT MUST BE VALID JSON ONLY:
 {
   "matchedEquipmentId": "ID or null",
+  "matchedSubAssetId": "ID or null",
   "category": "electrical | mechanical | instrumentation | operational",
   "priority": "critical | high | medium | low",
   "shift": "as | bs | cs | gs",
@@ -289,8 +305,8 @@ OUTPUT MUST BE VALID JSON ONLY:
   "odcObject": "Component or null",
   "odcDamage": "Primary damage mode or null",
   "odcCause": "Primary root cause or null",
-  "odcDamages": ["Damage 1", "Damage 2"],
-  "odcCauses": ["Cause 1", "Cause 2"],
+  "odcDamages": ["Damage 1"],
+  "odcCauses": ["Cause 1"],
   "isOdcApplicable": true,
   "isOdcClosed": true,
   "status": "pending | closed",
@@ -300,7 +316,6 @@ OUTPUT MUST BE VALID JSON ONLY:
 """;
 
     for (final model in models) {
-      final client = HttpClient();
       try {
         final url = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
@@ -315,38 +330,41 @@ OUTPUT MUST BE VALID JSON ONLY:
             }
           ],
           'generationConfig': {
-            'response_mime_type': 'application/json',
+            'responseMimeType': 'application/json',
             'temperature': 0.1,
           }
         };
 
-        final request = await client.postUrl(url);
-        request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(payload));
-        final response = await request.close().timeout(const Duration(seconds: 14));
+        final response = await http
+            .post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 15));
 
-        final responseBody = await response.transform(utf8.decoder).join();
         if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
+          final data = jsonDecode(response.body);
           final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'];
           if (text != null) {
-            final parsed = jsonDecode(text.toString());
+            final cleanJson = text.toString().replaceAll('```json', '').replaceAll('```', '').trim();
+            final parsed = jsonDecode(cleanJson) as Map<String, dynamic>;
+            await GeminiModelService().markModelWorking(model);
             return _buildDraftFromMap(
+              rawPrompt: rawPrompt,
               map: parsed,
               availableEquipments: availableEquipments,
               availableSubAssets: availableSubAssets,
               availableFaultTypes: availableFaultTypes,
               availableOdcCauses: availableOdcCauses,
+              usedModel: model,
             );
           }
         } else {
-          debugPrint('Gemini Model $model HTTP ${response.statusCode}: $responseBody');
-          // Try next model if 404 or unsupported
+          debugPrint('Gemini Model $model HTTP ${response.statusCode}: ${response.body}');
         }
       } catch (e) {
         debugPrint('Gemini Model $model Exception: $e');
-      } finally {
-        client.close();
       }
     }
     return null;
@@ -446,98 +464,34 @@ OUTPUT MUST BE VALID JSON ONLY:
     }
 
     // 7. Equipment Matching
-    MasterEquipmentModel? matchedEq;
-    int highestEqScore = 0;
-    for (final eq in availableEquipments) {
-      final eqName = eq.name.toLowerCase();
-      final eqId = eq.id.toLowerCase();
-      final tokens = ('$eqName $eqId').split(RegExp(r'[\s\-_]+'));
-      int score = 0;
-      for (final t in tokens) {
-        if (t.length >= 3 && lower.contains(t)) {
-          score += (t.length > 5 ? 3 : 1);
-        }
-      }
-      if (score > highestEqScore) {
-        highestEqScore = score;
-        matchedEq = eq;
-      }
-    }
+    final matchedEq = matchBestEquipment(lower, availableEquipments);
 
     // 8. Sub-Asset Matching
-    AssetModel? matchedAsset;
-    int highestAssetScore = 0;
-    for (final ast in availableSubAssets) {
-      final aName = ast.tagNo.toLowerCase();
-      final aType = ast.type.name.toLowerCase();
-      if (lower.contains(aName) || lower.contains(aType)) {
-        int score = 2;
-        if (lower.contains(aType)) score += 3;
-        if (score > highestAssetScore) {
-          highestAssetScore = score;
-          matchedAsset = ast;
-        }
-      }
-    }
+    final matchedAsset = matchBestSubAsset(lower, availableSubAssets);
 
-    // 9. Fault Type Matching
-    Map<String, dynamic>? matchedFt;
-    int highestFtScore = 0;
-    for (final ft in availableFaultTypes) {
-      final name = (ft['name'] ?? ft['faultTypeName'] ?? ft['id'] ?? '').toString().toLowerCase();
-      final tokens = name.split(RegExp(r'[\s\-_/]+'));
-      int score = 0;
-      for (final t in tokens) {
-        if (t.length >= 4 && lower.contains(t)) score++;
-      }
-      if (score > highestFtScore) {
-        highestFtScore = score;
-        matchedFt = ft;
-      }
-    }
+    // 9. Fault Type Matching (preferring matching category)
+    final matchedFt = matchBestFaultType(lower, availableFaultTypes, category);
 
-    // 10. Tri-axial ODC (Object Part, Damage Mode, Root Cause)
-    String? matchedOdcObject;
-    String? matchedOdcDamage;
-    String? matchedOdcCause;
-    final List<String> matchedOdcDamages = [];
-    final List<String> matchedOdcCauses = [];
-
-    // Contextual detection for electric motor earth fault
-    if (lower.contains('motor') && (lower.contains('earth fault') || lower.contains('short circuit') || lower.contains('winding'))) {
-      matchedOdcObject = 'Stator Winding';
-      matchedOdcDamage = 'Insulation Breakdown & Earth Leakage';
-      matchedOdcCause = 'Winding Short Circuit to Ground / Moisture Degradation';
-      matchedOdcDamages.add('Insulation Breakdown & Earth Leakage');
-      matchedOdcDamages.add('Earth Fault Trip');
-      matchedOdcCauses.add('Winding Short Circuit to Ground / Moisture Degradation');
-    } else {
-      int highestOdcItemScore = 0;
-      for (final item in OdcCatalogData.allCatalog) {
-        int score = 0;
-        final objTokens = item.objectName.toLowerCase().split(RegExp(r'[\s\-_/()]+'));
-        for (final t in objTokens) {
-          if (t.length >= 4 && lower.contains(t)) score += 3;
-        }
-        final dmgTokens = item.damageName.toLowerCase().split(RegExp(r'[\s\-_/()]+'));
-        for (final t in dmgTokens) {
-          if (t.length >= 4 && lower.contains(t)) score += 2;
-        }
-        final cauTokens = item.causeName.toLowerCase().split(RegExp(r'[\s\-_/()]+'));
-        for (final t in cauTokens) {
-          if (t.length >= 4 && lower.contains(t)) score += 2;
-        }
-
-        if (score > highestOdcItemScore) {
-          highestOdcItemScore = score;
-          matchedOdcObject = item.objectName;
-          matchedOdcDamage = item.damageName;
-          matchedOdcCause = item.causeName;
-        }
-      }
-      if (matchedOdcDamage != null) matchedOdcDamages.add(matchedOdcDamage);
-      if (matchedOdcCause != null) matchedOdcCauses.add(matchedOdcCause);
-    }
+    // 10. Tri-axial ODC (snapped to live Firestore availableOdcCauses when present)
+    final odcMatch = matchBestOdc(
+      lower,
+      availableOdcCauses,
+      category,
+      preferredObject: (lower.contains('motor') && (lower.contains('earth fault') || lower.contains('short circuit') || lower.contains('winding')))
+          ? 'Stator Winding'
+          : null,
+      preferredDamages: (lower.contains('motor') && (lower.contains('earth fault') || lower.contains('short circuit') || lower.contains('winding')))
+          ? ['Insulation Breakdown', 'Earth Fault']
+          : const [],
+      preferredCauses: (lower.contains('motor') && (lower.contains('earth fault') || lower.contains('short circuit') || lower.contains('winding')))
+          ? ['Short Circuit', 'Moisture', 'Insulation Degradation']
+          : const [],
+    );
+    final matchedOdcObject = odcMatch.objectPart;
+    final matchedOdcDamage = odcMatch.damages.isNotEmpty ? odcMatch.damages.first : null;
+    final matchedOdcCause = odcMatch.causes.isNotEmpty ? odcMatch.causes.first : null;
+    final List<String> matchedOdcDamages = odcMatch.damages;
+    final List<String> matchedOdcCauses = odcMatch.causes;
 
     // 11. Intelligent Problem vs Action Separation
     String problemDesc = normalized;
@@ -622,22 +576,27 @@ OUTPUT MUST BE VALID JSON ONLY:
   }
 
   ParsedFaultLogDraft _buildDraftFromMap({
+    required String rawPrompt,
     required Map<String, dynamic> map,
     required List<MasterEquipmentModel> availableEquipments,
     required List<AssetModel> availableSubAssets,
     required List<Map<String, dynamic>> availableFaultTypes,
     required List<Map<String, dynamic>> availableOdcCauses,
+    String? usedModel,
   }) {
-    final eqId = map['matchedEquipmentId']?.toString();
-    MasterEquipmentModel? matchedEq;
-    if (eqId != null && eqId.isNotEmpty) {
-      for (final e in availableEquipments) {
-        if (e.id == eqId || e.id.toLowerCase() == eqId.toLowerCase() || e.name.toLowerCase().contains(eqId.toLowerCase())) {
-          matchedEq = e;
-          break;
-        }
-      }
-    }
+    final normalizedLower = normalizeIndustrialText(rawPrompt).toLowerCase();
+
+    final matchedEq = matchBestEquipment(
+      normalizedLower,
+      availableEquipments,
+      preferredId: map['matchedEquipmentId']?.toString(),
+    );
+
+    final matchedAsset = matchBestSubAsset(
+      normalizedLower,
+      availableSubAssets,
+      preferredId: map['matchedSubAssetId']?.toString(),
+    );
 
     final catStr = (map['category'] ?? 'electrical').toString().toLowerCase();
     final cat = FaultCategory.values.firstWhere(
@@ -662,16 +621,12 @@ OUTPUT MUST BE VALID JSON ONLY:
         ? FaultStatus.closed
         : FaultStatus.pending;
 
-    final ftId = map['matchedFaultTypeId']?.toString();
-    Map<String, dynamic>? matchedFt;
-    if (ftId != null && ftId.isNotEmpty) {
-      for (final f in availableFaultTypes) {
-        if (f['id'] == ftId) {
-          matchedFt = f;
-          break;
-        }
-      }
-    }
+    final matchedFt = matchBestFaultType(
+      normalizedLower,
+      availableFaultTypes,
+      cat,
+      preferredId: map['matchedFaultTypeId']?.toString(),
+    );
 
     final odcObj = map['odcObject']?.toString();
     final odcDam = map['odcDamage']?.toString();
@@ -681,26 +636,264 @@ OUTPUT MUST BE VALID JSON ONLY:
     if (rawDamages.isEmpty && odcDam != null && odcDam.isNotEmpty) rawDamages.add(odcDam);
     if (rawCauses.isEmpty && odcCas != null && odcCas.isNotEmpty) rawCauses.add(odcCas);
 
+    final snappedOdc = matchBestOdc(
+      normalizedLower,
+      availableOdcCauses,
+      cat,
+      preferredObject: odcObj,
+      preferredDamages: rawDamages,
+      preferredCauses: rawCauses,
+    );
+
+    final finalDamages = snappedOdc.damages.isNotEmpty ? snappedOdc.damages : rawDamages;
+    final finalCauses = snappedOdc.causes.isNotEmpty ? snappedOdc.causes : rawCauses;
+    final finalObj = snappedOdc.objectPart ?? odcObj;
+
     return ParsedFaultLogDraft(
       equipmentId: matchedEq?.id,
       equipmentName: matchedEq?.name,
+      subAssetId: matchedAsset?.id,
+      subAssetName: matchedAsset?.tagNo,
       category: cat,
       priority: prio,
       shift: shift,
       problemDescription: map['problemDescription']?.toString() ?? '',
       actionTaken: map['actionTaken']?.toString() ?? '',
-      faultTypeId: matchedFt?['id'],
-      faultTypeName: matchedFt?['name'] ?? matchedFt?['faultTypeName'],
-      odcObject: odcObj,
-      odcDamage: odcDam ?? (rawDamages.isNotEmpty ? rawDamages.first : null),
-      odcCause: odcCas ?? (rawCauses.isNotEmpty ? rawCauses.first : null),
-      odcDamages: rawDamages,
-      odcCauses: rawCauses,
-      isOdcApplicable: map['isOdcApplicable'] == true || odcObj != null || odcCas != null || rawDamages.isNotEmpty,
+      faultTypeId: matchedFt?['id']?.toString(),
+      faultTypeName: (matchedFt?['name'] ?? matchedFt?['faultTypeName'])?.toString(),
+      odcObject: finalObj,
+      odcDamage: finalDamages.isNotEmpty ? finalDamages.first : odcDam,
+      odcCause: finalCauses.isNotEmpty ? finalCauses.first : odcCas,
+      odcDamages: finalDamages,
+      odcCauses: finalCauses,
+      isOdcApplicable: map['isOdcApplicable'] == true || finalObj != null || finalCauses.isNotEmpty || finalDamages.isNotEmpty,
       isOdcClosed: map['isOdcClosed'] == true || status == FaultStatus.closed,
       status: status,
-      downtimeMinutes: map['downtimeMinutes'] as int?,
+      downtimeMinutes: (map['downtimeMinutes'] as num?)?.toInt(),
       aiSummary: map['aiSummary']?.toString() ?? 'Auto-classified by AI Assistant',
+      usedModel: usedModel,
+    );
+  }
+
+  static bool _matchesCategory(String rawCat, FaultCategory target) {
+    final cat = rawCat.toLowerCase().trim();
+    if (cat.isEmpty || cat == 'all' || cat == 'generic') return true;
+    final cur = target.name.toLowerCase();
+    if (cat == cur) return true;
+    if (cur == 'instrumentation' && (cat == 'automation' || cat == 'inst')) return true;
+    return false;
+  }
+
+  static int _tokenOverlapScore(String textLower, String candidate) {
+    final tokens = candidate.toLowerCase().split(RegExp(r'[\s\-_/().,]+'));
+    int score = 0;
+    for (final t in tokens) {
+      if (t.length >= 3 && textLower.contains(t)) {
+        score += (t.length >= 5 ? 3 : 1);
+      }
+    }
+    return score;
+  }
+
+  static MasterEquipmentModel? matchBestEquipment(
+    String textLower,
+    List<MasterEquipmentModel> equipments, {
+    String? preferredId,
+  }) {
+    if (preferredId != null && preferredId.isNotEmpty && preferredId != 'null') {
+      final pLow = preferredId.toLowerCase();
+      for (final e in equipments) {
+        if (e.id == preferredId || e.id.toLowerCase() == pLow || e.name.toLowerCase() == pLow) {
+          return e;
+        }
+      }
+      for (final e in equipments) {
+        if (e.name.toLowerCase().contains(pLow) || pLow.contains(e.name.toLowerCase())) {
+          return e;
+        }
+      }
+    }
+    MasterEquipmentModel? best;
+    int bestScore = 0;
+    for (final eq in equipments) {
+      final score = _tokenOverlapScore(textLower, '${eq.name} ${eq.id}');
+      if (score > bestScore) {
+        bestScore = score;
+        best = eq;
+      }
+    }
+    return best;
+  }
+
+  static AssetModel? matchBestSubAsset(
+    String textLower,
+    List<AssetModel> subAssets, {
+    String? preferredId,
+  }) {
+    if (subAssets.isEmpty) return null;
+    if (preferredId != null && preferredId.isNotEmpty && preferredId != 'null') {
+      final pLow = preferredId.toLowerCase();
+      for (final a in subAssets) {
+        if (a.id == preferredId || a.id.toLowerCase() == pLow || a.tagNo.toLowerCase() == pLow) {
+          return a;
+        }
+      }
+    }
+    AssetModel? best;
+    int bestScore = 0;
+    for (final ast in subAssets) {
+      int score = 0;
+      final tag = ast.tagNo.toLowerCase();
+      final name = ast.name.toLowerCase();
+      final type = ast.type.name.toLowerCase();
+      if (tag.isNotEmpty && textLower.contains(tag)) score += 6;
+      if (name.isNotEmpty) score += _tokenOverlapScore(textLower, name);
+      if (textLower.contains(type)) score += 3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = ast;
+      }
+    }
+    return best;
+  }
+
+  static Map<String, dynamic>? matchBestFaultType(
+    String textLower,
+    List<Map<String, dynamic>> faultTypes,
+    FaultCategory category, {
+    String? preferredId,
+  }) {
+    if (faultTypes.isEmpty) return null;
+    final filtered = faultTypes.where((f) {
+      final c = (f['category'] ?? f['discipline'] ?? '').toString();
+      return _matchesCategory(c, category);
+    }).toList();
+    final pool = filtered.isNotEmpty ? filtered : faultTypes;
+
+    if (preferredId != null && preferredId.isNotEmpty && preferredId != 'null') {
+      final pLow = preferredId.toLowerCase();
+      for (final f in pool) {
+        final id = (f['id'] ?? '').toString();
+        final name = (f['name'] ?? f['faultTypeName'] ?? '').toString().toLowerCase();
+        if (id == preferredId || id.toLowerCase() == pLow || name == pLow) {
+          return f;
+        }
+      }
+    }
+
+    Map<String, dynamic>? best;
+    int bestScore = 0;
+    for (final f in pool) {
+      final name = (f['name'] ?? f['faultTypeName'] ?? f['id'] ?? '').toString();
+      final score = _tokenOverlapScore(textLower, name);
+      if (score > bestScore) {
+        bestScore = score;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  static ({String? objectPart, List<String> damages, List<String> causes}) matchBestOdc(
+    String textLower,
+    List<Map<String, dynamic>> availableOdcCauses,
+    FaultCategory category, {
+    String? preferredObject,
+    List<String> preferredDamages = const [],
+    List<String> preferredCauses = const [],
+  }) {
+    if (availableOdcCauses.isNotEmpty) {
+      final filtered = availableOdcCauses.where((o) {
+        final c = (o['discipline'] ?? o['category'] ?? '').toString();
+        return _matchesCategory(c, category);
+      }).toList();
+      final pool = filtered.isNotEmpty ? filtered : availableOdcCauses;
+
+      final searchText = [
+        textLower,
+        if (preferredObject != null) preferredObject.toLowerCase(),
+        ...preferredDamages.map((e) => e.toLowerCase()),
+        ...preferredCauses.map((e) => e.toLowerCase()),
+      ].join(' ');
+
+      String? bestObj;
+      int bestObjScore = 0;
+      for (final item in pool) {
+        final obj = (item['objectPart'] ?? item['Object_Part'] ?? item['object'])?.toString().trim();
+        if (obj == null || obj.isEmpty) continue;
+        int score = _tokenOverlapScore(searchText, obj);
+        if (preferredObject != null && obj.toLowerCase() == preferredObject.toLowerCase()) {
+          score += 10;
+        }
+        if (score > bestObjScore) {
+          bestObjScore = score;
+          bestObj = obj;
+        }
+      }
+
+      final objPool = bestObj != null
+          ? pool.where((o) => (o['objectPart'] ?? o['Object_Part'] ?? o['object'])?.toString().trim() == bestObj).toList()
+          : pool;
+
+      String? bestDmg;
+      int bestDmgScore = 0;
+      for (final item in objPool) {
+        final dmg = (item['damage'] ?? item['Damage_Mode'] ?? item['damageMode'])?.toString().trim();
+        if (dmg == null || dmg.isEmpty) continue;
+        int score = _tokenOverlapScore(searchText, dmg);
+        for (final p in preferredDamages) {
+          if (dmg.toLowerCase() == p.toLowerCase()) score += 10;
+        }
+        if (score > bestDmgScore) {
+          bestDmgScore = score;
+          bestDmg = dmg;
+        }
+      }
+
+      final cauPool = bestDmg != null
+          ? objPool.where((o) => (o['damage'] ?? o['Damage_Mode'] ?? o['damageMode'])?.toString().trim() == bestDmg).toList()
+          : objPool;
+
+      String? bestCau;
+      int bestCauScore = 0;
+      for (final item in cauPool) {
+        final cau = (item['cause'] ?? item['Root_Cause'] ?? item['rootCause'] ?? item['name'])?.toString().trim();
+        if (cau == null || cau.isEmpty) continue;
+        int score = _tokenOverlapScore(searchText, cau);
+        for (final p in preferredCauses) {
+          if (cau.toLowerCase() == p.toLowerCase()) score += 10;
+        }
+        if (score > bestCauScore) {
+          bestCauScore = score;
+          bestCau = cau;
+        }
+      }
+
+      return (
+        objectPart: bestObj,
+        damages: bestDmg != null ? [bestDmg] : <String>[],
+        causes: bestCau != null ? [bestCau] : <String>[],
+      );
+    }
+
+    // Fallback to static OdcCatalogData if Firestore ODC catalog is empty
+    String? bestObj;
+    String? bestDmg;
+    String? bestCau;
+    int bestScore = 0;
+    for (final item in OdcCatalogData.allCatalog) {
+      final score = _tokenOverlapScore(textLower, '${item.objectName} ${item.damageName} ${item.causeName}');
+      if (score > bestScore) {
+        bestScore = score;
+        bestObj = item.objectName;
+        bestDmg = item.damageName;
+        bestCau = item.causeName;
+      }
+    }
+    return (
+      objectPart: bestObj ?? preferredObject,
+      damages: bestDmg != null ? [bestDmg] : preferredDamages,
+      causes: bestCau != null ? [bestCau] : preferredCauses,
     );
   }
 }

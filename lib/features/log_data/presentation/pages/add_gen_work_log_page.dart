@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../../core/widgets/gemini_settings_dialog.dart';
 import '../../../../core/constants/app_roles.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/firestore_service.dart';
@@ -708,7 +708,11 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
             children: [
               const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 20),
               const SizedBox(width: 8),
-              Text('AI successfully extracted ${_equipmentBlocks.length} equipment work blocks!'),
+              Text(
+                draft.usedModel != null
+                    ? 'Gemini (${draft.usedModel}) extracted & classified ${_equipmentBlocks.length} equipment work blocks!'
+                    : 'Offline NLP extracted & classified ${_equipmentBlocks.length} equipment work blocks!',
+              ),
             ],
           ),
           backgroundColor: const Color(0xFF1E293B),
@@ -726,160 +730,8 @@ class _AddGenWorkLogPageState extends State<AddGenWorkLogPage> {
   }
 
   // --- GEMINI API KEY SETTINGS DIALOG ---
-  void _showApiKeyDialog() async {
-    final aiService = AiFaultLogService();
-    final prefs = await SharedPreferences.getInstance();
-    final savedKey = prefs.getString('gemini_ai_api_key') ?? '';
-    final isDevKey = savedKey.isEmpty;
-    final devEnabled = await aiService.getDeveloperKeyEnabled();
-
-    final controller = TextEditingController(text: savedKey);
-    bool localDevEnabled = devEnabled;
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Row(
-            children: [
-              Icon(Icons.psychology_rounded, color: Colors.purpleAccent, size: 22),
-              SizedBox(width: 8),
-              Text('AI Engine Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: SizedBox(
-            width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDevKey
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDevKey ? Colors.green.withValues(alpha: 0.3) : Colors.blue.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isDevKey ? Icons.developer_mode_rounded : Icons.vpn_key_rounded,
-                            size: 16,
-                            color: isDevKey ? Colors.greenAccent : Colors.blueAccent,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isDevKey ? 'Using Developer Key (Shared)' : 'Using Your Personal API Key',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: isDevKey ? Colors.greenAccent : Colors.blueAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isDevKey
-                            ? 'The developer key is shared & rate-limited. For unlimited usage, get your free personal key from aistudio.google.com'
-                            : 'You have configured your own Gemini API key. Full AI capabilities enabled.',
-                        style: const TextStyle(fontSize: 11, height: 1.4),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (isDevKey) ...[
-                  SwitchListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Use Developer Shared Key', style: TextStyle(fontSize: 13)),
-                    subtitle: const Text('Enable Gemini AI without a personal key', style: TextStyle(fontSize: 11)),
-                    value: localDevEnabled,
-                    activeThumbColor: Colors.greenAccent,
-                    onChanged: (v) => setDialogState(() => localDevEnabled = v),
-                  ),
-                  const Divider(),
-                ],
-                const Text(
-                  'Your Personal API Key (optional)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: controller,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Google Gemini API Key',
-                    hintText: 'AIzaSy... (leave blank to use developer key)',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '🔗 Get free key at aistudio.google.com',
-                  style: TextStyle(fontSize: 11, color: Colors.blueAccent, decoration: TextDecoration.underline),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            if (savedKey.isNotEmpty)
-              TextButton(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  await aiService.saveApiKey('');
-                  await aiService.setDeveloperKeyEnabled(true);
-                  await _checkApiKey();
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Personal key cleared. Switched to developer key.'), backgroundColor: Colors.orange),
-                    );
-                  }
-                },
-                child: const Text('Clear Key', style: TextStyle(color: Colors.red, fontSize: 12)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                final newKey = controller.text.trim();
-                await aiService.saveApiKey(newKey);
-                await aiService.setDeveloperKeyEnabled(localDevEnabled);
-                await _checkApiKey();
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  final msg = newKey.isNotEmpty
-                      ? 'Personal Gemini API Key saved. Full Cloud AI activated!'
-                      : localDevEnabled
-                          ? 'Using shared Developer Key. Cloud AI enabled!'
-                          : 'AI key cleared. Using Offline NLP mode.';
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(msg), backgroundColor: Colors.green),
-                  );
-                }
-              },
-              child: const Text('Save Settings'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showApiKeyDialog() {
+    showGeminiSettingsDialog(context, onUpdated: _checkApiKey);
   }
 
   // --- SELECTION MODAL: ENGINEERS ---
